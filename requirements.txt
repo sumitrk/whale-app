@@ -1,0 +1,7 @@
+sounddevice
+numpy
+scipy
+mlx-whisper
+anthropic
+pynput
+python-dotenv
