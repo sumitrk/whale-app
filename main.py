@@ -280,7 +280,19 @@ def main() -> None:
     _print_listening()
     print("Tip: If ⌘⇧R doesn't respond → System Settings → Privacy & Security → Accessibility → enable Terminal")
 
-    with keyboard.GlobalHotKeys({"<cmd>+<shift>+r": toggle_recording}) as listener:
+    # GlobalHotKeys is broken on Python 3.13 — use Listener with manual combo detection
+    pressed: set = set()
+
+    def on_press(key):
+        pressed.add(key)
+        combo = {keyboard.Key.cmd, keyboard.Key.shift, keyboard.KeyCode.from_char('r')}
+        if combo.issubset(pressed):
+            toggle_recording()
+
+    def on_release(key):
+        pressed.discard(key)
+
+    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
         listener.join()
 
 

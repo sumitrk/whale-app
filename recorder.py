@@ -11,7 +11,6 @@ import sounddevice as sd
 from scipy.io import wavfile
 
 SAMPLE_RATE = 16_000
-CHANNELS = 1
 DTYPE = "int16"
 
 
@@ -51,11 +50,13 @@ class Recorder:
         self._stop_event.clear()
 
         device_index = find_device_index(self._device_name)
-        print(f"Audio device: {sd.query_devices()[device_index]['name']} (index {device_index})")
+        device_info = sd.query_devices()[device_index]
+        num_channels = device_info["max_input_channels"]
+        print(f"Audio device: {device_info['name']} (index {device_index}, {num_channels} channels)")
 
         self._stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
-            channels=CHANNELS,
+            channels=num_channels,
             dtype=DTYPE,
             device=device_index,
             callback=self._audio_callback,
@@ -127,7 +128,8 @@ class Recorder:
                 self._write_chunk(final, chunk_index)
 
     def _write_chunk(self, audio: np.ndarray, chunk_index: int) -> None:
-        audio_mono = audio.flatten()  # (N, 1) → (N,) for mono
+        # Mix all channels down to mono (handles 1-ch, 2-ch, or 4-ch aggregate)
+        audio_mono = audio.mean(axis=1).astype(np.int16)
         path = self._session_dir / f"chunk_{chunk_index:03d}.wav"
         wavfile.write(str(path), SAMPLE_RATE, audio_mono)
         self._chunk_paths.append(path)
