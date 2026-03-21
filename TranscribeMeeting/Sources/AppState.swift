@@ -55,7 +55,7 @@ class AppState: ObservableObject {
             }
         )
 
-        requestAccessibility()
+        requestAccessibilityOnce()
     }
 
     var isReady: Bool { status == .ready }
@@ -94,7 +94,7 @@ class AppState: ObservableObject {
             isRecording = true
             status = .recording
             recordingStartedAt = Date()
-            playSound("Tink")  // start cue
+            playSound("Blow")  // start cue
         } catch {
             status = .error(error.localizedDescription)
         }
@@ -118,7 +118,7 @@ class AppState: ObservableObject {
             case .paste:
                 // PTT: just paste the raw transcript, no markdown file
                 status = .ready
-                playSound("Glass")  // done cue — transcription complete
+                playSound("Bottle")  // done cue — transcription complete
                 copyAndPaste(rawTranscript)
                 // Delete the WAV — nothing to keep
                 try? FileManager.default.removeItem(at: wavURL)
@@ -148,7 +148,7 @@ class AppState: ObservableObject {
 
                 lastMeetingPath = mdURL.path
                 status = .ready
-                playSound("Glass")  // done cue
+                playSound("Bottle")  // done cue
 
                 NSWorkspace.shared.selectFile(mdURL.path, inFileViewerRootedAtPath: "")
             }
@@ -172,30 +172,44 @@ class AppState: ObservableObject {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         print("Copied to clipboard (\(text.count) chars)")
+        print("AXIsProcessTrusted = \(AXIsProcessTrusted())")
 
-        guard AXIsProcessTrusted() else {
-            print("Accessibility not granted — clipboard only")
-            return
+        // Small delay to let the pasteboard settle, then simulate ⌘V
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            let src = CGEventSource(stateID: .combinedSessionState)
+
+            // Key down
+            let down = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: true)
+            down?.flags = .maskCommand
+            down?.post(tap: .cghidEventTap)
+
+            // Brief gap between down/up for the target app to process
+            usleep(10_000)  // 10ms
+
+            // Key up
+            let up = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: false)
+            up?.flags = .maskCommand
+            up?.post(tap: .cghidEventTap)
+
+            print("Auto-paste attempted via ⌘V (events created: down=\(down != nil), up=\(up != nil))")
         }
-
-        let src  = CGEventSource(stateID: .hidSystemState)
-        let down = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: true)
-        let up   = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: false)
-        down?.flags = .maskCommand
-        up?.flags   = .maskCommand
-        down?.post(tap: .cgAnnotatedSessionEventTap)
-        up?.post(tap: .cgAnnotatedSessionEventTap)
-        print("Auto-pasted via ⌘V")
     }
 
     // MARK: - Accessibility
 
-    var canAutoPaste: Bool { AXIsProcessTrusted() }
+    /// Prompt for Accessibility only on the very first launch.
+    /// Subsequent launches skip the prompt — the TCC entry persists
+    /// even if AXIsProcessTrusted() returns false due to debug-build
+    /// code-signature hash changes.
+    private func requestAccessibilityOnce() {
+        let key = "hasPromptedAccessibility"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
 
-    func requestAccessibility() {
-        guard !AXIsProcessTrusted() else { return }
-        let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(opts)
+        if !AXIsProcessTrusted() {
+            let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            AXIsProcessTrustedWithOptions(opts)
+        }
     }
 
     // MARK: - Markdown builder

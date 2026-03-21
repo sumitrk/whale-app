@@ -11,7 +11,8 @@ settings:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "14.2"
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: "WXZ5N9S74R"
+    DEVELOPMENT_TEAM: "G6Z6DNHM33"
+    OTHER_CODE_SIGN_FLAGS: '--requirements "=designated => identifier \"com.sumitrk.transcribe-meeting\" and anchor apple generic and certificate leaf[subject.OU] = \"G6Z6DNHM33\""'
 
 targets:
   TranscribeMeeting:
