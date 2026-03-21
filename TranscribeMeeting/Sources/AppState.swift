@@ -193,6 +193,7 @@ class AppState: ObservableObject {
     var canAutoPaste: Bool { AXIsProcessTrusted() }
 
     func requestAccessibility() {
+        guard !AXIsProcessTrusted() else { return }
         let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
         AXIsProcessTrustedWithOptions(opts)
     }
