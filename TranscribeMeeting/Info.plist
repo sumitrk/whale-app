@@ -15,7 +15,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
+    <string>14.2</string>
 
     <!-- Hide from Dock and App Switcher — menu bar only -->
     <key>LSUIElement</key>
@@ -24,7 +24,5 @@
     <!-- Permission descriptions (shown in system prompts) -->
     <key>NSMicrophoneUsageDescription</key>
     <string>TranscribeMeeting records your microphone during meetings.</string>
-    <key>NSScreenCaptureUsageDescription</key>
-    <string>TranscribeMeeting captures audio from meeting apps like Google Meet and Zoom.</string>
 </dict>
 </plist>

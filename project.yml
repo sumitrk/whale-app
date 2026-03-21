@@ -2,14 +2,14 @@ name: TranscribeMeeting
 options:
   bundleIdPrefix: com.sumitrk
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "14.2"
   defaultConfig: Debug
 
 settings:
   base:
     PRODUCT_NAME: TranscribeMeeting
     SWIFT_VERSION: "5.9"
-    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.2"
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ""  # XcodeGen will use your default team
 
@@ -29,7 +29,8 @@ targets:
         # Hide dock icon — menu bar only
         LSUIElement: YES
     dependencies:
-      - sdk: ScreenCaptureKit.framework
+      - sdk: CoreAudio.framework
+      - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
     entitlements:
       path: TranscribeMeeting/TranscribeMeeting.entitlements

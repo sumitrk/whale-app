@@ -1,8 +1,5 @@
 import AppKit
-import AVFoundation
-import CoreGraphics
 import Foundation
-import ScreenCaptureKit
 
 enum AppStatus: Equatable {
     case starting
@@ -27,7 +24,6 @@ class AppState: ObservableObject {
 
     init() {
         Task {
-            await requestPermissions()
             await startServer()
         }
     }
@@ -113,34 +109,6 @@ class AppState: ObservableObject {
         f.dateStyle = .medium
         f.timeStyle = .short
         return f.string(from: date)
-    }
-
-    // MARK: - Permissions
-
-    private func requestPermissions() async {
-        // Screen capture — triggers the system "Allow screen recording?" dialog if not yet granted.
-        // CGRequestScreenCaptureAccess() is a blocking call so we hop off the main actor briefly.
-        let hasScreen = await Task.detached(priority: .userInitiated) {
-            CGRequestScreenCaptureAccess()
-        }.value
-
-        if !hasScreen {
-            status = .error("Screen recording permission denied. Enable it in System Settings → Privacy → Screen & System Audio Recording, then relaunch.")
-            return
-        }
-
-        // Microphone — AVAudioEngine will surface its own prompt, but we pre-check here
-        // so the status reflects any denial early.
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
-            break
-        case .notDetermined:
-            _ = await AVCaptureDevice.requestAccess(for: .audio)
-        case .denied, .restricted:
-            status = .error("Microphone permission denied. Enable it in System Settings → Privacy → Microphone, then relaunch.")
-        @unknown default:
-            break
-        }
     }
 
     // MARK: - Server startup
