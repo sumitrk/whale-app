@@ -87,7 +87,7 @@ class AppState: ObservableObject {
 
     // MARK: - Recording core
 
-    func startRecording(mode: RecordingMode) async {
+    fileprivate func startRecording(mode: RecordingMode) async {
         do {
             currentMode = mode
             try await recorder.startRecording()
