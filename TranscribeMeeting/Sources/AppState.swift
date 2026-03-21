@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Foundation
 
 enum AppStatus: Equatable {
@@ -34,7 +35,25 @@ class AppState: ObservableObject {
 
     init() {
         Task { await startServer() }
+
+        // ⌘⇧T — toggle recording
         hotkey.start { [weak self] in self?.toggleRecording() }
+
+        // Fn (hold) — push-to-talk: start on press, stop on release
+        hotkey.startPushToTalk(
+            onPress: { [weak self] in
+                guard let self, !self.isRecording else { return }
+                Task { await self.startRecording() }
+            },
+            onRelease: { [weak self] in
+                guard let self, self.isRecording else { return }
+                Task { await self.stopRecording() }
+            }
+        )
+
+        // Request Accessibility permission so we can auto-paste after transcription.
+        // Without it we fall back to clipboard-only.
+        requestAccessibilityIfNeeded()
     }
 
     var isReady: Bool { status == .ready }
@@ -42,8 +61,8 @@ class AppState: ObservableObject {
     var statusLabel: String {
         switch status {
         case .starting:      return "Starting server…"
-        case .ready:         return "Ready  (⌘⇧T to record)"
-        case .recording:     return "Recording…  (⌘⇧T to stop)"
+        case .ready:         return "Ready  (⌘⇧T or hold Fn)"
+        case .recording:     return "Recording…  (⌘⇧T or release Fn)"
         case .transcribing:  return "Transcribing…"
         case .summarising:   return "Summarising…"
         case .error(let m):  return "Error: \(m)"
@@ -60,7 +79,7 @@ class AppState: ObservableObject {
         }
     }
 
-    private func startRecording() async {
+    func startRecording() async {
         do {
             try await recorder.startRecording()
             isRecording = true
@@ -71,7 +90,7 @@ class AppState: ObservableObject {
         }
     }
 
-    private func stopRecording() async {
+    func stopRecording() async {
         let startedAt = recordingStartedAt ?? Date()
         isRecording = false
         status = .transcribing
@@ -89,9 +108,11 @@ class AppState: ObservableObject {
             let mdURL = wavURL.deletingPathExtension().appendingPathExtension("md")
 
             // 3. Claude summarisation (skipped gracefully if no API key)
+            let pasteText: String  // what goes into clipboard / gets pasted
             let md: String
             if anthropicApiKey.isEmpty {
-                print("No API key set — skipping summarisation. Set via: defaults write com.sumitrk.transcribe-meeting anthropicApiKey \"sk-ant-...\"")
+                print("No API key — skipping summarisation")
+                pasteText = rawTranscript
                 md = buildMarkdown(date: startedAt, duration: duration,
                                    cleanedTranscript: rawTranscript, summary: nil)
             } else {
@@ -99,6 +120,7 @@ class AppState: ObservableObject {
                 let result = try await client.summarise(transcript: rawTranscript,
                                                         apiKey: anthropicApiKey)
                 print("Summary ready")
+                pasteText = result.cleaned_transcript
                 md = buildMarkdown(date: startedAt, duration: duration,
                                    cleanedTranscript: result.cleaned_transcript,
                                    summary: result.summary)
@@ -111,7 +133,10 @@ class AppState: ObservableObject {
             lastMeetingPath = mdURL.path
             status = .ready
 
-            // 5. Reveal in Finder
+            // 5. Copy transcript to clipboard + auto-paste into active input
+            copyAndPaste(pasteText)
+
+            // 6. Reveal in Finder
             NSWorkspace.shared.selectFile(mdURL.path, inFileViewerRootedAtPath: "")
 
         } catch {
@@ -119,6 +144,46 @@ class AppState: ObservableObject {
             status = .error(error.localizedDescription)
             print("Recording error: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Clipboard + paste
+
+    /// Copies `text` to the system clipboard, then simulates ⌘V to paste it
+    /// into whatever app/input is currently focused.
+    ///
+    /// Auto-paste requires Accessibility permission. If it hasn't been granted,
+    /// the text is still on the clipboard so the user can paste manually.
+    private func copyAndPaste(_ text: String) {
+        // Always copy to clipboard — no permission needed
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        print("Copied to clipboard (\(text.count) chars)")
+
+        guard AXIsProcessTrusted() else {
+            print("Accessibility not granted — clipboard only (grant in System Settings > Privacy & Security > Accessibility)")
+            return
+        }
+
+        // Simulate ⌘V into the currently focused app.
+        // Our app is LSUIElement (no dock icon, never steals focus), so the
+        // user's active window/input field remains focused throughout recording.
+        let src  = CGEventSource(stateID: .hidSystemState)
+        let down = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: true)
+        let up   = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: false)
+        down?.flags = .maskCommand
+        up?.flags   = .maskCommand
+        down?.post(tap: .cgAnnotatedSessionEventTap)
+        up?.post(tap: .cgAnnotatedSessionEventTap)
+        print("Auto-pasted via ⌘V")
+    }
+
+    // MARK: - Accessibility
+
+    private func requestAccessibilityIfNeeded() {
+        guard !AXIsProcessTrusted() else { return }
+        // Shows the system prompt directing the user to System Settings > Accessibility
+        let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(opts)
     }
 
     // MARK: - Markdown builder
