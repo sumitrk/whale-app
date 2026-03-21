@@ -12,7 +12,7 @@ struct MenuBarView: View {
 
         // Start / Stop recording  (also triggered by ⌘⇧T globally)
         Button(appState.isRecording ? "Stop Recording" : "Start Recording") {
-            appState.toggleRecording()
+            appState.toggleMarkdown()
         }
         .keyboardShortcut("t", modifiers: [.command, .shift])
         .disabled(!appState.isReady && !appState.isRecording)
