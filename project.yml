@@ -41,6 +41,7 @@ targets:
           if [ -d "$BINARY_DIR" ]; then
             echo "Bundling Python server binary from $BINARY_DIR"
             rm -rf "$DEST"
+            mkdir -p "$(dirname "$DEST")"
             cp -r "$BINARY_DIR" "$DEST"
           else
             echo "No dist/transcribe_server found — app will use Python fallback (dev mode)"
