@@ -64,7 +64,7 @@ struct ModelSettingsView: View {
 
     private func download(_ model: ModelInfo) async {
         downloading.insert(model.id)
-        downloadProgress[model.id] = 0.0
+        // Don't pre-set 0.0 — show indeterminate spinner until real progress arrives
         defer {
             downloading.remove(model.id)
             downloadProgress.removeValue(forKey: model.id)
@@ -106,7 +106,8 @@ struct ModelSettingsView: View {
         struct Resp: Decodable { let percent: Double }
         guard let (data, _) = try? await URLSession.shared.data(from: url),
               let resp = try? JSONDecoder().decode(Resp.self, from: data) else { return }
-        downloadProgress[modelId] = resp.percent
+        // Only switch to determinate bar once real bytes are detected
+        if resp.percent > 0.01 { downloadProgress[modelId] = resp.percent }
     }
 }
 

@@ -286,7 +286,6 @@ private struct ModelStep: View {
 
     private func download(_ model: ModelInfo) async {
         downloading.insert(model.id)
-        downloadProgress[model.id] = 0.0
         defer {
             downloading.remove(model.id)
             downloadProgress.removeValue(forKey: model.id)
@@ -332,7 +331,7 @@ private struct ModelStep: View {
         struct Resp: Decodable { let percent: Double }
         guard let (data, _) = try? await URLSession.shared.data(from: url),
               let resp = try? JSONDecoder().decode(Resp.self, from: data) else { return }
-        downloadProgress[modelId] = resp.percent
+        if resp.percent > 0.01 { downloadProgress[modelId] = resp.percent }
     }
 }
 

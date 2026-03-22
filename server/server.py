@@ -115,13 +115,22 @@ async def download_model(model_id: str = Form(...)):
     def track():
         cache_key = "models--" + model_id.replace("/", "--")
         cache_path = _HF_CACHE / cache_key
+        # hf-transfer writes to a tmp dir outside cache; also check system tmp
+        tmp_path = Path(tempfile.gettempdir())
         while not _download_progress[model_id]["done"]:
-            if cache_path.exists():
-                try:
-                    size = sum(f.stat().st_size for f in cache_path.rglob("*") if f.is_file())
+            try:
+                size = 0
+                # Cache dir (regular downloads use .incomplete files here)
+                if cache_path.exists():
+                    size += sum(f.stat().st_size for f in cache_path.rglob("*") if f.is_file())
+                # hf-transfer tmp files (named with model hash fragments)
+                for f in tmp_path.glob("*.incomplete"):
+                    try: size += f.stat().st_size
+                    except Exception: pass
+                if size > 0:
                     _download_progress[model_id]["downloaded_mb"] = min(size / (1024 * 1024), total_mb)
-                except Exception:
-                    pass
+            except Exception:
+                pass
             time.sleep(0.5)
 
     tracker = threading.Thread(target=track, daemon=True)
