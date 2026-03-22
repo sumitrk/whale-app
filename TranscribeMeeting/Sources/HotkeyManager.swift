@@ -12,12 +12,14 @@ final class HotkeyManager {
     private var toggleMonitor: Any?
     private var pttMonitor: Any?
 
-    // MARK: - Toggle mode (⌘⇧T)
+    // MARK: - Toggle mode (configurable, default ⌘⇧T)
 
-    func start(onTrigger: @escaping @MainActor () -> Void) {
+    func start(keyCode: Int, modifiers: NSEvent.ModifierFlags,
+               onTrigger: @escaping @MainActor () -> Void) {
+        if let m = toggleMonitor { NSEvent.removeMonitor(m) }
         toggleMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard flags == [.command, .shift], event.keyCode == 17 else { return }
+            guard flags == modifiers, event.keyCode == UInt16(keyCode) else { return }
             Task { @MainActor in onTrigger() }
         }
     }

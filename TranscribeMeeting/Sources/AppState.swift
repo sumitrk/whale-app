@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import CoreGraphics
 import Foundation
 
@@ -28,11 +29,8 @@ class AppState: ObservableObject {
     let client   = TranscribeClient()
     let hotkey   = HotkeyManager()
 
-    var whisperModel: String = "mlx-community/whisper-large-v3-turbo"
-
-    var anthropicApiKey: String {
-        UserDefaults.standard.string(forKey: "anthropicApiKey") ?? ""
-    }
+    private let settings = SettingsStore.shared
+    private var cancellables = Set<AnyCancellable>()
 
     private var recordingStartedAt: Date?
     private var currentMode: RecordingMode = .markdown
@@ -40,8 +38,15 @@ class AppState: ObservableObject {
     init() {
         Task { await startServer() }
 
-        // ⌘⇧T — toggle: full markdown pipeline
-        hotkey.start { [weak self] in self?.toggleMarkdown() }
+        // ⌘⇧T (or user-configured combo) — toggle: full markdown pipeline
+        restartToggleHotkey()
+
+        // React to key combo changes in Settings
+        Publishers.CombineLatest(settings.$toggleKeyCode, settings.$toggleModifiers)
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _, _ in self?.restartToggleHotkey() }
+            .store(in: &cancellables)
 
         // Fn (hold) — push-to-talk: paste only, no markdown
         hotkey.startPushToTalk(
@@ -71,6 +76,15 @@ class AppState: ObservableObject {
         case .transcribing:  return "Transcribing…"
         case .summarising:   return "Summarising…"
         case .error(let m):  return "Error: \(m)"
+        }
+    }
+
+    // MARK: - Hotkey setup
+
+    private func restartToggleHotkey() {
+        let flags = NSEvent.ModifierFlags(rawValue: UInt(settings.toggleModifiers))
+        hotkey.start(keyCode: settings.toggleKeyCode, modifiers: flags) { [weak self] in
+            self?.toggleMarkdown()
         }
     }
 
@@ -112,37 +126,41 @@ class AppState: ObservableObject {
             let wavURL = try await recorder.stopRecording()
             print("WAV saved: \(wavURL.path)")
 
-            let rawTranscript = try await client.transcribe(wavURL: wavURL, model: whisperModel)
+            let rawTranscript = try await client.transcribe(wavURL: wavURL, model: settings.activeModelId)
             print("Transcript ready (\(rawTranscript.count) chars)")
 
             switch mode {
 
             case .paste:
-                // PTT: just paste the raw transcript, no markdown file
                 status = .ready
-                playSound("Bottle")  // done cue — transcription complete
+                playSound("Bottle")
                 copyAndPaste(rawTranscript)
-                // Delete the WAV — nothing to keep
                 try? FileManager.default.removeItem(at: wavURL)
 
             case .markdown:
-                // Toggle: full pipeline — Claude → .md → Finder
                 let duration = Int(Date().timeIntervalSince(startedAt) / 60)
-                let mdURL = wavURL.deletingPathExtension().appendingPathExtension("md")
+                let saveURL  = settings.transcriptFolder
+                let stamp    = ISO8601DateFormatter().string(from: startedAt)
+                    .replacingOccurrences(of: ":", with: "-")
+                    .replacingOccurrences(of: "T", with: "_")
+                    .replacingOccurrences(of: "Z", with: "")
+                let mdURL = saveURL.appendingPathComponent("transcript-\(stamp).md")
 
                 let md: String
-                if anthropicApiKey.isEmpty {
-                    print("No API key — skipping summarisation")
-                    md = buildMarkdown(date: startedAt, duration: duration,
-                                       cleanedTranscript: rawTranscript, summary: nil)
-                } else {
+                if settings.aiEnabled && !settings.aiApiKey.isEmpty {
                     status = .summarising
-                    let result = try await client.summarise(transcript: rawTranscript,
-                                                            apiKey: anthropicApiKey)
+                    let result = try await client.summarise(
+                        transcript: rawTranscript,
+                        apiKey:     settings.aiApiKey,
+                        provider:   settings.aiProvider
+                    )
                     print("Summary ready")
                     md = buildMarkdown(date: startedAt, duration: duration,
                                        cleanedTranscript: result.cleaned_transcript,
                                        summary: result.summary)
+                } else {
+                    md = buildMarkdown(date: startedAt, duration: duration,
+                                       cleanedTranscript: rawTranscript, summary: nil)
                 }
 
                 try md.write(to: mdURL, atomically: true, encoding: .utf8)
@@ -150,7 +168,7 @@ class AppState: ObservableObject {
 
                 lastMeetingPath = mdURL.path
                 status = .ready
-                playSound("Bottle")  // done cue
+                playSound("Bottle")
 
                 NSWorkspace.shared.selectFile(mdURL.path, inFileViewerRootedAtPath: "")
             }
@@ -253,7 +271,7 @@ class AppState: ObservableObject {
                                cleanedTranscript: String, summary: String?) -> String {
         var sections: [String] = [
             "# Meeting — \(formattedDate(date))",
-            "**Duration:** ~\(max(1, duration)) min  |  **Model:** \(whisperModel)",
+            "**Duration:** ~\(max(1, duration)) min  |  **Model:** \(settings.activeModelId)",
         ]
         if let summary { sections += ["", summary] }
         sections += ["", "## Transcript", "", cleanedTranscript]

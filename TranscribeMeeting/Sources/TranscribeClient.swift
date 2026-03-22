@@ -45,13 +45,13 @@ struct TranscribeClient {
 
     /// POST /summarise — send transcript, get cleaned text + summary
     func summarise(transcript: String, apiKey: String,
-                   model: String = "claude-sonnet-4-6") async throws -> SummariseResponse {
+                   provider: String = "anthropic") async throws -> SummariseResponse {
         let endpoint = baseURL.appendingPathComponent("summarise")
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body = SummariseRequest(transcript: transcript, api_key: apiKey, model: model)
+        let body = SummariseRequest(transcript: transcript, api_key: apiKey, provider: provider)
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -71,7 +71,7 @@ private struct TranscribeResponse: Decodable { let transcript: String }
 private struct SummariseRequest: Encodable {
     let transcript: String
     let api_key: String
-    let model: String
+    let provider: String
 }
 
 struct SummariseResponse: Decodable {
