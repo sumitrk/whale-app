@@ -393,6 +393,31 @@ private struct TryItStep: View {
                                 .onAppear { pttRecorderAutoStart = false }
                             }
                         }
+
+                        Divider()
+
+                        // ── Test box ──────────────────────────────────────
+                        VStack(alignment: .leading, spacing: 6) {
+                            ZStack(alignment: .topLeading) {
+                                TextEditor(text: $previewText)
+                                    .font(.body)
+                                    .scrollContentBackground(.hidden)
+                                    .padding(6)
+                                if previewText.isEmpty {
+                                    Text("Transcript will appear here…")
+                                        .foregroundStyle(.tertiary)
+                                        .padding(12)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .frame(height: 80)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
+
+                            Label("Click outside this window, hold **\(store.pttKeyLabel)**, speak, release — transcript appears above without pasting.", systemImage: "info.circle")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -437,30 +462,6 @@ private struct TryItStep: View {
                     }
                 }
 
-                // ── Test area ─────────────────────────────────────────────
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Test it out").fontWeight(.semibold)
-
-                    ZStack(alignment: .topLeading) {
-                        TextEditor(text: $previewText)
-                            .font(.body)
-                            .scrollContentBackground(.hidden)
-                            .padding(6)
-                        if previewText.isEmpty {
-                            Text("Transcript will appear here…")
-                                .foregroundStyle(.tertiary)
-                                .padding(12)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    .frame(height: 90)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
-
-                    Label("Click somewhere outside this window, hold **\(store.pttKeyLabel)**, speak, release — transcript appears above without pasting.", systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
             .padding(24)
         }
