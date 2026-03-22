@@ -33,3 +33,15 @@ targets:
       - sdk: CoreAudio.framework
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
+    postBuildScripts:
+      - name: Copy Python Server Binary (if built)
+        script: |
+          BINARY_DIR="${SRCROOT}/dist/transcribe_server"
+          DEST="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Resources/transcribe_server"
+          if [ -d "$BINARY_DIR" ]; then
+            echo "Bundling Python server binary from $BINARY_DIR"
+            rm -rf "$DEST"
+            cp -r "$BINARY_DIR" "$DEST"
+          else
+            echo "No dist/transcribe_server found — app will use Python fallback (dev mode)"
+          fi

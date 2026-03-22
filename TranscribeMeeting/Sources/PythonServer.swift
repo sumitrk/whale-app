@@ -11,22 +11,26 @@ class PythonServer {
         // Always kill any leftover process on this port so updated code always loads.
         killProcessOnPort(8765)
 
-        guard let serverScript = findServerScript() else {
+        let proc = Process()
+
+        if let bundledBinary = findBundledBinary() {
+            // Production: PyInstaller standalone binary bundled inside the .app
+            print("PythonServer: using bundled binary → \(bundledBinary)")
+            proc.executableURL = URL(fileURLWithPath: bundledBinary)
+            proc.arguments = []
+            proc.currentDirectoryURL = URL(fileURLWithPath: bundledBinary).deletingLastPathComponent()
+        } else if let serverScript = findServerScript() {
+            // Development: run server.py with the venv Python
+            let python = findPython()
+            print("PythonServer: using python → \(python)")
+            print("PythonServer: using script → \(serverScript)")
+            proc.executableURL = URL(fileURLWithPath: python)
+            proc.arguments = [serverScript]
+            // Working directory = server/ so relative imports (transcriber, llm) work
+            proc.currentDirectoryURL = URL(fileURLWithPath: serverScript).deletingLastPathComponent()
+        } else {
             throw ServerError.serverScriptNotFound
         }
-
-        let python = findPython()
-
-        print("PythonServer: using python → \(python)")
-        print("PythonServer: using script → \(serverScript)")
-
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: python)
-        proc.arguments = [serverScript]
-
-        // Working directory = server/ so relative imports (transcriber, llm) work
-        proc.currentDirectoryURL = URL(fileURLWithPath: serverScript)
-            .deletingLastPathComponent()
 
         // Ensure Homebrew and system tools (ffmpeg, etc.) are on PATH.
         // macOS apps launched from Xcode get a stripped environment that excludes /opt/homebrew/bin.
@@ -99,20 +103,25 @@ class PythonServer {
 
     // MARK: - Path resolution
 
-    private func findServerScript() -> String? {
-        // 1. Bundled inside .app (production)
-        if let bundled = Bundle.main.path(forResource: "server", ofType: "py",
-                                          inDirectory: "scripts") {
-            return bundled
-        }
+    /// Returns the path to the PyInstaller binary bundled inside the .app, if present.
+    private func findBundledBinary() -> String? {
+        guard let resourceURL = Bundle.main.resourceURL else { return nil }
+        let binary = resourceURL
+            .appendingPathComponent("transcribe_server")
+            .appendingPathComponent("transcribe_server")
+            .path
+        return FileManager.default.fileExists(atPath: binary) ? binary : nil
+    }
 
-        // 2. Hardcoded dev path (fastest and most reliable during development)
+    /// Returns the path to server.py for development (runs via Python interpreter).
+    private func findServerScript() -> String? {
+        // 1. Hardcoded dev path (fastest and most reliable during development)
         let devPath = "/Users/sumitkumar/Downloads/Projects/transcribe-meetings/server/server.py"
         if FileManager.default.fileExists(atPath: devPath) {
             return devPath
         }
 
-        // 3. Walk up from DerivedData binary location
+        // 2. Walk up from DerivedData binary location
         let binaryURL = URL(fileURLWithPath: Bundle.main.executablePath ?? "")
         let derived = binaryURL
             .deletingLastPathComponent() // MacOS/
@@ -152,7 +161,7 @@ enum ServerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .serverScriptNotFound:
-            return "Could not find server/server.py"
+            return "Could not find server binary or server/server.py"
         case .startupTimeout(let log):
             return "Python server failed to start.\nLast log:\n\(log)"
         }

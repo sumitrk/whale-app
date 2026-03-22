@@ -17,3 +17,8 @@ dependencies = [
     "soundfile>=0.13.1",
     "uvicorn[standard]>=0.42.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.19.0",
+]
