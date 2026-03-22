@@ -4,8 +4,9 @@ struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        SettingsLink {
-            Text("Settings…")
+        Button("Settings…") {
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         }
         .keyboardShortcut(",", modifiers: .command)
 
