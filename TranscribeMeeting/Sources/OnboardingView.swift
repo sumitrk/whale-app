@@ -485,6 +485,7 @@ private struct TryItStep: View {
         }
     }
 
+
     private func derivedPreset() -> PTTPreset {
         guard store.pttModifiers == 0 else { return .custom }
         return PTTPreset.allCases.first { $0.keyCode == store.pttKeyCode } ?? .custom

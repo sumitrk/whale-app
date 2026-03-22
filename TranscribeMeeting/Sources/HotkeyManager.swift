@@ -8,11 +8,14 @@ import AppKit
 /// Fn/Globe (keyCode 63) is a modifier key — detected via flagsChanged.
 /// All other keys use keyDown + keyUp global+local monitors.
 final class HotkeyManager {
-    private var toggleGlobalMonitor: Any?
-    private var toggleLocalMonitor:  Any?
-    private var pttFlagsMonitor:     Any?
-    private var pttDownMonitor:      Any?
-    private var pttUpMonitor:        Any?
+    private var toggleGlobalMonitor:    Any?
+    private var toggleLocalMonitor:     Any?
+    private var pttFlagsGlobalMonitor:  Any?
+    private var pttFlagsLocalMonitor:   Any?
+    private var pttDownGlobalMonitor:   Any?
+    private var pttDownLocalMonitor:    Any?
+    private var pttUpGlobalMonitor:     Any?
+    private var pttUpLocalMonitor:      Any?
 
     // MARK: - Toggle (configurable)
 
@@ -39,14 +42,20 @@ final class HotkeyManager {
     func startPushToTalk(keyCode: Int, modifiers: NSEvent.ModifierFlags,
                          onPress:   @escaping @MainActor () -> Void,
                          onRelease: @escaping @MainActor () -> Void) {
-        if let m = pttFlagsMonitor { NSEvent.removeMonitor(m); pttFlagsMonitor = nil }
-        if let m = pttDownMonitor  { NSEvent.removeMonitor(m); pttDownMonitor  = nil }
-        if let m = pttUpMonitor    { NSEvent.removeMonitor(m); pttUpMonitor    = nil }
+        for m in [pttFlagsGlobalMonitor, pttFlagsLocalMonitor,
+                  pttDownGlobalMonitor, pttDownLocalMonitor,
+                  pttUpGlobalMonitor, pttUpLocalMonitor].compactMap({ $0 }) {
+            NSEvent.removeMonitor(m)
+        }
+        pttFlagsGlobalMonitor = nil; pttFlagsLocalMonitor = nil
+        pttDownGlobalMonitor  = nil; pttDownLocalMonitor  = nil
+        pttUpGlobalMonitor    = nil; pttUpLocalMonitor    = nil
 
         if let flag = modifierFlag(for: keyCode) {
-            // Solo modifier key (Fn, Right ⌘, Right ⌥, etc.) — tracked via flagsChanged
+            // Solo modifier key (Fn, Right ⌘, Right ⌥, etc.) — tracked via flagsChanged.
+            // Both global (other apps frontmost) and local (our app frontmost) monitors needed.
             var isDown = false
-            pttFlagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { event in
+            let handleFlags: (NSEvent) -> Void = { event in
                 guard event.keyCode == UInt16(keyCode) else { return }
                 let nowDown = event.modifierFlags.contains(flag)
                 if nowDown && !isDown {
@@ -57,19 +66,31 @@ final class HotkeyManager {
                     Task { @MainActor in onRelease() }
                 }
             }
+            pttFlagsGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: handleFlags)
+            pttFlagsLocalMonitor  = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                handleFlags(event); return event
+            }
         } else {
-            // Regular key — hold via keyDown + keyUp
+            // Regular key — hold via keyDown + keyUp, both global and local monitors.
             var isDown = false
-            pttDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
+            let handleDown: (NSEvent) -> Void = { event in
                 let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 guard flags == modifiers, event.keyCode == UInt16(keyCode), !isDown else { return }
                 isDown = true
                 Task { @MainActor in onPress() }
             }
-            pttUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyUp) { event in
+            let handleUp: (NSEvent) -> Void = { event in
                 guard event.keyCode == UInt16(keyCode), isDown else { return }
                 isDown = false
                 Task { @MainActor in onRelease() }
+            }
+            pttDownGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: handleDown)
+            pttUpGlobalMonitor   = NSEvent.addGlobalMonitorForEvents(matching: .keyUp,   handler: handleUp)
+            pttDownLocalMonitor  = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                handleDown(event); return event
+            }
+            pttUpLocalMonitor    = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { event in
+                handleUp(event); return event
             }
         }
     }
@@ -78,9 +99,13 @@ final class HotkeyManager {
 
     func stop() {
         [toggleGlobalMonitor, toggleLocalMonitor,
-         pttFlagsMonitor, pttDownMonitor, pttUpMonitor]
+         pttFlagsGlobalMonitor, pttFlagsLocalMonitor,
+         pttDownGlobalMonitor, pttDownLocalMonitor,
+         pttUpGlobalMonitor, pttUpLocalMonitor]
             .compactMap { $0 }.forEach { NSEvent.removeMonitor($0) }
         toggleGlobalMonitor = nil; toggleLocalMonitor = nil
-        pttFlagsMonitor = nil; pttDownMonitor = nil; pttUpMonitor = nil
+        pttFlagsGlobalMonitor = nil; pttFlagsLocalMonitor = nil
+        pttDownGlobalMonitor = nil; pttDownLocalMonitor = nil
+        pttUpGlobalMonitor = nil; pttUpLocalMonitor = nil
     }
 }
