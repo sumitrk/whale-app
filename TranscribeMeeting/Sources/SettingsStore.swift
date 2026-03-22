@@ -51,6 +51,12 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(activeModelId, forKey: Keys.activeModel) }
     }
 
+    // MARK: - Onboarding
+
+    @Published var hasCompletedOnboarding: Bool {
+        didSet { ud.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
+    }
+
     // MARK: - General
 
     @Published var launchAtLogin: Bool {
@@ -85,19 +91,18 @@ class SettingsStore: ObservableObject {
     private static let defaultModifiers = Int(NSEvent.ModifierFlags([.command, .shift]).rawValue)
 
     private init() {
-        transcriptFolderPath = ud.string(forKey: Keys.transcriptFolder) ?? ""
-        activeModelId        = ud.string(forKey: Keys.activeModel)      ?? "mlx-community/parakeet-tdt-0.6b-v3"
-        launchAtLogin        = ud.bool(forKey: Keys.launchAtLogin)
-        aiEnabled            = ud.bool(forKey: Keys.aiEnabled)
-        aiProvider           = ud.string(forKey: Keys.aiProvider) ?? "anthropic"
-        aiApiKey             = ud.string(forKey: Keys.aiApiKey)   ?? ""
-        toggleKeyCode        = (ud.object(forKey: Keys.toggleKeyCode) as? Int) ?? 17
-        toggleModifiers      = (ud.object(forKey: Keys.toggleModifiers) as? Int) ?? SettingsStore.defaultModifiers
-        pttKeyCode           = (ud.object(forKey: Keys.pttKeyCode) as? Int) ?? 63
-        pttModifiers         = (ud.object(forKey: Keys.pttModifiers) as? Int) ?? 0
+        transcriptFolderPath     = ud.string(forKey: Keys.transcriptFolder) ?? ""
+        activeModelId            = ud.string(forKey: Keys.activeModel)      ?? "mlx-community/parakeet-tdt-0.6b-v3"
+        hasCompletedOnboarding   = ud.bool(forKey: Keys.hasCompletedOnboarding)
+        launchAtLogin            = ud.bool(forKey: Keys.launchAtLogin)
+        aiEnabled                = ud.bool(forKey: Keys.aiEnabled)
+        aiProvider               = ud.string(forKey: Keys.aiProvider) ?? "anthropic"
+        aiApiKey                 = ud.string(forKey: Keys.aiApiKey)   ?? ""
+        toggleKeyCode            = (ud.object(forKey: Keys.toggleKeyCode) as? Int) ?? 17
+        toggleModifiers          = (ud.object(forKey: Keys.toggleModifiers) as? Int) ?? SettingsStore.defaultModifiers
+        pttKeyCode               = (ud.object(forKey: Keys.pttKeyCode) as? Int) ?? 63
+        pttModifiers             = (ud.object(forKey: Keys.pttModifiers) as? Int) ?? 0
     }
-
-    // MARK: - Keys
 
     // MARK: - Key name helper
 
@@ -128,15 +133,16 @@ class SettingsStore: ObservableObject {
     }
 
     private enum Keys {
-        static let transcriptFolder = "transcriptFolderPath"
-        static let activeModel      = "activeModelId"
-        static let launchAtLogin    = "launchAtLogin"
-        static let aiEnabled        = "aiEnabled"
-        static let aiProvider       = "aiProvider"
-        static let aiApiKey         = "aiApiKey"
-        static let toggleKeyCode    = "toggleKeyCode"
-        static let toggleModifiers  = "toggleModifiers"
-        static let pttKeyCode       = "pttKeyCode"
-        static let pttModifiers     = "pttModifiers"
+        static let transcriptFolder      = "transcriptFolderPath"
+        static let activeModel           = "activeModelId"
+        static let hasCompletedOnboarding = "hasCompletedOnboarding"
+        static let launchAtLogin         = "launchAtLogin"
+        static let aiEnabled             = "aiEnabled"
+        static let aiProvider            = "aiProvider"
+        static let aiApiKey              = "aiApiKey"
+        static let toggleKeyCode         = "toggleKeyCode"
+        static let toggleModifiers       = "toggleModifiers"
+        static let pttKeyCode            = "pttKeyCode"
+        static let pttModifiers          = "pttModifiers"
     }
 }

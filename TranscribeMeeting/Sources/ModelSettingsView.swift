@@ -86,7 +86,7 @@ struct ModelSettingsView: View {
 
 // MARK: - Row
 
-private struct ModelRow: View {
+struct ModelRow: View {
     let model:         ModelInfo
     let isActive:      Bool
     let isDownloading: Bool
@@ -146,7 +146,7 @@ private struct ModelRow: View {
 
 // MARK: - Data helper
 
-private extension Data {
+extension Data {
     mutating func appendField(_ name: String, value: String, boundary: String) {
         append("--\(boundary)\r\n".data(using: .utf8)!)
         append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)

@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import CoreGraphics
 import Foundation
+import SwiftUI
 
 enum AppStatus: Equatable {
     case starting
@@ -23,6 +24,8 @@ class AppState: ObservableObject {
     @Published var status: AppStatus = .starting
     @Published var isRecording = false
     @Published var lastMeetingPath: String? = nil
+    /// Set after every transcription — observed by the onboarding test screen.
+    @Published var lastTranscript: String = ""
 
     let server   = PythonServer()
     let recorder = AudioRecorder()
@@ -31,6 +34,7 @@ class AppState: ObservableObject {
 
     private let settings = SettingsStore.shared
     private var cancellables = Set<AnyCancellable>()
+    private var onboardingWindow: NSWindow?
 
     private var recordingStartedAt: Date?
     private var currentMode: RecordingMode = .markdown
@@ -59,6 +63,34 @@ class AppState: ObservableObject {
             .store(in: &cancellables)
 
         requestAccessibilityOnce()
+
+        if !settings.hasCompletedOnboarding {
+            Task { @MainActor [weak self] in self?.showOnboardingWindow() }
+        }
+    }
+
+    func showOnboardingWindow() {
+        if onboardingWindow != nil { onboardingWindow?.makeKeyAndOrderFront(nil); return }
+        let view = OnboardingView { [weak self] in
+            self?.onboardingWindow?.close()
+            self?.onboardingWindow = nil
+        }
+        let hosting = NSHostingView(rootView: view.environmentObject(self))
+        hosting.frame = NSRect(x: 0, y: 0, width: 540, height: 460)
+        let window = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 460),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hosting
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
+        window.title = ""
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        onboardingWindow = window
     }
 
     var isReady: Bool { status == .ready }
@@ -141,6 +173,7 @@ class AppState: ObservableObject {
 
             let rawTranscript = try await client.transcribe(wavURL: wavURL, model: settings.activeModelId)
             print("Transcript ready (\(rawTranscript.count) chars)")
+            lastTranscript = rawTranscript
 
             switch mode {
 
