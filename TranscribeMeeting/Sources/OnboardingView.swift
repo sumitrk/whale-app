@@ -292,6 +292,10 @@ private struct ModelStep: View {
         do {
             let _ = try await URLSession.shared.data(for: req)
             await fetchModels()
+            // Auto-activate if this is the first downloaded model
+            if store.activeModelId.isEmpty || !models.contains(where: { $0.downloaded && $0.id == store.activeModelId }) {
+                store.activeModelId = model.id
+            }
         } catch {
             downloadError = "Download failed: \(error.localizedDescription)"
         }

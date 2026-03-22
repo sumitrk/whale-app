@@ -121,7 +121,7 @@ struct ModelRow: View {
                 ProgressView().scaleEffect(0.7)
                 Text("Downloading…").foregroundStyle(.secondary).font(.callout)
             }
-        } else if isActive {
+        } else if isActive && model.downloaded {
             Label("Active", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.blue)
                 .font(.callout)
