@@ -169,29 +169,62 @@ class AppState: ObservableObject {
     // MARK: - Clipboard + paste
 
     private func copyAndPaste(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        print("Copied to clipboard (\(text.count) chars)")
-        print("AXIsProcessTrusted = \(AXIsProcessTrusted())")
+        if focusedElementIsTextInput() {
+            // A text input is active — snapshot old clipboard, auto-paste, restore after 1s.
+            let previous = snapshotClipboard()
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
 
-        // Small delay to let the pasteboard settle, then simulate ⌘V
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            let src = CGEventSource(stateID: .combinedSessionState)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                let src  = CGEventSource(stateID: .combinedSessionState)
+                let down = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: true)
+                let up   = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: false)
+                down?.flags = .maskCommand
+                up?.flags   = .maskCommand
+                down?.post(tap: .cghidEventTap)
+                usleep(10_000)
+                up?.post(tap: .cghidEventTap)
+            }
 
-            // Key down
-            let down = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: true)
-            down?.flags = .maskCommand
-            down?.post(tap: .cghidEventTap)
+            // Restore old clipboard once paste has completed.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                NSPasteboard.general.clearContents()
+                if !previous.isEmpty { NSPasteboard.general.writeObjects(previous) }
+            }
+        } else {
+            // No focused text input — copy to clipboard like a normal copy.
+            // User can ⌘V whenever they want; clipboard manages itself naturally.
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
+    }
 
-            // Brief gap between down/up for the target app to process
-            usleep(10_000)  // 10ms
+    /// Returns true if the currently focused UI element is a writable text input.
+    /// Works for native macOS apps AND browsers (Chrome/Safari/Arc expose web
+    /// inputs as AXTextField / AXTextArea in their accessibility tree).
+    private func focusedElementIsTextInput() -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        let system = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            system, kAXFocusedUIElementAttribute as CFString, &focusedRef
+        ) == .success, let focusedRef else { return false }
 
-            // Key up
-            let up = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: false)
-            up?.flags = .maskCommand
-            up?.post(tap: .cghidEventTap)
+        var roleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            focusedRef as! AXUIElement, kAXRoleAttribute as CFString, &roleRef
+        ) == .success, let role = roleRef as? String else { return false }
 
-            print("Auto-paste attempted via ⌘V (events created: down=\(down != nil), up=\(up != nil))")
+        return ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role)
+    }
+
+    private func snapshotClipboard() -> [NSPasteboardItem] {
+        (NSPasteboard.general.pasteboardItems ?? []).compactMap { item in
+            let copy = NSPasteboardItem()
+            for type in item.types {
+                if let data = item.data(forType: type) { copy.setData(data, forType: type) }
+            }
+            return copy
         }
     }
 
