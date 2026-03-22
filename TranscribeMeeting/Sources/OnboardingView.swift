@@ -343,7 +343,6 @@ private struct TryItStep: View {
     let onDone: () -> Void
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var store = SettingsStore.shared
-    @State private var previewText: String = ""
     @State private var pttPreset: PTTPreset = .globe
     @State private var pttRecorderAutoStart = false
 
@@ -396,26 +395,14 @@ private struct TryItStep: View {
 
                         Divider()
 
-                        // ── Test box ──────────────────────────────────────
-                        VStack(alignment: .leading, spacing: 6) {
-                            ZStack(alignment: .topLeading) {
-                                TextEditor(text: $previewText)
-                                    .font(.body)
-                                    .scrollContentBackground(.hidden)
-                                    .padding(6)
-                                if previewText.isEmpty {
-                                    Text("Transcript will appear here…")
-                                        .foregroundStyle(.tertiary)
-                                        .padding(12)
-                                        .allowsHitTesting(false)
-                                }
-                            }
-                            .frame(height: 80)
-                            .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
-
-                            Label("Click outside this window, hold **\(store.pttKeyLabel)**, speak, release — transcript appears above without pasting.", systemImage: "info.circle")
-                                .font(.caption)
+                        // ── Try it ────────────────────────────────────────
+                        Label {
+                            Text("Switch to any other app, hold **\(store.pttKeyLabel)**, speak, then release. Your words will be transcribed and pasted automatically.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } icon: {
+                            Image(systemName: "hand.point.right")
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -478,11 +465,6 @@ private struct TryItStep: View {
             .background(.regularMaterial)
         }
         .onAppear { pttPreset = derivedPreset() }
-        .onChange(of: appState.lastTranscript) {
-            if !appState.lastTranscript.isEmpty {
-                previewText = appState.lastTranscript
-            }
-        }
     }
 
 
