@@ -86,6 +86,7 @@ class AppState: ObservableObject {
         window.contentView = hosting
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
+        window.hidesOnDeactivate = false
         window.title = ""
         window.center()
         window.makeKeyAndOrderFront(nil)
