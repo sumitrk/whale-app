@@ -25,9 +25,8 @@ def health():
 @app.post("/transcribe")
 async def transcribe(
     file: UploadFile = File(...),
-    model: str = Form(default="mlx-community/whisper-large-v3-turbo"),
 ):
-    """Receive a WAV file, return the transcript."""
+    """Receive a WAV file, return the transcript via Parakeet."""
     suffix = Path(file.filename or "audio.wav").suffix or ".wav"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         content = await file.read()
@@ -35,13 +34,13 @@ async def transcribe(
         tmp_path = Path(tmp.name)
 
     try:
-        transcript = transcribe_chunks([tmp_path], model)
+        transcript = transcribe_chunks([tmp_path])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         tmp_path.unlink(missing_ok=True)
 
-    return {"transcript": transcript, "model": model}
+    return {"transcript": transcript, "model": "mlx-community/parakeet-tdt-0.6b-v3"}
 
 
 # ── Summarise ──────────────────────────────────────────────────────────────────
