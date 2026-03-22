@@ -29,8 +29,13 @@ enum PTTPreset: String, CaseIterable, Identifiable {
 struct ShortcutsSettingsView: View {
     @ObservedObject private var store = SettingsStore.shared
 
-    /// Derived from current keyCode — updates picker selection without extra storage.
-    private var pttPreset: PTTPreset {
+    /// Tracks the picker selection independently so selecting Custom isn't
+    /// immediately overridden by the computed value.
+    @State private var pttPreset: PTTPreset = .globe
+    /// True only right after the user picks Custom — auto-starts the recorder.
+    @State private var pttRecorderAutoStart = false
+
+    private func derivedPreset() -> PTTPreset {
         guard store.pttModifiers == 0 else { return .custom }
         return PTTPreset.allCases.first { $0.keyCode == store.pttKeyCode } ?? .custom
     }
@@ -40,16 +45,7 @@ struct ShortcutsSettingsView: View {
             // MARK: Push-to-Talk
             Section {
                 LabeledContent("Key") {
-                    Picker("", selection: Binding(
-                        get: { pttPreset },
-                        set: { preset in
-                            if let kc = preset.keyCode {
-                                store.pttKeyCode = kc
-                                store.pttModifiers = 0
-                            }
-                            // Custom: leave keyCode as-is; recorder below will update it
-                        }
-                    )) {
+                    Picker("", selection: $pttPreset) {
                         ForEach(PTTPreset.allCases) { preset in
                             Text(preset.rawValue).tag(preset)
                         }
@@ -57,15 +53,25 @@ struct ShortcutsSettingsView: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                     .fixedSize()
+                    .onChange(of: pttPreset) { preset in
+                        if let kc = preset.keyCode {
+                            store.pttKeyCode = kc
+                            store.pttModifiers = 0
+                        } else {
+                            // Custom selected — auto-start the recorder
+                            pttRecorderAutoStart = true
+                        }
+                    }
                 }
 
-                // Only show key recorder when Custom is selected
                 if pttPreset == .custom {
                     LabeledContent("Custom key") {
                         PTTRecorderView(
-                            keyCode:   $store.pttKeyCode,
-                            modifiers: $store.pttModifiers
+                            keyCode:        $store.pttKeyCode,
+                            modifiers:      $store.pttModifiers,
+                            startImmediately: pttRecorderAutoStart
                         )
+                        .onAppear { pttRecorderAutoStart = false }
                     }
                 }
             } header: {
@@ -102,6 +108,7 @@ struct ShortcutsSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { pttPreset = derivedPreset() }
     }
 
     private func pickFolder() {

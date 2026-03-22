@@ -49,6 +49,7 @@ func modifierOnlyKeyName(_ keyCode: Int) -> String? {
 struct PTTRecorderView: View {
     @Binding var keyCode: Int
     @Binding var modifiers: Int
+    var startImmediately: Bool = false
 
     @State private var isRecording = false
     @State private var keyDownMonitor: Any?
@@ -60,6 +61,7 @@ struct PTTRecorderView: View {
         }
         .buttonStyle(.bordered)
         .foregroundStyle(isRecording ? Color.orange : Color.primary)
+        .onAppear { if startImmediately { startRecording() } }
         .onDisappear { stopRecording() }
     }
 
