@@ -62,7 +62,11 @@ class AppState: ObservableObject {
             .sink { [weak self] _, _ in self?.restartPTTHotkey() }
             .store(in: &cancellables)
 
-        requestAccessibilityOnce()
+        // Only auto-prompt accessibility for returning users.
+        // New users get the prompt via the onboarding permissions step.
+        if settings.hasCompletedOnboarding {
+            requestAccessibilityOnce()
+        }
 
         if !settings.hasCompletedOnboarding {
             Task { @MainActor [weak self] in self?.showOnboardingWindow() }
