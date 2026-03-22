@@ -30,6 +30,6 @@ targets:
         # Hide dock icon — menu bar only
         LSUIElement: YES
     dependencies:
+      - sdk: CoreAudio.framework
+      - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
-      - sdk: CoreMedia.framework
-      - sdk: ScreenCaptureKit.framework

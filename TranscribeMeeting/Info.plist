@@ -24,7 +24,5 @@
     <!-- Permission descriptions (shown in system prompts) -->
     <key>NSMicrophoneUsageDescription</key>
     <string>TranscribeMeeting records your microphone during meetings.</string>
-    <key>NSScreenCaptureUsageDescription</key>
-    <string>TranscribeMeeting captures system audio to transcribe meetings, even when system audio is muted.</string>
 </dict>
 </plist>
