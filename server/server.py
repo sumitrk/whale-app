@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import os
-import tempfile
+import tempfile  # used for temp WAV files in /transcribe
 import threading
 import time
 from pathlib import Path
 
-# Enable hf-transfer for 5-10x faster HuggingFace downloads
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+# Note: hf-transfer is intentionally disabled — it writes to a single temp file
+# with no incremental progress, which makes the download bar useless.
+# The standard downloader writes .incomplete files that grow in the HF cache,
+# giving accurate progress tracking.
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -115,22 +117,15 @@ async def download_model(model_id: str = Form(...)):
     def track():
         cache_key = "models--" + model_id.replace("/", "--")
         cache_path = _HF_CACHE / cache_key
-        # hf-transfer writes to a tmp dir outside cache; also check system tmp
-        tmp_path = Path(tempfile.gettempdir())
         while not _download_progress[model_id]["done"]:
-            try:
-                size = 0
-                # Cache dir (regular downloads use .incomplete files here)
-                if cache_path.exists():
-                    size += sum(f.stat().st_size for f in cache_path.rglob("*") if f.is_file())
-                # hf-transfer tmp files (named with model hash fragments)
-                for f in tmp_path.glob("*.incomplete"):
-                    try: size += f.stat().st_size
-                    except Exception: pass
-                if size > 0:
-                    _download_progress[model_id]["downloaded_mb"] = min(size / (1024 * 1024), total_mb)
-            except Exception:
-                pass
+            if cache_path.exists():
+                try:
+                    # Includes .incomplete files that grow during download
+                    size = sum(f.stat().st_size for f in cache_path.rglob("*") if f.is_file())
+                    if size > 0:
+                        _download_progress[model_id]["downloaded_mb"] = min(size / (1024 * 1024), total_mb)
+                except Exception:
+                    pass
             time.sleep(0.5)
 
     tracker = threading.Thread(target=track, daemon=True)
