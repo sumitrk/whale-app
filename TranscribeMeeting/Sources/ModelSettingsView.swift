@@ -91,12 +91,12 @@ struct ModelSettingsView: View {
         do {
             let (_, response) = try await URLSession.shared.data(for: req)
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                self.error = "Download failed (server error \(http.statusCode))"
+                self.error = "\(model.label) failed to download — try restarting the app (error \(http.statusCode))"
                 return
             }
             await fetchModels()
         } catch {
-            self.error = "Download failed: \(error.localizedDescription)"
+            self.error = "\(model.label) failed to download: \(error.localizedDescription)"
         }
     }
 
