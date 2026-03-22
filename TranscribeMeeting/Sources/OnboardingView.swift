@@ -209,7 +209,8 @@ private struct ModelStep: View {
 
     @State private var models: [ModelInfo] = []
     @State private var downloading: Set<String> = []
-    @State private var loadError: String?
+    @State private var serverReady = false
+    @State private var downloadError: String?
     @State private var pollTimer: Timer?
 
     var body: some View {
@@ -224,23 +225,34 @@ private struct ModelStep: View {
             .padding(.horizontal, 28)
             .padding(.top, 28)
 
-            if let loadError {
-                Text(loadError)
+            if let downloadError {
+                Text(downloadError)
                     .foregroundStyle(.red)
                     .font(.caption)
                     .padding(.horizontal, 28)
             }
 
-            List(models) { model in
-                ModelRow(
-                    model:         model,
-                    isActive:      store.activeModelId == model.id,
-                    isDownloading: downloading.contains(model.id),
-                    onSelect:      { store.activeModelId = model.id },
-                    onDownload:    { Task { await download(model) } }
-                )
+            if !serverReady {
+                // Server still starting — show a friendly wait state
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Starting transcription server…")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(models) { model in
+                    ModelRow(
+                        model:         model,
+                        isActive:      store.activeModelId == model.id,
+                        isDownloading: downloading.contains(model.id),
+                        onSelect:      { store.activeModelId = model.id },
+                        onDownload:    { Task { await download(model) } }
+                    )
+                }
+                .listStyle(.inset)
             }
-            .listStyle(.inset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await fetchModels() }
@@ -249,7 +261,7 @@ private struct ModelStep: View {
     }
 
     private func startPolling() {
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
             Task { await fetchModels() }
         }
     }
@@ -258,13 +270,11 @@ private struct ModelStep: View {
         do {
             let (data, _) = try await URLSession.shared.data(from: URL(string: "http://127.0.0.1:8765/models")!)
             let resp = try JSONDecoder().decode(ModelsResponse.self, from: data)
+            serverReady = true
             models = resp.models
             hasModel = models.contains { $0.downloaded }
         } catch {
-            let msg = error.localizedDescription
-            loadError = msg.contains("Connection refused") || msg.contains("Could not connect")
-                ? "Server starting up — please wait…"
-                : msg
+            serverReady = false
         }
     }
 
@@ -283,7 +293,7 @@ private struct ModelStep: View {
             let _ = try await URLSession.shared.data(for: req)
             await fetchModels()
         } catch {
-            loadError = "Download failed: \(error.localizedDescription)"
+            downloadError = "Download failed: \(error.localizedDescription)"
         }
     }
 }
