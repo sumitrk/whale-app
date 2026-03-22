@@ -7,10 +7,10 @@ import threading
 import time
 from pathlib import Path
 
-# Note: hf-transfer is intentionally disabled — it writes to a single temp file
-# with no incremental progress, which makes the download bar useless.
-# The standard downloader writes .incomplete files that grow in the HF cache,
-# giving accurate progress tracking.
+# Enable hf-transfer for faster parallel downloads.
+# Progress is tracked via st_blocks (actual bytes written to disk) not st_size,
+# because hf-transfer pre-allocates the full file size before writing chunks.
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -121,9 +121,12 @@ async def download_model(model_id: str = Form(...)):
             if cache_path.exists():
                 try:
                     # Includes .incomplete files that grow during download
-                    size = sum(f.stat().st_size for f in cache_path.rglob("*") if f.is_file())
-                    if size > 0:
-                        _download_progress[model_id]["downloaded_mb"] = min(size / (1024 * 1024), total_mb)
+                    # Use st_blocks (actual disk blocks written) not st_size —
+                    # hf-transfer pre-allocates the full file so st_size is
+                    # always 100% from the start.
+                    written = sum(f.stat().st_blocks * 512 for f in cache_path.rglob("*") if f.is_file())
+                    if written > 0:
+                        _download_progress[model_id]["downloaded_mb"] = min(written / (1024 * 1024), total_mb)
                 except Exception:
                     pass
             time.sleep(0.5)
