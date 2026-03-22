@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import tempfile
 import threading
 import time
 from pathlib import Path
+
+# Enable hf-transfer for 5-10x faster HuggingFace downloads
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -75,11 +79,8 @@ def summarise(req: SummariseRequest):
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 
 AVAILABLE_MODELS = [
-    {"id": "mlx-community/parakeet-tdt-0.6b-v3",   "label": "Parakeet 0.6B (English only, fastest)", "size_mb": 600},
-    {"id": "mlx-community/whisper-tiny-mlx",        "label": "Whisper Tiny (multilingual)",           "size_mb": 40},
-    {"id": "mlx-community/whisper-small-mlx",       "label": "Whisper Small (multilingual)",          "size_mb": 150},
-    {"id": "mlx-community/whisper-large-v3-turbo",  "label": "Whisper Large v3 Turbo (multilingual)", "size_mb": 809},
-    {"id": "mlx-community/whisper-large-v3-mlx",    "label": "Whisper Large v3 (multilingual)",       "size_mb": 3000},
+    {"id": "mlx-community/parakeet-tdt-0.6b-v3",  "label": "Parakeet 0.6B (English only, fastest)", "size_mb": 600},
+    {"id": "mlx-community/whisper-large-v3-turbo", "label": "Whisper Large v3 Turbo (multilingual)", "size_mb": 809},
 ]
 
 # HuggingFace cache where mlx-whisper stores downloaded models

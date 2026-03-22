@@ -4202,6 +4202,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "fastapi" },
+    { name = "hf-transfer" },
     { name = "mlx-audio" },
     { name = "numpy" },
     { name = "pydantic" },
@@ -4223,6 +4224,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.86.0" },
     { name = "fastapi", specifier = ">=0.135.1" },
+    { name = "hf-transfer", specifier = ">=0.1.9" },
     { name = "mlx-audio", specifier = ">=0.1.0" },
     { name = "numpy", specifier = ">=2.4.3" },
     { name = "pydantic", specifier = ">=2.12.5" },

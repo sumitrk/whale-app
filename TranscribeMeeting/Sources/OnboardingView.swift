@@ -274,7 +274,11 @@ private struct ModelStep: View {
             let resp = try JSONDecoder().decode(ModelsResponse.self, from: data)
             serverReady = true
             models = resp.models
-            hasModel = models.contains { $0.downloaded }
+            // Only unlock Continue when no download is in progress
+            // (the cache dir is created immediately so downloaded=true too early)
+            if downloading.isEmpty {
+                hasModel = models.contains { $0.downloaded }
+            }
         } catch {
             serverReady = false
         }
@@ -313,6 +317,7 @@ private struct ModelStep: View {
                 return
             }
             await fetchModels()
+            hasModel = true  // unlock Continue only after full download completes
             if store.activeModelId.isEmpty || !models.contains(where: { $0.downloaded && $0.id == store.activeModelId }) {
                 store.activeModelId = model.id
             }
@@ -339,67 +344,57 @@ private struct TryItStep: View {
     let onDone: () -> Void
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var store = SettingsStore.shared
+    @State private var previewText: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Try it out")
-                    .font(.title2.bold())
-                Text("Hold \(store.pttKeyLabel) anywhere on your Mac to start recording.")
-                    .foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Try it out")
+                .font(.title2.bold())
 
-            // Live transcript preview
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Transcript preview")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(.background)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
-                        )
-                    if appState.lastTranscript.isEmpty {
-                        Text("Your transcribed text will appear here…")
-                            .foregroundStyle(.tertiary)
-                            .padding(10)
-                    } else {
-                        ScrollView {
-                            Text(appState.lastTranscript)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(10)
-                        }
-                    }
+            // Editable transcript preview
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $previewText)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .padding(6)
+                if previewText.isEmpty {
+                    Text("Type something, or hold \(store.pttKeyLabel) to record…")
+                        .foregroundStyle(.tertiary)
+                        .padding(12)
+                        .allowsHitTesting(false)
                 }
-                .frame(height: 100)
             }
+            .frame(height: 120)
+            .background(.background, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
 
-            // Transcript folder
+            // Instruction below the box
+            Label("Hold **\(store.pttKeyLabel)** anywhere on your Mac to record. Release to transcribe.", systemImage: "info.circle")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            // Transcript folder — entire row is tappable
             VStack(alignment: .leading, spacing: 6) {
                 Text("Save transcripts to")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 8) {
-                    Text(store.transcriptFolder.abbreviatedPath)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    Button { pickFolder() } label: {
+                Button(action: pickFolder) {
+                    HStack(spacing: 8) {
+                        Text(store.transcriptFolder.abbreviatedPath)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
                         Image(systemName: "folder")
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.borderless)
+                    .padding(10)
+                    .frame(maxWidth: .infinity)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 7))
+                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
                 }
-                .padding(8)
-                .background(.background, in: RoundedRectangle(cornerRadius: 7))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
-                )
+                .buttonStyle(.plain)
             }
 
             Spacer()
@@ -413,6 +408,11 @@ private struct TryItStep: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(28)
+        .onChange(of: appState.lastTranscript) {
+            if !appState.lastTranscript.isEmpty {
+                previewText = appState.lastTranscript
+            }
+        }
     }
 
     private func pickFolder() {
