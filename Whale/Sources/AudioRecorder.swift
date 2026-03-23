@@ -24,6 +24,7 @@ class AudioRecorder: NSObject, ObservableObject {
     private var tapObjectID: AudioObjectID = kAudioObjectUnknown
     private var aggregateDeviceID: AudioDeviceID = kAudioObjectUnknown
     private var tapIOProcID: AudioDeviceIOProcID? = nil
+    private var deviceChangeListener: AudioObjectPropertyListenerBlock?
 
     // MARK: - Microphone (AVAudioEngine)
 
@@ -158,9 +159,53 @@ class AudioRecorder: NSObject, ObservableObject {
         }
 
         print("AudioRecorder: CATap capture started (sr=\(sr)Hz)")
+        installOutputDeviceListener()
+    }
+
+    private func installOutputDeviceListener() {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope:    kAudioObjectPropertyScopeGlobal,
+            mElement:  kAudioObjectPropertyElementMain)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self, self.isRecording else { return }
+            // Output device changed (e.g. headphones connected) — restart the tap
+            // so the aggregate device wraps the new device's audio graph.
+            self.restartSystemAudioCapture()
+        }
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &addr, DispatchQueue.main, block)
+        deviceChangeListener = block
+    }
+
+    private func removeOutputDeviceListener() {
+        guard let block = deviceChangeListener else { return }
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope:    kAudioObjectPropertyScopeGlobal,
+            mElement:  kAudioObjectPropertyElementMain)
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &addr, DispatchQueue.main, block)
+        deviceChangeListener = nil
+    }
+
+    /// Called on the main thread when the default output device changes during recording.
+    private func restartSystemAudioCapture() {
+        // Remove listener first so we don't recurse during teardown.
+        removeOutputDeviceListener()
+        stopSystemAudioCaptureObjects()
+        lock.lock()
+        systemAudioSamples = []
+        lock.unlock()
+        try? startSystemAudioCapture()
     }
 
     private func stopSystemAudioCapture() {
+        removeOutputDeviceListener()
+        stopSystemAudioCaptureObjects()
+    }
+
+    private func stopSystemAudioCaptureObjects() {
         if let procID = tapIOProcID, aggregateDeviceID != kAudioObjectUnknown {
             AudioDeviceStop(aggregateDeviceID, procID)
             AudioDeviceDestroyIOProcID(aggregateDeviceID, procID)
@@ -233,15 +278,34 @@ class AudioRecorder: NSObject, ObservableObject {
             self.lock.unlock()
         }
 
+        // When headphones with a mic are connected/disconnected, AVAudioEngine posts
+        // AVAudioEngineConfigurationChange — the engine must be restarted.
+        NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, self.isRecording else { return }
+            self.micEngine?.inputNode.removeTap(onBus: 0)
+            self.micEngine?.stop()
+            self.micEngine = nil
+            try? self.startMicCapture()
+        }
+
         try engine.start()
         self.micEngine = engine
         print("AudioRecorder: microphone capture started")
     }
 
     private func stopMicCapture() {
+        if let engine = micEngine {
+            NotificationCenter.default.removeObserver(
+                self, name: .AVAudioEngineConfigurationChange, object: engine)
+        }
         micEngine?.inputNode.removeTap(onBus: 0)
         micEngine?.stop()
         micEngine = nil
+        DispatchQueue.main.async { self.micLevel = 0 }
     }
 
     // MARK: - Mix + Write WAV
