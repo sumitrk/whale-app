@@ -6,14 +6,14 @@
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
         <item>
-            <title>Version 0.3.0</title>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
-            <pubDate>Sun, 22 Mar 2026 16:00:54 +0000</pubDate>
+            <title>Version 0.4.0</title>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
+            <pubDate>Mon, 23 Mar 2026 04:05:23 +0000</pubDate>
             <enclosure
-                url="https://github.com/sumitrk/transcribe-meeting/releases/download/v0.3.0/TranscribeMeeting.dmg"
-                sparkle:edSignature="KKxWIwW9L7ZXrHRbFOjaUVhA8IQxSDEcglcO6Ls1bm9x/bThrUBTJPiz1hnPKrjqzRrIfc3y13V7pUrP2rzSCA=="
-                length="614941451"
+                url="https://github.com/sumitrk/transcribe-meeting/releases/download/v0.4.0/TranscribeMeeting.dmg"
+                sparkle:edSignature="cvaO4Zi1hRfVjiWSGKsNPqIRq7+VAoW45I0PfHM1zDoOfMojsVR3PUesEhnMayALjG0POaNBEio2Vq59gfAFCA=="
+                length="614190995"
                 type="application/octet-stream"
             />
         </item>
