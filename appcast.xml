@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
     <channel>
-        <title>TranscribeMeeting Updates</title>
-        <link>https://github.com/sumitrk/transcribe-meeting</link>
+        <title>Whale Updates</title>
+        <link>https://github.com/sumitrk/whale-app</link>
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
         <item>
-            <title>Version 0.4.0</title>
-            <sparkle:version>3</sparkle:version>
-            <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
-            <pubDate>Mon, 23 Mar 2026 04:05:23 +0000</pubDate>
+            <title>Version 0.5.0</title>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
+            <pubDate>Mon, 23 Mar 2026 15:24:44 +0000</pubDate>
             <enclosure
-                url="https://github.com/sumitrk/transcribe-meeting/releases/download/v0.4.0/TranscribeMeeting.dmg"
-                sparkle:edSignature="cvaO4Zi1hRfVjiWSGKsNPqIRq7+VAoW45I0PfHM1zDoOfMojsVR3PUesEhnMayALjG0POaNBEio2Vq59gfAFCA=="
-                length="614190995"
+                url="https://github.com/sumitrk/whale-app/releases/download/v0.5.0/Whale.dmg"
+                sparkle:edSignature="FoHlcRMkd+cT41l3VeqDvqq1t8QqJ/HmmiitFt/tZdfCx34wvpTqmSilggpUGfsfkoREwOzqMeTdCKY9xPrbAw=="
+                length="610195887"
                 type="application/octet-stream"
             />
         </item>
