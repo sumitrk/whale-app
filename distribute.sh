@@ -2,9 +2,9 @@
 # distribute.sh — builds, signs, packages, and releases TranscribeMeeting
 set -e
 
-APP_NAME="TranscribeMeeting"
+APP_NAME="Whale"
 SCHEME="TranscribeMeeting"
-ENTITLEMENTS="TranscribeMeeting/TranscribeMeeting.entitlements"
+ENTITLEMENTS="Whale/TranscribeMeeting.entitlements"
 DERIVED_DATA="build/xcode"
 DIST_DIR="build/dist_staging"
 DMG_NAME="${APP_NAME}.dmg"
@@ -19,8 +19,8 @@ if [ -z "$SPARKLE_BIN" ]; then
 fi
 
 # ── Version bump ─────────────────────────────────────────────────────────────
-CURRENT_VERSION=$(defaults read "$(pwd)/TranscribeMeeting/Info.plist" CFBundleShortVersionString)
-CURRENT_BUILD=$(defaults read "$(pwd)/TranscribeMeeting/Info.plist" CFBundleVersion)
+CURRENT_VERSION=$(defaults read "$(pwd)/Whale/Info.plist" CFBundleShortVersionString)
+CURRENT_BUILD=$(defaults read "$(pwd)/Whale/Info.plist" CFBundleVersion)
 NEXT_BUILD=$((CURRENT_BUILD + 1))
 
 echo "Current version: ${CURRENT_VERSION} (build ${CURRENT_BUILD})"
@@ -29,8 +29,8 @@ VERSION="${INPUT_VERSION:-$CURRENT_VERSION}"
 BUILD=$NEXT_BUILD
 
 # Write back to Info.plist
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "TranscribeMeeting/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" "TranscribeMeeting/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "Whale/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" "Whale/Info.plist"
 echo "▶ Building version ${VERSION} (build ${BUILD})"
 
 # ── PyInstaller binary check ─────────────────────────────────────────────────
@@ -116,7 +116,7 @@ cat > appcast.xml << EOF
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
     <channel>
-        <title>TranscribeMeeting Updates</title>
+        <title>Whale Updates</title>
         <link>https://github.com/${GITHUB_REPO}</link>
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
@@ -148,7 +148,7 @@ else
   gh release create "v${VERSION}" "$DMG_NAME" \
     --repo "$GITHUB_REPO" \
     --title "v${VERSION}" \
-    --notes "TranscribeMeeting v${VERSION}" \
+    --notes "Whale v${VERSION}" \
     2>&1 && echo "✅ GitHub release created" || echo "⚠️  Release may already exist — upload DMG manually"
 fi
 

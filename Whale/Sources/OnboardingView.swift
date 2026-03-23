@@ -373,7 +373,7 @@ private struct TryItStep: View {
                             .pickerStyle(.menu)
                             .labelsHidden()
                             .fixedSize()
-                            .onChange(of: pttPreset) { preset in
+                            .onChange(of: pttPreset) { _, preset in
                                 if let kc = preset.keyCode {
                                     store.pttKeyCode = kc; store.pttModifiers = 0
                                 } else { pttRecorderAutoStart = true }

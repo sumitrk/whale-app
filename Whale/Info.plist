@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Swift</string>
+	<string>Whale</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.sumitrk.transcribe-meeting</string>
 	<key>CFBundleName</key>
-	<string>Swift</string>
+	<string>Whale</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
