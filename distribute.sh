@@ -8,7 +8,7 @@ ENTITLEMENTS="Whale/TranscribeMeeting.entitlements"
 DERIVED_DATA="build/xcode"
 DIST_DIR="build/dist_staging"
 DMG_NAME="${APP_NAME}.dmg"
-GITHUB_REPO="sumitrk/transcribe-meeting"
+GITHUB_REPO="sumitrk/whale-swift"
 
 # ── Sparkle tools ────────────────────────────────────────────────────────────
 SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData -name "sign_update" \
