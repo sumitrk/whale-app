@@ -25,6 +25,10 @@ class AudioRecorder: NSObject, ObservableObject {
     private var aggregateDeviceID: AudioDeviceID = kAudioObjectUnknown
     private var tapIOProcID: AudioDeviceIOProcID? = nil
     private var deviceChangeListener: AudioObjectPropertyListenerBlock?
+    private var pendingOutputDeviceListenerInstall: DispatchWorkItem?
+    private var systemRestartWorkItem: DispatchWorkItem?
+    private var isRestartingSystemAudio = false
+    private var ignoreOutputDeviceChangesUntil = Date.distantPast
 
     // MARK: - Microphone (AVAudioEngine)
 
@@ -33,6 +37,12 @@ class AudioRecorder: NSObject, ObservableObject {
     /// stored and used to unregister, because removeObserver(_:name:object:)
     /// does NOT work with the closure-based registration.
     private var configChangeObserver: (any NSObjectProtocol)?
+    /// macOS can briefly report an invalid input hardware format while the CATap
+    /// aggregate device is being created or torn down. Use this timestamp to
+    /// suppress AVAudioEngine restart churn during that settling window.
+    private var lastMicStartDate: Date = .distantPast
+    private var micRestartWorkItem: DispatchWorkItem?
+    private var isRestartingMicCapture = false
 
     // MARK: - Sample buffers (lock-protected)
 
@@ -46,17 +56,25 @@ class AudioRecorder: NSObject, ObservableObject {
     // MARK: - Public API
 
     @MainActor
-    func startRecording() async throws {
+    func startRecording(captureSystemAudio: Bool = true) async throws {
         guard !isRecording else { return }
 
         systemAudioSamples = []
         micSamples = []
-
-        try startSystemAudioCapture()
-        try startMicCapture()
-
-        isRecording = true
-        print("AudioRecorder: recording started")
+        do {
+            if captureSystemAudio {
+                try startSystemAudioCapture()
+            }
+            try startMicCapture()
+            isRecording = true
+            let modeLabel = captureSystemAudio ? "mic + system audio" : "mic only"
+            print("AudioRecorder: recording started (\(modeLabel))")
+        } catch {
+            stopSystemAudioCapture()
+            stopMicCapture()
+            isRecording = false
+            throw error
+        }
     }
 
     @MainActor
@@ -162,27 +180,45 @@ class AudioRecorder: NSObject, ObservableObject {
             throw RecorderError.audioDeviceStartFailed(startStatus)
         }
 
+        ignoreOutputDeviceChangesUntil = Date().addingTimeInterval(2.0)
         print("AudioRecorder: CATap capture started (sr=\(sr)Hz)")
-        installOutputDeviceListener()
+        // Creating the private aggregate device itself can briefly perturb the
+        // HAL graph. Delay listener installation so we do not immediately react
+        // to our own setup work and enter a restart loop.
+        scheduleOutputDeviceListenerInstall()
     }
 
     private func installOutputDeviceListener() {
+        guard deviceChangeListener == nil else { return }
         var addr = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope:    kAudioObjectPropertyScopeGlobal,
             mElement:  kAudioObjectPropertyElementMain)
         let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             guard let self, self.isRecording else { return }
+            guard Date() >= self.ignoreOutputDeviceChangesUntil else { return }
             // Output device changed (e.g. headphones connected) — restart the tap
             // so the aggregate device wraps the new device's audio graph.
-            self.restartSystemAudioCapture()
+            self.scheduleSystemAudioRestart()
         }
         AudioObjectAddPropertyListenerBlock(
             AudioObjectID(kAudioObjectSystemObject), &addr, DispatchQueue.main, block)
         deviceChangeListener = block
     }
 
+    private func scheduleOutputDeviceListenerInstall() {
+        pendingOutputDeviceListenerInstall?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.isRecording || self.tapObjectID != kAudioObjectUnknown else { return }
+            self.installOutputDeviceListener()
+        }
+        pendingOutputDeviceListenerInstall = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: workItem)
+    }
+
     private func removeOutputDeviceListener() {
+        pendingOutputDeviceListenerInstall?.cancel()
+        pendingOutputDeviceListenerInstall = nil
         guard let block = deviceChangeListener else { return }
         var addr = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -193,8 +229,20 @@ class AudioRecorder: NSObject, ObservableObject {
         deviceChangeListener = nil
     }
 
+    private func scheduleSystemAudioRestart() {
+        systemRestartWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.restartSystemAudioCapture()
+        }
+        systemRestartWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem)
+    }
+
     /// Called on the main thread when the default output device changes during recording.
     private func restartSystemAudioCapture() {
+        guard !isRestartingSystemAudio else { return }
+        isRestartingSystemAudio = true
+        defer { isRestartingSystemAudio = false }
         // Remove listener first so we don't recurse during teardown.
         removeOutputDeviceListener()
         stopSystemAudioCaptureObjects()
@@ -205,6 +253,8 @@ class AudioRecorder: NSObject, ObservableObject {
     }
 
     private func stopSystemAudioCapture() {
+        systemRestartWorkItem?.cancel()
+        systemRestartWorkItem = nil
         removeOutputDeviceListener()
         stopSystemAudioCaptureObjects()
     }
@@ -252,15 +302,23 @@ class AudioRecorder: NSObject, ObservableObject {
     // MARK: - Microphone (AVAudioEngine)
 
     private func startMicCapture() throws {
+        lastMicStartDate = Date()
         let engine    = AVAudioEngine()
         let inputNode = engine.inputNode
         let inputFmt  = inputNode.outputFormat(forBus: 0)
+        guard inputFmt.sampleRate > 0, inputFmt.channelCount > 0 else {
+            throw RecorderError.invalidInputHardwareFormat
+        }
 
         guard let targetFmt = AVAudioFormat(
             standardFormatWithSampleRate: targetSampleRate, channels: 1
         ) else { throw RecorderError.formatError }
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFmt) {
+        // Do not force a potentially stale hardware format back into the engine.
+        // Let AVAudioEngine use the current bus format and convert from each buffer's
+        // actual format instead. This avoids the "Input HW format is invalid" crash
+        // during transient route churn.
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: nil) {
             [weak self] buffer, _ in
             guard let self else { return }
 
@@ -276,7 +334,9 @@ class AudioRecorder: NSObject, ObservableObject {
                 DispatchQueue.main.async { self.micLevel = normalised }
             }
 
-            let samples = self.convertAndExtract(buffer, from: inputFmt, to: targetFmt)
+            let sourceFormat = buffer.format
+            guard sourceFormat.sampleRate > 0, sourceFormat.channelCount > 0 else { return }
+            let samples = self.convertAndExtract(buffer, from: sourceFormat, to: targetFmt)
             self.lock.lock()
             self.micSamples.append(contentsOf: samples)
             self.lock.unlock()
@@ -291,26 +351,10 @@ class AudioRecorder: NSObject, ObservableObject {
             queue: .main
         ) { [weak self] _ in
             guard let self, self.isRecording else { return }
-            self.micEngine?.inputNode.removeTap(onBus: 0)
-            self.micEngine?.stop()
-            self.micEngine = nil
-            // Remove the observer for the old engine before restarting,
-            // otherwise each restart adds another leaked observer.
-            if let token = self.configChangeObserver {
-                NotificationCenter.default.removeObserver(token)
-                self.configChangeObserver = nil
-            }
-            // Brief delay lets the audio system finish routing to the new device
-            // before we try to start a new engine (important with Google Meet /
-            // any app that also reconfigures audio on the same event).
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                guard let self, self.isRecording else { return }
-                do {
-                    try self.startMicCapture()
-                } catch {
-                    print("AudioRecorder: mic restart failed after config change: \(error)")
-                }
-            }
+            // Ignore notifications emitted by the graph churn we cause ourselves
+            // while CATap + aggregate device creation is still settling.
+            guard Date().timeIntervalSince(self.lastMicStartDate) > 2.0 else { return }
+            self.scheduleMicCaptureRestart()
         }
 
         try engine.start()
@@ -318,7 +362,39 @@ class AudioRecorder: NSObject, ObservableObject {
         print("AudioRecorder: microphone capture started")
     }
 
+    private func scheduleMicCaptureRestart() {
+        micRestartWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.restartMicCapture()
+        }
+        micRestartWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+    }
+
+    private func restartMicCapture() {
+        guard isRecording, !isRestartingMicCapture else { return }
+        isRestartingMicCapture = true
+        defer { isRestartingMicCapture = false }
+
+        micEngine?.inputNode.removeTap(onBus: 0)
+        micEngine?.stop()
+        micEngine = nil
+        if let token = configChangeObserver {
+            NotificationCenter.default.removeObserver(token)
+            configChangeObserver = nil
+        }
+
+        do {
+            try startMicCapture()
+        } catch {
+            print("AudioRecorder: mic restart failed after config change: \(error)")
+        }
+    }
+
     private func stopMicCapture() {
+        micRestartWorkItem?.cancel()
+        micRestartWorkItem = nil
+        isRestartingMicCapture = false
         if let token = configChangeObserver {
             NotificationCenter.default.removeObserver(token)
             configChangeObserver = nil
@@ -434,6 +510,7 @@ enum RecorderError: LocalizedError {
     case aggregateDeviceCreationFailed(OSStatus)
     case ioProcCreationFailed(OSStatus)
     case audioDeviceStartFailed(OSStatus)
+    case invalidInputHardwareFormat
     case formatError
     case noAudioCaptured
 
@@ -444,6 +521,7 @@ enum RecorderError: LocalizedError {
         case .aggregateDeviceCreationFailed(let s):  return "Failed to create aggregate device (err \(s))"
         case .ioProcCreationFailed(let s):           return "Failed to create IOProc (err \(s))"
         case .audioDeviceStartFailed(let s):         return "Failed to start audio device (err \(s))"
+        case .invalidInputHardwareFormat:            return "Microphone hardware format was temporarily invalid"
         case .formatError:                           return "Audio format conversion failed"
         case .noAudioCaptured:                       return "No audio was captured"
         }

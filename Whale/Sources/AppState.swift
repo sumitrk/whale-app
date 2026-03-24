@@ -159,7 +159,7 @@ class AppState: ObservableObject {
     fileprivate func startRecording(mode: RecordingMode) async {
         do {
             currentMode = mode
-            try await recorder.startRecording()
+            try await recorder.startRecording(captureSystemAudio: mode == .markdown)
             isRecording = true
             status = .recording
             recordingStartedAt = Date()
