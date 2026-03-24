@@ -268,10 +268,10 @@ class AppState: ObservableObject {
                 if !previous.isEmpty { NSPasteboard.general.writeObjects(previous) }
             }
         } else {
-            // No focused text input — copy to clipboard like a normal copy.
-            // User can ⌘V whenever they want; clipboard manages itself naturally.
+            // No focused text input — copy to clipboard and nudge the user to paste manually.
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
+            RecordingIndicatorWindow.shared.showHint()
         }
     }
 
