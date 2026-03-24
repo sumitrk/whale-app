@@ -1,5 +1,5 @@
 #!/bin/bash
-# distribute.sh — builds, signs, packages, and releases TranscribeMeeting
+# distribute.sh — builds, signs, packages, and releases Whale
 set -e
 
 APP_NAME="Whale"
@@ -52,16 +52,12 @@ fi
 
 # ── Build ────────────────────────────────────────────────────────────────────
 echo ""
-echo "▶ Building Xcode project (Release, ad-hoc signed)..."
+echo "▶ Building Xcode project (Release, Xcode-signed)..."
 xcodebuild \
   -project Whale.xcodeproj \
   -scheme "$SCHEME" \
   -configuration Release \
   -derivedDataPath "$DERIVED_DATA" \
-  CODE_SIGN_IDENTITY="-" \
-  CODE_SIGN_STYLE=Manual \
-  DEVELOPMENT_TEAM="" \
-  OTHER_CODE_SIGN_FLAGS="" \
   clean build 2>&1 | grep -E "^(Build|error:)" || true
 
 APP_PATH=$(find "$DERIVED_DATA" -name "${APP_NAME}.app" -maxdepth 6 | head -1)
@@ -77,37 +73,42 @@ echo "▶ Bundling Python server binary..."
 cp -r "dist/transcribe_server" "$APP_PATH/Contents/Resources/"
 echo "✅ Server binary bundled"
 
-# ── Ad-hoc sign ──────────────────────────────────────────────────────────────
-# Must sign inside-out: nested bundles first, then frameworks, then the app.
-# --deep is intentionally avoided — it mishandles Sparkle's nested Updater.app
-# and XPC services, producing an "ambiguous bundle" rejection from codesign.
+# ── Re-sign injected payload with the app's real signing identity ───────────
 echo ""
-echo "▶ Ad-hoc signing..."
+echo "▶ Re-signing bundled server with the app's real identity..."
 
-SPARKLE="$APP_PATH/Contents/Frameworks/Sparkle.framework/Versions/B"
+SIGNING_IDENTITY=$(codesign -dvvv "$APP_PATH" 2>&1 | awk -F= '/^Authority=/{print $2; exit}')
+if [ -z "$SIGNING_IDENTITY" ]; then
+  echo "❌ Could not determine the app signing identity."
+  echo "   The release app must be signed by Xcode with a real certificate."
+  exit 1
+fi
 
-# 1. Sign loose dylibs and .so files (PyInstaller server binary etc.)
-find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.so" \) | while read f; do
-  codesign --force --sign - "$f" 2>/dev/null || true
+SERVER_DEST="$APP_PATH/Contents/Resources/transcribe_server"
+
+# Sign only the code we injected after the Xcode build. Re-signing the whole
+# Sparkle tree ad-hoc makes Accessibility trust unstable across installs/updates.
+find "$SERVER_DEST" -type f \( -name "*.dylib" -o -name "*.so" -o -perm -111 \) -print0 | \
+while IFS= read -r -d '' f; do
+  codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$f"
 done
 
-# 2. Sign Sparkle's XPC services (innermost)
-for xpc in "$SPARKLE/XPCServices/"*.xpc; do
-  [ -d "$xpc" ] && codesign --force --sign - "$xpc"
-done
+codesign \
+  --force \
+  --sign "$SIGNING_IDENTITY" \
+  --entitlements "$ENTITLEMENTS" \
+  --preserve-metadata=identifier,requirements,flags \
+  --timestamp=none \
+  "$APP_PATH"
 
-# 3. Sign Sparkle's nested Updater.app
-[ -d "$SPARKLE/Updater.app" ] && codesign --force --sign - "$SPARKLE/Updater.app"
+if codesign -dvvv "$APP_PATH" 2>&1 | grep -q "Signature=adhoc"; then
+  echo "❌ Release app is still ad-hoc signed; aborting packaging."
+  exit 1
+fi
 
-# 4. Sign the Sparkle framework itself
-codesign --force --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
-
-# 5. Sign the top-level app bundle with entitlements
-codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP_PATH"
-
-# Verify the signature is valid before packaging
 codesign -vvv "$APP_PATH" 2>&1 | tail -3
-echo "✅ Ad-hoc signed"
+codesign -dr - "$APP_PATH" 2>&1 | tail -1
+echo "✅ Re-signed with ${SIGNING_IDENTITY}"
 
 # ── Create DMG ───────────────────────────────────────────────────────────────
 echo ""
