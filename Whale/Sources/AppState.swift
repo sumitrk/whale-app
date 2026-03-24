@@ -247,8 +247,7 @@ class AppState: ObservableObject {
 
     private func copyAndPaste(_ text: String) {
         if focusedElementIsTextInput() {
-            // A text input is active — snapshot old clipboard, auto-paste, restore after 1s.
-            let previous = snapshotClipboard()
+            // A text input is active — copy transcript and auto-paste it.
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
 
@@ -261,12 +260,6 @@ class AppState: ObservableObject {
                 down?.post(tap: .cghidEventTap)
                 usleep(10_000)
                 up?.post(tap: .cghidEventTap)
-            }
-
-            // Restore old clipboard once paste has completed.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                NSPasteboard.general.clearContents()
-                if !previous.isEmpty { NSPasteboard.general.writeObjects(previous) }
             }
         } else {
             // No focused text input — copy to clipboard and nudge the user to paste manually.
@@ -293,16 +286,6 @@ class AppState: ObservableObject {
         ) == .success, let role = roleRef as? String else { return false }
 
         return ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role)
-    }
-
-    private func snapshotClipboard() -> [NSPasteboardItem] {
-        (NSPasteboard.general.pasteboardItems ?? []).compactMap { item in
-            let copy = NSPasteboardItem()
-            for type in item.types {
-                if let data = item.data(forType: type) { copy.setData(data, forType: type) }
-            }
-            return copy
-        }
     }
 
     // MARK: - Accessibility
