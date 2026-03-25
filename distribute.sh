@@ -9,6 +9,11 @@
 # - verifies bundle integrity
 # - creates a DMG
 #
+# On main, publish mode also creates the GitHub release and pushes release
+# metadata to main. On other branches, publish mode behaves like a branch
+# preview: it signs the DMG, updates appcast.xml, and pushes the current branch
+# without creating a repo-wide GitHub release.
+#
 # Optional local-only dry run:
 #   WHALE_RELEASE_MODE=local ./distribute.sh
 # Public "download and just open" distribution still requires Developer ID +
@@ -29,11 +34,6 @@ CURRENT_BRANCH="$(git branch --show-current)"
 if [ "$RELEASE_MODE" != "local" ] && [ "$RELEASE_MODE" != "publish" ]; then
   echo "❌ Unsupported WHALE_RELEASE_MODE: $RELEASE_MODE"
   echo "   Use WHALE_RELEASE_MODE=local or WHALE_RELEASE_MODE=publish"
-  exit 1
-fi
-
-if [ "$RELEASE_MODE" = "publish" ] && [ "$CURRENT_BRANCH" != "main" ]; then
-  echo "❌ Publish mode must run from main after the branch has been merged."
   exit 1
 fi
 
@@ -193,7 +193,7 @@ verify_app_bundle() {
     smoke_root="${DERIVED_DATA}/smoke"
     rm -rf "$smoke_root"
     mkdir -p "$smoke_root"
-    cp -R "$APP_PATH" "$smoke_root/"
+    ditto "$APP_PATH" "$smoke_root/${APP_NAME}.app"
     smoke_app="$smoke_root/${APP_NAME}.app"
     open "$smoke_app"
     sleep 5
@@ -208,7 +208,8 @@ create_dmg() {
   echo "▶ Creating DMG..."
   rm -rf "$DIST_DIR"
   mkdir -p "$DIST_DIR"
-  cp -r "$APP_PATH" "$DIST_DIR/"
+  # Preserve framework symlinks exactly; cp -r can flatten Sparkle.framework.
+  ditto "$APP_PATH" "$DIST_DIR/${APP_NAME}.app"
   ln -s /Applications "$DIST_DIR/Applications"
   rm -f "$DMG_NAME"
   hdiutil create \
@@ -246,7 +247,7 @@ sign_dmg_for_sparkle() {
 }
 
 publish_release() {
-  local pub_date
+  local pub_date metadata_branch appcast_link
 
   sign_dmg_for_sparkle
 
@@ -254,6 +255,8 @@ publish_release() {
   echo "▶ Updating appcast.xml..."
   pub_date=$(date -u "+%a, %d %b %Y %H:%M:%S +0000")
   DMG_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/${DMG_NAME}"
+  metadata_branch="$CURRENT_BRANCH"
+  appcast_link="https://raw.githubusercontent.com/${GITHUB_REPO}/${metadata_branch}/appcast.xml"
 
   cat > appcast.xml << EOF
 <?xml version="1.0" encoding="utf-8"?>
@@ -280,26 +283,36 @@ publish_release() {
 EOF
   echo "✅ appcast.xml updated"
 
-  echo ""
-  echo "▶ Creating GitHub release v${VERSION}..."
-  if ! command -v gh &>/dev/null; then
-    echo "⚠️  gh CLI not found — skipping GitHub release."
-    echo "   Install with: brew install gh"
-    echo "   Then manually upload ${DMG_NAME} to https://github.com/${GITHUB_REPO}/releases"
+  if [ "$CURRENT_BRANCH" = "main" ]; then
+    echo ""
+    echo "▶ Creating GitHub release v${VERSION}..."
+    if ! command -v gh &>/dev/null; then
+      echo "⚠️  gh CLI not found — skipping GitHub release."
+      echo "   Install with: brew install gh"
+      echo "   Then manually upload ${DMG_NAME} to https://github.com/${GITHUB_REPO}/releases"
+    else
+      gh release create "v${VERSION}" "$DMG_NAME" \
+        --repo "$GITHUB_REPO" \
+        --title "v${VERSION}" \
+        --notes "Whale v${VERSION}" \
+        2>&1 && echo "✅ GitHub release created" || echo "⚠️  Release may already exist — upload DMG manually"
+    fi
   else
-    gh release create "v${VERSION}" "$DMG_NAME" \
-      --repo "$GITHUB_REPO" \
-      --title "v${VERSION}" \
-      --notes "Whale v${VERSION}" \
-      2>&1 && echo "✅ GitHub release created" || echo "⚠️  Release may already exist — upload DMG manually"
+    echo ""
+    echo "▶ Skipping GitHub release on branch ${CURRENT_BRANCH}"
+    echo "   Branch preview mode avoids creating repo-wide release tags/assets."
   fi
 
   echo ""
-  echo "▶ Publishing appcast.xml..."
+  echo "▶ Publishing release metadata to ${metadata_branch}..."
   git add appcast.xml "$VERSION_PLIST"
   git commit -m "release: v${VERSION}" || echo "(release metadata unchanged)"
-  git push origin main
-  echo "✅ Release metadata pushed to main"
+  git push origin "$metadata_branch"
+  echo "✅ Release metadata pushed to ${metadata_branch}"
+
+  if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo "ℹ️  Branch preview appcast: ${appcast_link}"
+  fi
 }
 
 sync_version_metadata
@@ -319,7 +332,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 if [ "$RELEASE_MODE" = "publish" ]; then
   echo "✅ Released v${VERSION}"
   echo "   DMG     → $(pwd)/${DMG_NAME}"
-  echo "   Appcast → https://raw.githubusercontent.com/${GITHUB_REPO}/main/appcast.xml"
+  echo "   Appcast → https://raw.githubusercontent.com/${GITHUB_REPO}/${CURRENT_BRANCH}/appcast.xml"
   echo "   Mode    → publish"
 else
   echo "✅ Packaged v${VERSION}"

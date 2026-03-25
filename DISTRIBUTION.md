@@ -60,8 +60,8 @@ This default flow:
 - creates the DMG
 - signs the DMG for Sparkle
 - updates `appcast.xml`
-- creates the GitHub release
-- commits and pushes release metadata from `main`
+- on `main`, creates the GitHub release
+- commits and pushes release metadata to the current branch
 
 Optional post-launch integrity smoke test:
 ```bash
@@ -74,6 +74,11 @@ WHALE_RELEASE_MODE=local ./distribute.sh
 ```
 
 Local mode packages the current app version without editing `Whale/Info.plist` or publishing release metadata.
+
+Branch behavior:
+- running `./distribute.sh` on `main` performs the real release flow
+- running `./distribute.sh` on any other branch performs a branch preview release
+- branch preview mode signs the DMG and updates `appcast.xml`, but skips the repo-wide GitHub release so you can test packaging without polluting `main`
 
 ## Verification Contract
 
@@ -129,7 +134,8 @@ To support true "download and just use it" installs:
 ## Publish Prerequisites
 
 The default `./distribute.sh` flow expects:
-- you are running it from `main`
 - `gh` is installed and authenticated
 - the Sparkle private key is available in your keychain
 - Sparkle tools have been built by Xcode at least once
+
+GitHub release creation only happens when the current branch is `main`.
