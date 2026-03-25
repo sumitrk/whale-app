@@ -79,42 +79,9 @@ final class RecordingIndicatorWindow: NSPanel {
 
     /// Returns the Cocoa-coordinate frame of the currently focused AX text element, or nil.
     private func focusedInputFrame() -> NSRect? {
-        guard AXIsProcessTrusted() else { return nil }
-
-        let system = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            system, kAXFocusedUIElementAttribute as CFString, &focusedRef
-        ) == .success, let focusedRef else { return nil }
-
-        let element = focusedRef as! AXUIElement
-
-        // Only position relative to writable text inputs.
-        var roleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element, kAXRoleAttribute as CFString, &roleRef
-        ) == .success,
-              let role = roleRef as? String,
-              ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role)
-        else { return nil }
-
-        var frameRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element, "AXFrame" as CFString, &frameRef
-        ) == .success, let frameRef else { return nil }
-
-        var axRect = CGRect.zero
-        guard AXValueGetValue(frameRef as! AXValue, .cgRect, &axRect) else { return nil }
-
-        // AX coordinates: origin top-left of primary screen, y increases downward.
-        // Cocoa coordinates: origin bottom-left, y increases upward.
-        let screenH = NSScreen.screens.first?.frame.height ?? 0
-        return NSRect(
-            x: axRect.origin.x,
-            y: screenH - axRect.origin.y - axRect.height,
-            width: axRect.width,
-            height: axRect.height
-        )
+        guard let snapshot = FocusedElementInspector.snapshot(),
+              snapshot.isWritableTextTarget else { return nil }
+        return snapshot.frame
     }
 
     private func clampAndSet(_ origin: NSPoint) {

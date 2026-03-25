@@ -276,7 +276,12 @@ class AppState: ObservableObject {
     // MARK: - Clipboard + paste
 
     private func copyAndPaste(_ text: String) {
-        if focusedElementIsTextInput() {
+        let focusedElement = FocusedElementInspector.snapshot()
+        let canAutoPaste = focusedElement?.isWritableTextTarget == true
+
+        logPasteDecision(snapshot: focusedElement, attemptedAutoPaste: canAutoPaste)
+
+        if canAutoPaste {
             // A text input is active — copy transcript and auto-paste it.
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
@@ -302,23 +307,18 @@ class AppState: ObservableObject {
         }
     }
 
-    /// Returns true if the currently focused UI element is a writable text input.
-    /// Works for native macOS apps AND browsers (Chrome/Safari/Arc expose web
-    /// inputs as AXTextField / AXTextArea in their accessibility tree).
-    private func focusedElementIsTextInput() -> Bool {
-        guard AXIsProcessTrusted() else { return false }
-        let system = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            system, kAXFocusedUIElementAttribute as CFString, &focusedRef
-        ) == .success, let focusedRef else { return false }
+    private func logPasteDecision(snapshot: FocusedElementSnapshot?, attemptedAutoPaste: Bool) {
+        let appName = snapshot?.appName ?? "unknown"
+        let bundle = snapshot?.bundleIdentifier ?? "unknown"
+        let role = snapshot?.role ?? "nil"
+        let subrole = snapshot?.subrole ?? "nil"
+        let editable = snapshot?.isEditable ?? false
+        let selectedTextRange = snapshot?.supportsSelectedTextRange ?? false
+        let decision = attemptedAutoPaste ? "auto-paste" : "clipboard-only"
 
-        var roleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            focusedRef as! AXUIElement, kAXRoleAttribute as CFString, &roleRef
-        ) == .success, let role = roleRef as? String else { return false }
-
-        return ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role)
+        print(
+            "AutoPaste decision=\(decision) app=\(appName) bundle=\(bundle) role=\(role) subrole=\(subrole) editable=\(editable) selectedTextRange=\(selectedTextRange)"
+        )
     }
 
     // MARK: - Markdown builder

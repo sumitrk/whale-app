@@ -13,6 +13,7 @@
 		0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */; };
 		173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */; };
 		225A0771E3382915CC101010 /* PermissionsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */; };
+		26F65C1A9D4E4F21A8B7C6D5 /* FocusedElementInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26F65C1A9D4E4F21A8B7C6D4 /* FocusedElementInspector.swift */; };
 		29A65EDEADEA0F1B5158FD69 /* KeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E38A11A0F59E213976F5390 /* KeyRecorderView.swift */; };
 		3EF16474D07EFA86261B35A2 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9765E7786B962732E0D4B5C /* AISettingsView.swift */; };
 		44B72D2C29F587378408A9BA /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */; };
@@ -40,6 +41,7 @@
 		19D6490C04B4740A610C1E18 /* PythonServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonServer.swift; sourceTree = "<group>"; };
 		173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityController.swift; sourceTree = "<group>"; };
 		1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicatorWindow.swift; sourceTree = "<group>"; };
+		26F65C1A9D4E4F21A8B7C6D4 /* FocusedElementInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusedElementInspector.swift; sourceTree = "<group>"; };
 		4ABD2DA0658FF2189FE2CD1C /* ShortcutsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutsSettingsView.swift; sourceTree = "<group>"; };
 		4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsSettingsView.swift; sourceTree = "<group>"; };
 		5EB407F215A4729F95EBD5AA /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -92,6 +94,7 @@
 				E9765E7786B962732E0D4B5C /* AISettingsView.swift */,
 				D5228B35E5BC11AB86698BDC /* AppState.swift */,
 				A24AEF266FF0BBF055AB8CFB /* AudioRecorder.swift */,
+				26F65C1A9D4E4F21A8B7C6D4 /* FocusedElementInspector.swift */,
 				D450792BC5E0CE42F90269FE /* GeneralSettingsView.swift */,
 				B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */,
 				9E38A11A0F59E213976F5390 /* KeyRecorderView.swift */,
@@ -244,6 +247,7 @@
 				173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */,
 				89E3B9353ADD0FFF6610144B /* AppState.swift in Sources */,
 				700DD29FBEB9B95443CCDCEA /* AudioRecorder.swift in Sources */,
+				26F65C1A9D4E4F21A8B7C6D5 /* FocusedElementInspector.swift in Sources */,
 				CCA720AE0BE461180105FE92 /* GeneralSettingsView.swift in Sources */,
 				44B72D2C29F587378408A9BA /* HotkeyManager.swift in Sources */,
 				29A65EDEADEA0F1B5158FD69 /* KeyRecorderView.swift in Sources */,
