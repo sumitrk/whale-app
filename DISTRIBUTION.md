@@ -43,12 +43,7 @@ Three independent properties must hold for distribution to behave correctly:
 
 Default publish flow:
 
-1. Build the bundled server artifact.
-```bash
-./scripts/build_server_binary.sh
-```
-
-2. Build, verify, package, sign for Sparkle, update `appcast.xml`, and publish.
+1. Build, verify, package, sign for Sparkle, update `appcast.xml`, and publish.
 ```bash
 ./distribute.sh
 ```

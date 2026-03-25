@@ -20,7 +20,7 @@ struct GeneralSettingsView: View {
                             .foregroundStyle(.secondary)
                         Button("Check for Updates") {
                             NSWorkspace.shared.open(
-                                URL(string: "https://github.com/sumitrk/transcribe-meeting/releases")!
+                                URL(string: "https://github.com/sumitrk/whale-app/releases")!
                             )
                         }
                         .buttonStyle(.borderless)

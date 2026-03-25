@@ -195,14 +195,7 @@ private struct PermissionRow: View {
 
 private struct ModelStep: View {
     @Binding var hasModel: Bool
-    @ObservedObject private var store = SettingsStore.shared
-
-    @State private var models: [ModelInfo] = []
-    @State private var downloading: Set<String> = []
-    @State private var downloadProgress: [String: Double] = [:]
-    @State private var error: String?
-    @State private var isLoading = true
-    @State private var pollTimer: Timer?
+    @ObservedObject private var modelStore = TranscriptionModelStore.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -216,113 +209,26 @@ private struct ModelStep: View {
             .padding(.horizontal, 28)
             .padding(.top, 28)
 
-            if let error, !models.isEmpty {
-                ModelStatusCard(
-                    title: "Model issue",
-                    message: error,
-                    buttonTitle: "Retry",
-                    action: { Task { await fetchModels() } }
-                )
+            NativeModelInstallCard(contentPadding: 16)
                 .padding(.horizontal, 28)
-            }
 
-            if isLoading && models.isEmpty {
-                ModelStatusCard(
-                    title: "Starting transcription server…",
-                    message: "Checking which models are fully available on this Mac."
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, 28)
-            } else if models.isEmpty {
-                ModelStatusCard(
-                    title: error == nil ? "No models available" : "Could not load models",
-                    message: error ?? "Retry once the transcription server is ready.",
-                    buttonTitle: "Retry",
-                    action: { Task { await fetchModels() } }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, 28)
-            } else {
-                if !models.contains(where: { $0.downloaded }) {
-                    ModelStatusCard(
-                        title: "Download one model to continue",
-                        message: "Only fully completed downloads unlock onboarding. Interrupted downloads stay inactive until they finish cleanly."
-                    )
+            if case .ready = modelStore.installState {
+                Text("Model installed. Continue to configure your shortcut and test dictation.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, 28)
-                }
-
-                List(models) { model in
-                    ModelRow(
-                        model:            model,
-                        isActive:         store.activeModelId == model.id && model.downloaded,
-                        isDownloading:    downloading.contains(model.id),
-                        downloadProgress: downloadProgress[model.id],
-                        onSelect:         { store.activeModelId = model.id },
-                        onDownload:       { Task { await download(model) } }
-                    )
-                }
-                .listStyle(.inset)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task { await fetchModels() }
-        .onAppear  { startPolling() }
-        .onDisappear { pollTimer?.invalidate() }
-    }
-
-    private func startPolling() {
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
-            Task { await fetchModels() }
+        .task { await syncModelState() }
+        .onChange(of: modelStore.installState) { _, _ in
+            hasModel = modelStore.isReady
         }
     }
 
-    private func fetchModels() async {
-        if models.isEmpty {
-            isLoading = true
-        }
-
-        do {
-            let fetched = try await ModelService.fetchModels()
-            models = fetched
-            error = nil
-            let downloadedIds = fetched.filter { $0.downloaded }.map { $0.id }
-            store.reconcileActiveModel(downloadedModelIds: downloadedIds)
-            hasModel = !downloadedIds.isEmpty
-        } catch {
-            self.error = error.localizedDescription
-            hasModel = false
-        }
-
-        isLoading = false
-    }
-
-    private func download(_ model: ModelInfo) async {
-        downloading.insert(model.id)
-        defer {
-            downloading.remove(model.id)
-            downloadProgress.removeValue(forKey: model.id)
-        }
-
-        // Poll progress while download is in-flight
-        let pollTask = Task {
-            while !Task.isCancelled {
-                if let progress = await ModelService.fetchDownloadProgress(for: model.id) {
-                    await MainActor.run {
-                        downloadProgress[model.id] = progress
-                    }
-                }
-                try? await Task.sleep(nanoseconds: 800_000_000)
-            }
-        }
-        defer { pollTask.cancel() }
-
-        do {
-            try await ModelService.download(model)
-            await fetchModels()
-        } catch {
-            self.error = "\(model.label) failed to download. \(error.localizedDescription)"
-            await fetchModels()
-        }
+    private func syncModelState() async {
+        await modelStore.refreshNow()
+        hasModel = modelStore.isReady
     }
 }
 

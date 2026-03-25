@@ -23,7 +23,7 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/sumitrk/transcribe-meeting/main/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/sumitrk/whale-app/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>RRN4cJZf4vmWZOCv26lN57MjWUABKSkhCtc1P13kTXY=</string>
 </dict>

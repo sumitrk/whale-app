@@ -23,7 +23,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case shortcuts   = "Shortcuts"
     case model       = "Model"
     case permissions = "Permissions"
-    case ai          = "AI"
 
     var id: String { rawValue }
 
@@ -33,7 +32,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .shortcuts:   return "keyboard"
         case .model:       return "cpu"
         case .permissions: return "lock.shield"
-        case .ai:          return "sparkles"
         }
     }
 }
@@ -60,7 +58,6 @@ struct SettingsView: View {
                 case .shortcuts:   ShortcutsSettingsView()
                 case .model:       ModelSettingsView()
                 case .permissions: PermissionsSettingsView()
-                case .ai:          AISettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

@@ -12,7 +12,7 @@ options:
 settings:
   base:
     PRODUCT_NAME: TranscribeMeeting
-    SWIFT_VERSION: "5.9"
+    SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.2"
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: "G6Z6DNHM33"
@@ -36,22 +36,3 @@ targets:
       - sdk: CoreAudio.framework
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
-    postBuildScripts:
-      - name: Copy Python Server Binary (if built)
-        script: |
-          BINARY_DIR="${SRCROOT}/dist/transcribe_server"
-          DEST="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Resources/transcribe_server"
-          if [ -d "$BINARY_DIR" ]; then
-            echo "Bundling Python server binary from $BINARY_DIR"
-            rm -rf "$DEST"
-            mkdir -p "$(dirname "$DEST")"
-            cp -r "$BINARY_DIR" "$DEST"
-            INTERNAL_DIR="$DEST/_internal"
-            METALLIB_LINK="$INTERNAL_DIR/mlx.metallib"
-            METALLIB_TARGET="mlx/lib/mlx.metallib"
-            if [ -f "$INTERNAL_DIR/$METALLIB_TARGET" ] && [ ! -e "$METALLIB_LINK" ]; then
-              ln -s "$METALLIB_TARGET" "$METALLIB_LINK"
-            fi
-          else
-            echo "No dist/transcribe_server found — app will use Python fallback (dev mode)"
-          fi

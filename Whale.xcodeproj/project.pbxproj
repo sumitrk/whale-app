@@ -8,14 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */; };
-		0BAAD6EA58BAF432A7E4FBAC /* TranscribeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078C61959EE23AA2D177D0EC /* TranscribeClient.swift */; };
-		0CA143F9429899C52FBEA980 /* PythonServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D6490C04B4740A610C1E18 /* PythonServer.swift */; };
 		0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */; };
+		1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */; };
+		1C91A4D62C0C4A0B9F20A111 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C91A4D72C0C4A0B9F20A111 /* FluidAudio */; };
 		173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */; };
 		225A0771E3382915CC101010 /* PermissionsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */; };
 		26F65C1A9D4E4F21A8B7C6D5 /* FocusedElementInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26F65C1A9D4E4F21A8B7C6D4 /* FocusedElementInspector.swift */; };
 		29A65EDEADEA0F1B5158FD69 /* KeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E38A11A0F59E213976F5390 /* KeyRecorderView.swift */; };
-		3EF16474D07EFA86261B35A2 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9765E7786B962732E0D4B5C /* AISettingsView.swift */; };
 		44B72D2C29F587378408A9BA /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */; };
 		458667B43F9AE26431333EA6 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2954E642B3BA0DC9A23C8B0 /* MenuBarView.swift */; };
 		49AE7A1CFDC69357DD4B865D /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D7ECD4881167C564AC493E67 /* AVFoundation.framework */; };
@@ -37,10 +36,9 @@
 
 /* Begin PBXFileReference section */
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		078C61959EE23AA2D177D0EC /* TranscribeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscribeClient.swift; sourceTree = "<group>"; };
-		19D6490C04B4740A610C1E18 /* PythonServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonServer.swift; sourceTree = "<group>"; };
 		173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityController.swift; sourceTree = "<group>"; };
 		1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicatorWindow.swift; sourceTree = "<group>"; };
+		1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionService.swift; sourceTree = "<group>"; };
 		26F65C1A9D4E4F21A8B7C6D4 /* FocusedElementInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusedElementInspector.swift; sourceTree = "<group>"; };
 		4ABD2DA0658FF2189FE2CD1C /* ShortcutsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutsSettingsView.swift; sourceTree = "<group>"; };
 		4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsSettingsView.swift; sourceTree = "<group>"; };
@@ -59,7 +57,6 @@
 		D5228B35E5BC11AB86698BDC /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		D7ECD4881167C564AC493E67 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		E30A00EEB7141B3BFD0B065B /* TranscribeMeeting.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TranscribeMeeting.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E9765E7786B962732E0D4B5C /* AISettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsView.swift; sourceTree = "<group>"; };
 		EC32008B10AB2F3A32901A8F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		F9355D4C305CC2A5F0A0E16D /* ModelSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -70,6 +67,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A61089AAB7BD42A35D460B5 /* CoreAudio.framework in Frameworks */,
+				1C91A4D62C0C4A0B9F20A111 /* FluidAudio in Frameworks */,
 				C6A3D56B2F7023BB00A16DA0 /* Sparkle in Frameworks */,
 				A5F1E893C1214A87B9A5BDFC /* AudioToolbox.framework in Frameworks */,
 				49AE7A1CFDC69357DD4B865D /* AVFoundation.framework in Frameworks */,
@@ -91,25 +89,23 @@
 			isa = PBXGroup;
 			children = (
 				173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */,
-				E9765E7786B962732E0D4B5C /* AISettingsView.swift */,
 				D5228B35E5BC11AB86698BDC /* AppState.swift */,
 				A24AEF266FF0BBF055AB8CFB /* AudioRecorder.swift */,
 				26F65C1A9D4E4F21A8B7C6D4 /* FocusedElementInspector.swift */,
 				D450792BC5E0CE42F90269FE /* GeneralSettingsView.swift */,
 				B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */,
 				9E38A11A0F59E213976F5390 /* KeyRecorderView.swift */,
+				1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */,
 				C2954E642B3BA0DC9A23C8B0 /* MenuBarView.swift */,
 				F9355D4C305CC2A5F0A0E16D /* ModelSettingsView.swift */,
 				EC32008B10AB2F3A32901A8F /* OnboardingView.swift */,
 				4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */,
 				8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */,
-				19D6490C04B4740A610C1E18 /* PythonServer.swift */,
 				1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */,
 				D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */,
 				8416E07055CA131C50C9B6F6 /* SettingsStore.swift */,
 				5EB407F215A4729F95EBD5AA /* SettingsView.swift */,
 				4ABD2DA0658FF2189FE2CD1C /* ShortcutsSettingsView.swift */,
-				078C61959EE23AA2D177D0EC /* TranscribeClient.swift */,
 				617C5598D1998EE5F01350BC /* TranscribeMeetingApp.swift */,
 			);
 			name = Sources;
@@ -155,7 +151,6 @@
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* Resources */,
 				C9421B68B0297431CB7B7584 /* Sources */,
 				BBEDF9B9D3FBB5E122CFB20D /* Frameworks */,
-				33792503CD20009BBFDA8525 /* Copy Python Server Binary (if built) */,
 			);
 			buildRules = (
 			);
@@ -163,6 +158,7 @@
 			);
 			name = Whale;
 			packageProductDependencies = (
+				1C91A4D72C0C4A0B9F20A111 /* FluidAudio */,
 				C6A3D56A2F7023BB00A16DA0 /* Sparkle */,
 			);
 			productName = TranscribeMeeting;
@@ -194,6 +190,7 @@
 			mainGroup = 8F2DCE44CE4C7CA0FB04F8BC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -217,33 +214,11 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		33792503CD20009BBFDA8525 /* Copy Python Server Binary (if built) */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Copy Python Server Binary (if built)";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "BINARY_DIR=\"${SRCROOT}/dist/transcribe_server\"\nDEST=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Resources/transcribe_server\"\nif [ -d \"$BINARY_DIR\" ]; then\n  echo \"Bundling Python server binary from $BINARY_DIR\"\n  rm -rf \"$DEST\"\n  mkdir -p \"$(dirname \"$DEST\")\"\n  cp -r \"$BINARY_DIR\" \"$DEST\"\n  INTERNAL_DIR=\"$DEST/_internal\"\n  METALLIB_LINK=\"$INTERNAL_DIR/mlx.metallib\"\n  METALLIB_TARGET=\"mlx/lib/mlx.metallib\"\n  if [ -f \"$INTERNAL_DIR/$METALLIB_TARGET\" ] && [ ! -e \"$METALLIB_LINK\" ]; then\n    ln -s \"$METALLIB_TARGET\" \"$METALLIB_LINK\"\n  fi\nelse\n  echo \"No dist/transcribe_server found — app will use Python fallback (dev mode)\"\nfi\n";
-		};
-/* End PBXShellScriptBuildPhase section */
-
 /* Begin PBXSourcesBuildPhase section */
 		C9421B68B0297431CB7B7584 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3EF16474D07EFA86261B35A2 /* AISettingsView.swift in Sources */,
 				173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */,
 				89E3B9353ADD0FFF6610144B /* AppState.swift in Sources */,
 				700DD29FBEB9B95443CCDCEA /* AudioRecorder.swift in Sources */,
@@ -251,18 +226,17 @@
 				CCA720AE0BE461180105FE92 /* GeneralSettingsView.swift in Sources */,
 				44B72D2C29F587378408A9BA /* HotkeyManager.swift in Sources */,
 				29A65EDEADEA0F1B5158FD69 /* KeyRecorderView.swift in Sources */,
+				1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */,
 				458667B43F9AE26431333EA6 /* MenuBarView.swift in Sources */,
 				6662ADC802438E2174FFF967 /* ModelSettingsView.swift in Sources */,
 				99A09F84D12D5E5B2A3D164D /* OnboardingView.swift in Sources */,
 				EA62496C0185BEEC105B2E85 /* PTTRecorderView.swift in Sources */,
 				225A0771E3382915CC101010 /* PermissionsSettingsView.swift in Sources */,
-				0CA143F9429899C52FBEA980 /* PythonServer.swift in Sources */,
 				0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */,
 				D4E5F60718293A4B5C6D7E8F /* SettingsCoordinator.swift in Sources */,
 				EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */,
 				F0F812B0EA8E670D04878BDD /* SettingsView.swift in Sources */,
 				94E2FF4554D92D4265DAFE60 /* ShortcutsSettingsView.swift in Sources */,
-				0BAAD6EA58BAF432A7E4FBAC /* TranscribeClient.swift in Sources */,
 				84740FA4C22131C091BD729B /* TranscribeMeetingApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -451,6 +425,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.12.4;
+			};
+		};
 		C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -462,6 +444,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1C91A4D72C0C4A0B9F20A111 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
 		C6A3D56A2F7023BB00A16DA0 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */;

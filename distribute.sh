@@ -4,8 +4,6 @@
 #
 # Default mode is publish for bridge distribution:
 # - builds the app
-# - injects the prepared transcribe_server artifact
-# - re-signs only the injected payload + top-level app
 # - verifies bundle integrity
 # - creates a DMG
 #
@@ -22,7 +20,6 @@ set -euo pipefail
 
 APP_NAME="Whale"
 SCHEME="Whale"
-ENTITLEMENTS="Whale/TranscribeMeeting.entitlements"
 DERIVED_DATA="build/xcode"
 DIST_DIR="build/dist_staging"
 DMG_NAME="${APP_NAME}.dmg"
@@ -46,17 +43,6 @@ SPARKLE_BIN=""
 ED_SIGNATURE=""
 DMG_LENGTH=""
 DMG_URL=""
-
-require_server_bundle() {
-  echo ""
-  echo "▶ Checking bundled transcription server..."
-  if [ ! -d "dist/transcribe_server" ]; then
-    echo "❌ dist/transcribe_server not found."
-    echo "   Run: ./scripts/build_server_binary.sh"
-    exit 1
-  fi
-  echo "✅ Server bundle found"
-}
 
 resolve_sparkle_tools() {
   SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData -name "sign_update" \
@@ -113,58 +99,6 @@ build_app() {
     exit 1
   fi
   echo "✅ Built: $APP_PATH"
-}
-
-bundle_server_payload() {
-  local internal_dir metallib_link metallib_target
-
-  echo ""
-  echo "▶ Bundling Python server binary..."
-  cp -r "dist/transcribe_server" "$APP_PATH/Contents/Resources/"
-  internal_dir="$APP_PATH/Contents/Resources/transcribe_server/_internal"
-  metallib_link="$internal_dir/mlx.metallib"
-  metallib_target="mlx/lib/mlx.metallib"
-  if [ -f "$internal_dir/$metallib_target" ] && [ ! -e "$metallib_link" ]; then
-    ln -s "$metallib_target" "$metallib_link"
-  fi
-  echo "✅ Server binary bundled"
-}
-
-resign_app() {
-  local server_dest app_codesign_details
-
-  echo ""
-  echo "▶ Re-signing bundled server with the app's real identity..."
-
-  app_codesign_details=$(codesign -dvvv "$APP_PATH" 2>&1)
-  SIGNING_IDENTITY=$(printf "%s\n" "$app_codesign_details" | awk -F= '/^Authority=/{print $2; exit}')
-  if [ -z "$SIGNING_IDENTITY" ]; then
-    echo "❌ Could not determine the app signing identity."
-    echo "   The release app must be signed by Xcode with a real certificate."
-    exit 1
-  fi
-
-  server_dest="$APP_PATH/Contents/Resources/transcribe_server"
-
-  find "$server_dest" -type f \( -name "*.dylib" -o -name "*.so" -o -perm -111 \) -print0 | \
-  while IFS= read -r -d '' f; do
-    codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$f"
-  done
-
-  codesign \
-    --force \
-    --sign "$SIGNING_IDENTITY" \
-    --entitlements "$ENTITLEMENTS" \
-    --preserve-metadata=identifier,requirements,flags \
-    --timestamp=none \
-    "$APP_PATH"
-
-  if codesign -dvvv "$APP_PATH" 2>&1 | grep -q "Signature=adhoc"; then
-    echo "❌ Release app is still ad-hoc signed; aborting packaging."
-    exit 1
-  fi
-
-  echo "✅ Re-signed with ${SIGNING_IDENTITY}"
 }
 
 verify_app_bundle() {
@@ -316,10 +250,7 @@ EOF
 }
 
 sync_version_metadata
-require_server_bundle
 build_app
-bundle_server_payload
-resign_app
 verify_app_bundle
 create_dmg
 

@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import CoreGraphics
+import FluidAudio
 import Foundation
 import SwiftUI
 
@@ -9,14 +10,13 @@ enum AppStatus: Equatable {
     case ready
     case recording
     case transcribing
-    case summarising
     case error(String)
 }
 
 /// Tracks how the current recording was triggered.
 fileprivate enum RecordingMode {
-    case markdown   // ⌘⇧T: Whisper → Claude → .md file → Finder
-    case paste      // Fn:   Whisper only → clipboard + auto-paste
+    case markdown   // ⌘⇧T: Transcribe → .md file → Finder
+    case paste      // Fn:   Transcribe only → clipboard + auto-paste
 }
 
 @MainActor
@@ -30,13 +30,12 @@ class AppState: ObservableObject {
     /// Set during onboarding so the test box works without pasting into other apps.
     var suppressPaste = false
 
-    let server   = PythonServer()
     let recorder = AudioRecorder()
-    let client   = TranscribeClient()
     let hotkey   = HotkeyManager()
     let accessibility: AccessibilityController
 
     private let settings = SettingsStore.shared
+    private let transcriber = LocalTranscriptionService.shared
     private var cancellables = Set<AnyCancellable>()
     private var onboardingWindow: NSWindow?
 
@@ -46,7 +45,7 @@ class AppState: ObservableObject {
     init(accessibility: AccessibilityController) {
         self.accessibility = accessibility
 
-        Task { await startServer() }
+        Task { await prepareApp() }
 
         Publishers.CombineLatest4(
             settings.$toggleKeyCode,
@@ -108,14 +107,13 @@ class AppState: ObservableObject {
 
     var statusLabel: String {
         switch status {
-        case .starting:      return "Starting server…"
+        case .starting:      return "Preparing transcription…"
         case .ready:         return "Ready  (⌘⇧T to record | hold Fn to dictate)"
         case .recording:
             return currentMode == .paste
                 ? "Dictating…  (release Fn to stop)"
                 : "Recording…  (⌘⇧T to stop)"
         case .transcribing:  return "Transcribing…"
-        case .summarising:   return "Summarising…"
         case .error(let m):  return "Error: \(m)"
         }
     }
@@ -182,12 +180,12 @@ class AppState: ObservableObject {
     // MARK: - Recording core
 
     fileprivate func startRecording(mode: RecordingMode) async {
-        guard !settings.activeModelId.isEmpty else {
-            status = .error("No transcription model is installed. Open Settings > Model and download one.")
-            return
-        }
-
         do {
+            guard try await transcriber.isModelInstalled() else {
+                status = .error("No transcription model is installed. Open Settings > Model and download the English model.")
+                return
+            }
+
             currentMode = mode
             try await recorder.startRecording(captureSystemAudio: mode == .markdown)
             isRecording = true
@@ -211,7 +209,8 @@ class AppState: ObservableObject {
             let wavURL = try await recorder.stopRecording()
             print("WAV saved: \(wavURL.path)")
 
-            let rawTranscript = try await client.transcribe(wavURL: wavURL, model: settings.activeModelId)
+            let audioSource: AudioSource = mode == .paste ? .microphone : .system
+            let rawTranscript = try await transcriber.transcribe(wavURL: wavURL, source: audioSource)
             print("Transcript ready (\(rawTranscript.count) chars)")
             lastTranscript = rawTranscript
 
@@ -232,22 +231,11 @@ class AppState: ObservableObject {
                     .replacingOccurrences(of: "Z", with: "")
                 let mdURL = saveURL.appendingPathComponent("transcript-\(stamp).md")
 
-                let md: String
-                if settings.aiEnabled && !settings.aiApiKey.isEmpty {
-                    status = .summarising
-                    let result = try await client.summarise(
-                        transcript: rawTranscript,
-                        apiKey:     settings.aiApiKey,
-                        provider:   settings.aiProvider
-                    )
-                    print("Summary ready")
-                    md = buildMarkdown(date: startedAt, duration: duration,
-                                       cleanedTranscript: result.cleaned_transcript,
-                                       summary: result.summary)
-                } else {
-                    md = buildMarkdown(date: startedAt, duration: duration,
-                                       cleanedTranscript: rawTranscript, summary: nil)
-                }
+                let md = buildMarkdown(
+                    date: startedAt,
+                    duration: duration,
+                    transcript: rawTranscript
+                )
 
                 try md.write(to: mdURL, atomically: true, encoding: .utf8)
                 print("Saved: \(mdURL.path)")
@@ -323,14 +311,17 @@ class AppState: ObservableObject {
 
     // MARK: - Markdown builder
 
-    private func buildMarkdown(date: Date, duration: Int,
-                               cleanedTranscript: String, summary: String?) -> String {
-        var sections: [String] = [
+    private func buildMarkdown(date: Date, duration: Int, transcript: String) -> String {
+        let sections: [String] = [
             "# Meeting — \(formattedDate(date))",
-            "**Duration:** ~\(max(1, duration)) min  |  **Model:** \(settings.activeModelId)",
+            "**Duration:** ~\(max(1, duration)) min  |  **Model:** \(LocalTranscriptionService.markdownModelName)",
+            "",
+            "> AI cleanup and summarisation are temporarily disabled in the native build. This file contains the raw transcript.",
+            "",
+            "## Transcript",
+            "",
+            transcript,
         ]
-        if let summary { sections += ["", summary] }
-        sections += ["", "## Transcript", "", cleanedTranscript]
         return sections.joined(separator: "\n")
     }
 
@@ -341,26 +332,10 @@ class AppState: ObservableObject {
         return f.string(from: date)
     }
 
-    // MARK: - Server startup
+    // MARK: - Startup
 
-    private func startServer() async {
-        do {
-            try await server.start()
-            try await server.waitUntilHealthy()
-            await refreshModelSelection()
-            status = .ready
-        } catch {
-            status = .error(error.localizedDescription)
-        }
-    }
-
-    private func refreshModelSelection() async {
-        do {
-            let models = try await ModelService.fetchModels()
-            let downloadedIds = models.filter { $0.downloaded }.map { $0.id }
-            settings.reconcileActiveModel(downloadedModelIds: downloadedIds)
-        } catch {
-            print("Model refresh skipped: \(error.localizedDescription)")
-        }
+    private func prepareApp() async {
+        await TranscriptionModelStore.shared.refreshNow()
+        status = .ready
     }
 }

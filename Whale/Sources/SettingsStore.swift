@@ -45,12 +45,6 @@ class SettingsStore: ObservableObject {
             : URL(fileURLWithPath: transcriptFolderPath)
     }
 
-    // MARK: - Transcription model
-
-    @Published var activeModelId: String {
-        didSet { ud.set(activeModelId, forKey: Keys.activeModel) }
-    }
-
     // MARK: - Onboarding
 
     @Published var hasCompletedOnboarding: Bool {
@@ -70,20 +64,6 @@ class SettingsStore: ObservableObject {
         }
     }
 
-    // MARK: - AI Summarisation
-
-    @Published var aiEnabled: Bool {
-        didSet { ud.set(aiEnabled, forKey: Keys.aiEnabled) }
-    }
-
-    @Published var aiProvider: String {
-        didSet { ud.set(aiProvider, forKey: Keys.aiProvider) }
-    }
-
-    @Published var aiApiKey: String {
-        didSet { ud.set(aiApiKey, forKey: Keys.aiApiKey) }
-    }
-
     // MARK: - Init
 
     private let ud = UserDefaults.standard
@@ -92,35 +72,12 @@ class SettingsStore: ObservableObject {
 
     private init() {
         transcriptFolderPath     = ud.string(forKey: Keys.transcriptFolder) ?? ""
-        activeModelId            = ud.string(forKey: Keys.activeModel)      ?? ""
         hasCompletedOnboarding   = ud.bool(forKey: Keys.hasCompletedOnboarding)
         launchAtLogin            = ud.bool(forKey: Keys.launchAtLogin)
-        aiEnabled                = ud.bool(forKey: Keys.aiEnabled)
-        aiProvider               = ud.string(forKey: Keys.aiProvider) ?? "anthropic"
-        aiApiKey                 = ud.string(forKey: Keys.aiApiKey)   ?? ""
         toggleKeyCode            = (ud.object(forKey: Keys.toggleKeyCode) as? Int) ?? 17
         toggleModifiers          = (ud.object(forKey: Keys.toggleModifiers) as? Int) ?? SettingsStore.defaultModifiers
         pttKeyCode               = (ud.object(forKey: Keys.pttKeyCode) as? Int) ?? 63
         pttModifiers             = (ud.object(forKey: Keys.pttModifiers) as? Int) ?? 0
-    }
-
-    @discardableResult
-    func reconcileActiveModel(downloadedModelIds: [String]) -> String {
-        if !activeModelId.isEmpty, downloadedModelIds.contains(activeModelId) {
-            return activeModelId
-        }
-
-        if let fallback = downloadedModelIds.first {
-            if activeModelId != fallback {
-                activeModelId = fallback
-            }
-            return fallback
-        }
-
-        if !activeModelId.isEmpty {
-            activeModelId = ""
-        }
-        return ""
     }
 
     // MARK: - Key name helper
@@ -153,12 +110,8 @@ class SettingsStore: ObservableObject {
 
     private enum Keys {
         static let transcriptFolder      = "transcriptFolderPath"
-        static let activeModel           = "activeModelId"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
         static let launchAtLogin         = "launchAtLogin"
-        static let aiEnabled             = "aiEnabled"
-        static let aiProvider            = "aiProvider"
-        static let aiApiKey              = "aiApiKey"
         static let toggleKeyCode         = "toggleKeyCode"
         static let toggleModifiers       = "toggleModifiers"
         static let pttKeyCode            = "pttKeyCode"
