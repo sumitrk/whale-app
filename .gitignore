@@ -19,3 +19,5 @@ DerivedData/
 *.xcscmblueprint
 TranscribeMeeting.dmg
 Whale.dmg
+whale-local-models/
+whale-local-models-debug/
