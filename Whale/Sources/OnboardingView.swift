@@ -196,24 +196,24 @@ private struct PermissionRow: View {
 private struct ModelStep: View {
     @Binding var hasModel: Bool
     @ObservedObject private var modelStore = TranscriptionModelStore.shared
+    @ObservedObject private var settings = SettingsStore.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Download a model")
+                Text("Choose and install a model")
                     .font(.title2.bold())
-                Text("Stored on your Mac. One-time download, no internet needed after.")
+                Text("Models are stored on your Mac. Install the one you want to use, then continue.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             }
             .padding(.horizontal, 28)
             .padding(.top, 28)
 
-            NativeModelInstallCard(contentPadding: 16)
-                .padding(.horizontal, 28)
+            TranscriptionModelGroupsView(horizontalPadding: 28, contentPadding: 16)
 
-            if case .ready = modelStore.installState {
-                Text("Model installed. Continue to configure your shortcut and test dictation.")
+            if modelStore.isReady(for: settings.selectedBuiltInModelID) {
+                Text("Selected model installed. Continue to configure your shortcut and test dictation.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 28)
@@ -221,14 +221,17 @@ private struct ModelStep: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await syncModelState() }
-        .onChange(of: modelStore.installState) { _, _ in
-            hasModel = modelStore.isReady
+        .onChange(of: modelStore.installStates) { _, _ in
+            hasModel = modelStore.isReady(for: settings.selectedBuiltInModelID)
+        }
+        .onChange(of: settings.selectedBuiltInModelID) { _, _ in
+            hasModel = modelStore.isReady(for: settings.selectedBuiltInModelID)
         }
     }
 
     private func syncModelState() async {
         await modelStore.refreshNow()
-        hasModel = modelStore.isReady
+        hasModel = modelStore.isReady(for: settings.selectedBuiltInModelID)
     }
 }
 

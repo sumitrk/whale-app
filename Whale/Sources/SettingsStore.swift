@@ -4,6 +4,7 @@ import ServiceManagement
 
 /// Central settings store backed by UserDefaults.
 /// Shared singleton — read from anywhere, mutate only on the main thread.
+@MainActor
 class SettingsStore: ObservableObject {
 
     static let shared = SettingsStore()
@@ -64,13 +65,24 @@ class SettingsStore: ObservableObject {
         }
     }
 
+    // MARK: - Transcription Models
+
+    @Published var selectedBuiltInModelID: BuiltInModelID {
+        didSet { ud.set(selectedBuiltInModelID.rawValue, forKey: Keys.selectedBuiltInModelID) }
+    }
+
+    @Published private var builtInModelLocalPaths: [String: String] {
+        didSet { ud.set(builtInModelLocalPaths, forKey: Keys.builtInModelLocalPaths) }
+    }
+
     // MARK: - Init
 
-    private let ud = UserDefaults.standard
+    private let ud: UserDefaults
 
     private static let defaultModifiers = Int(NSEvent.ModifierFlags([.command, .shift]).rawValue)
 
-    private init() {
+    init(userDefaults: UserDefaults = .standard) {
+        ud = userDefaults
         transcriptFolderPath     = ud.string(forKey: Keys.transcriptFolder) ?? ""
         hasCompletedOnboarding   = ud.bool(forKey: Keys.hasCompletedOnboarding)
         launchAtLogin            = ud.bool(forKey: Keys.launchAtLogin)
@@ -78,6 +90,18 @@ class SettingsStore: ObservableObject {
         toggleModifiers          = (ud.object(forKey: Keys.toggleModifiers) as? Int) ?? SettingsStore.defaultModifiers
         pttKeyCode               = (ud.object(forKey: Keys.pttKeyCode) as? Int) ?? 63
         pttModifiers             = (ud.object(forKey: Keys.pttModifiers) as? Int) ?? 0
+        selectedBuiltInModelID   = BuiltInModelID(
+            rawValue: ud.string(forKey: Keys.selectedBuiltInModelID) ?? ""
+        ) ?? .parakeetEnglishV2
+        builtInModelLocalPaths   = ud.dictionary(forKey: Keys.builtInModelLocalPaths) as? [String: String] ?? [:]
+    }
+
+    func localModelPath(for modelID: BuiltInModelID) -> String? {
+        builtInModelLocalPaths[modelID.rawValue]
+    }
+
+    func setLocalModelPath(_ path: String?, for modelID: BuiltInModelID) {
+        builtInModelLocalPaths[modelID.rawValue] = path
     }
 
     // MARK: - Key name helper
@@ -116,5 +140,7 @@ class SettingsStore: ObservableObject {
         static let toggleModifiers       = "toggleModifiers"
         static let pttKeyCode            = "pttKeyCode"
         static let pttModifiers          = "pttModifiers"
+        static let selectedBuiltInModelID = "selectedBuiltInModelID"
+        static let builtInModelLocalPaths = "builtInModelLocalPaths"
     }
 }

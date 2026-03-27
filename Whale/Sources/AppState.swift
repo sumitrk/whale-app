@@ -41,6 +41,7 @@ class AppState: ObservableObject {
 
     private var recordingStartedAt: Date?
     private var currentMode: RecordingMode = .markdown
+    private var currentModelID: BuiltInModelID = .parakeetEnglishV2
     private var isPTTArming = false
     private var stopPTTAfterStart = false
 
@@ -215,15 +216,17 @@ class AppState: ObservableObject {
         }
 
         do {
-            guard try await transcriber.isModelInstalled() else {
+            let modelID = settings.selectedBuiltInModelID
+            guard try await transcriber.isModelInstalled(modelID) else {
                 if isDictation {
                     isPTTArming = false
                     stopPTTAfterStart = false
                 }
-                status = .error("No transcription model is installed. Open Settings > Model and download the English model.")
+                status = .error(modelID.descriptor.installationPrompt)
                 return
             }
 
+            currentModelID = modelID
             currentMode = mode
             try await recorder.startRecording(captureSystemAudio: mode == .markdown)
             if mode == .markdown {
@@ -267,7 +270,11 @@ class AppState: ObservableObject {
 
             status = .transcribing
             let audioSource: AudioSource = mode == .paste ? .microphone : .system
-            let rawTranscript = try await transcriber.transcribe(wavURL: wavURL, source: audioSource)
+            let rawTranscript = try await transcriber.transcribe(
+                modelID: currentModelID,
+                wavURL: wavURL,
+                source: audioSource
+            )
             print("Transcript ready (\(rawTranscript.count) chars)")
             lastTranscript = rawTranscript
 
@@ -291,6 +298,7 @@ class AppState: ObservableObject {
                 let md = buildMarkdown(
                     date: startedAt,
                     duration: duration,
+                    model: currentModelID.descriptor,
                     transcript: rawTranscript
                 )
 
@@ -374,18 +382,19 @@ class AppState: ObservableObject {
 
     // MARK: - Markdown builder
 
-    private func buildMarkdown(date: Date, duration: Int, transcript: String) -> String {
-        let sections: [String] = [
-            "# Meeting — \(formattedDate(date))",
-            "**Duration:** ~\(max(1, duration)) min  |  **Model:** \(LocalTranscriptionService.markdownModelName)",
-            "",
-            "> AI cleanup and summarisation are temporarily disabled in the native build. This file contains the raw transcript.",
-            "",
-            "## Transcript",
-            "",
-            transcript,
-        ]
-        return sections.joined(separator: "\n")
+    private func buildMarkdown(
+        date: Date,
+        duration: Int,
+        model: BuiltInModelDescriptor,
+        transcript: String
+    ) -> String {
+        TranscriptMarkdownBuilder.build(
+            date: date,
+            duration: duration,
+            model: model,
+            transcript: transcript,
+            formattedDate: formattedDate(date)
+        )
     }
 
     private func formattedDate(_ date: Date) -> String {
@@ -400,5 +409,27 @@ class AppState: ObservableObject {
     private func prepareApp() async {
         await TranscriptionModelStore.shared.refreshNow()
         status = .ready
+    }
+}
+
+enum TranscriptMarkdownBuilder {
+    static func build(
+        date _: Date,
+        duration: Int,
+        model: BuiltInModelDescriptor,
+        transcript: String,
+        formattedDate: String
+    ) -> String {
+        let sections: [String] = [
+            "# Meeting — \(formattedDate)",
+            "**Duration:** ~\(max(1, duration)) min  |  **Model:** \(model.markdownLabel)",
+            "",
+            "> AI cleanup and summarisation are temporarily disabled in the native build. This file contains the raw transcript.",
+            "",
+            "## Transcript",
+            "",
+            transcript,
+        ]
+        return sections.joined(separator: "\n")
     }
 }

@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */; };
+		AA0000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000072 /* WhisperKit */; };
+		AA0000000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000011 /* XCTest.framework */; };
+		AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000013 /* TranscriptionModelTests.swift */; };
+		AA0000000000000000000004 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C91A4D72C0C4A0B9F20A111 /* FluidAudio */; };
 		0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */; };
 		1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */; };
 		1C91A4D62C0C4A0B9F20A111 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C91A4D72C0C4A0B9F20A111 /* FluidAudio */; };
@@ -35,6 +39,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AA0000000000000000000011 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		AA0000000000000000000012 /* WhaleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhaleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000013 /* TranscriptionModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionModelTests.swift; sourceTree = "<group>"; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityController.swift; sourceTree = "<group>"; };
 		1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicatorWindow.swift; sourceTree = "<group>"; };
@@ -62,12 +69,22 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AA0000000000000000000031 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000004 /* FluidAudio in Frameworks */,
+				AA0000000000000000000002 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BBEDF9B9D3FBB5E122CFB20D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				7A61089AAB7BD42A35D460B5 /* CoreAudio.framework in Frameworks */,
 				1C91A4D62C0C4A0B9F20A111 /* FluidAudio in Frameworks */,
+				AA0000000000000000000001 /* WhisperKit in Frameworks */,
 				C6A3D56B2F7023BB00A16DA0 /* Sparkle in Frameworks */,
 				A5F1E893C1214A87B9A5BDFC /* AudioToolbox.framework in Frameworks */,
 				49AE7A1CFDC69357DD4B865D /* AVFoundation.framework in Frameworks */,
@@ -81,6 +98,7 @@
 			isa = PBXGroup;
 			children = (
 				E30A00EEB7141B3BFD0B065B /* TranscribeMeeting.app */,
+				AA0000000000000000000012 /* WhaleTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -125,10 +143,19 @@
 			isa = PBXGroup;
 			children = (
 				1FF43984F054E7654B1EEA37 /* Sources */,
+				AA0000000000000000000021 /* Tests */,
 				C3D4E5F6A7B8C9D0E1F2A3B5 /* Resources */,
 				FD08E838474B977A29696F57 /* Frameworks */,
 				1DB310FC63230A872DF63309 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000021 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
+			);
+			path = WhaleTests;
 			sourceTree = "<group>";
 		};
 		FD08E838474B977A29696F57 /* Frameworks */ = {
@@ -137,11 +164,22 @@
 				D46A1ED1172B492709C538FC /* AudioToolbox.framework */,
 				D7ECD4881167C564AC493E67 /* AVFoundation.framework */,
 				8EEEF1DF5515540F6788EFF8 /* CoreAudio.framework */,
+				AA0000000000000000000011 /* XCTest.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+
+/* Begin PBXContainerItemProxy section */
+		AA0000000000000000000051 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49FAB7016FB2C5DDF4EB5204 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 92FC86E1A1F73D62CBA0B22D;
+			remoteInfo = Whale;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXNativeTarget section */
 		92FC86E1A1F73D62CBA0B22D /* TranscribeMeeting */ = {
@@ -159,11 +197,32 @@
 			name = Whale;
 			packageProductDependencies = (
 				1C91A4D72C0C4A0B9F20A111 /* FluidAudio */,
+				AA0000000000000000000072 /* WhisperKit */,
 				C6A3D56A2F7023BB00A16DA0 /* Sparkle */,
 			);
 			productName = TranscribeMeeting;
 			productReference = E30A00EEB7141B3BFD0B065B /* TranscribeMeeting.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AA0000000000000000000041 /* WhaleTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000061 /* Build configuration list for PBXNativeTarget "WhaleTests" */;
+			buildPhases = (
+				AA0000000000000000000032 /* Sources */,
+				AA0000000000000000000031 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0000000000000000000052 /* PBXTargetDependency */,
+			);
+			name = WhaleTests;
+			packageProductDependencies = (
+				1C91A4D72C0C4A0B9F20A111 /* FluidAudio */,
+			);
+			productName = WhaleTests;
+			productReference = AA0000000000000000000012 /* WhaleTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -175,6 +234,10 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					92FC86E1A1F73D62CBA0B22D = {
+						DevelopmentTeam = G6Z6DNHM33;
+						ProvisioningStyle = Automatic;
+					};
+					AA0000000000000000000041 = {
 						DevelopmentTeam = G6Z6DNHM33;
 						ProvisioningStyle = Automatic;
 					};
@@ -191,6 +254,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+				AA0000000000000000000071 /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -199,6 +263,7 @@
 			projectRoot = "";
 			targets = (
 				92FC86E1A1F73D62CBA0B22D /* TranscribeMeeting */,
+				AA0000000000000000000041 /* WhaleTests */,
 			);
 		};
 /* End PBXProject section */
@@ -215,6 +280,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AA0000000000000000000032 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C9421B68B0297431CB7B7584 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -258,6 +331,44 @@
 				LSUIElement = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meeting";
 				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		AA0000000000000000000062 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G6Z6DNHM33;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Whale.app/Contents/MacOS/Whale";
+				TEST_TARGET_NAME = Whale;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000063 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G6Z6DNHM33;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Whale.app/Contents/MacOS/Whale";
+				TEST_TARGET_NAME = Whale;
 			};
 			name = Release;
 		};
@@ -413,6 +524,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		AA0000000000000000000061 /* Build configuration list for PBXNativeTarget "WhaleTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000062 /* Debug */,
+				AA0000000000000000000063 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		E16D1E3FBFCDFDAC4957447A /* Build configuration list for PBXProject "Swift" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -433,6 +553,14 @@
 				minimumVersion = 0.12.4;
 			};
 		};
+		AA0000000000000000000071 /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.0;
+			};
+		};
 		C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -449,12 +577,25 @@
 			package = 1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */;
 			productName = FluidAudio;
 		};
+		AA0000000000000000000072 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000071 /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
 		C6A3D56A2F7023BB00A16DA0 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
+
+/* Begin PBXTargetDependency section */
+		AA0000000000000000000052 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 92FC86E1A1F73D62CBA0B22D /* TranscribeMeeting */;
+			targetProxy = AA0000000000000000000051 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 	};
 	rootObject = 49FAB7016FB2C5DDF4EB5204 /* Project object */;
 }
