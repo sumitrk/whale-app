@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ModelSettingsView: View {
@@ -71,10 +72,15 @@ struct TranscriptionModelCard: View {
         modelStore.installState(for: model.id)
     }
 
+    private var canSelect: Bool {
+        modelStore.isReady(for: model.id)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Button {
+                    guard canSelect else { return }
                     settings.selectedBuiltInModelID = model.id
                 } label: {
                     Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
@@ -83,6 +89,7 @@ struct TranscriptionModelCard: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)
+                .disabled(!canSelect)
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
@@ -94,7 +101,7 @@ struct TranscriptionModelCard: View {
                                 .foregroundStyle(Color.accentColor)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
-                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                .background(Color.accentColor.opacity(0.12), in: Capsule())
                         }
                     }
 
@@ -103,6 +110,7 @@ struct TranscriptionModelCard: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .opacity(canSelect || isSelected ? 1 : 0.9)
 
                 Spacer()
 
@@ -123,8 +131,8 @@ struct TranscriptionModelCard: View {
             ProgressView()
                 .controlSize(.small)
         case .notInstalled:
-            Button("Install") {
-                modelStore.install(model.id)
+            Button(model.actionTitle) {
+                triggerPrimaryAction()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
@@ -134,13 +142,21 @@ struct TranscriptionModelCard: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
         case .ready:
-            Label("Installed", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .font(.callout)
-                .fontWeight(.medium)
+            if let changeActionTitle = model.changeActionTitle {
+                Button(changeActionTitle) {
+                    triggerPrimaryAction()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            } else {
+                Label("Installed", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.callout)
+                    .fontWeight(.medium)
+            }
         case .failed:
-            Button("Retry") {
-                modelStore.install(model.id)
+            Button(model.retryActionTitle) {
+                triggerPrimaryAction()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -160,17 +176,19 @@ struct TranscriptionModelCard: View {
             }
         case .notInstalled:
             Text(
-                isSelected
-                    ? "\(model.title) is selected, but not installed yet. Install it to use dictation and meeting transcription."
-                    : "Install this model to make it available for dictation and meeting transcription."
+                canSelect
+                    ? "Ready to use."
+                    : "Install or validate this model before you can select it for dictation and meeting transcription."
             )
             .font(.callout)
             .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         case .downloading(let progress, let phase):
             VStack(alignment: .leading, spacing: 8) {
                 Text(phase)
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let progress {
                     ProgressView(value: progress)
                         .tint(.blue)
@@ -180,17 +198,40 @@ struct TranscriptionModelCard: View {
                 }
             }
         case .ready:
-            Text(
-                isSelected
-                    ? "Selected and ready. New recordings will use this model."
-                    : "Installed and ready. Select this model whenever you want to switch."
-            )
-            .font(.callout)
-            .foregroundStyle(.secondary)
-        case .failed(let message):
-            Text(message)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(
+                    isSelected
+                        ? readyMessage
+                        : idleReadyMessage
+                )
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                if let localModelPath {
+                    Text(localModelPath)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+
+                if let localModelPath {
+                    Text(localModelPath)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
     }
 
@@ -200,5 +241,53 @@ struct TranscriptionModelCard: View {
             return "\(Int(progress * 100))%"
         }
         return "Working…"
+    }
+
+    private var localModelPath: String? {
+        guard model.provisioning == .localFolder else { return nil }
+        return settings.localModelPath(for: model.id)
+    }
+
+    private var readyMessage: String {
+        switch model.provisioning {
+        case .download:
+            return "Selected and ready. New recordings will use this model."
+        case .localFolder:
+            return "Selected and ready. New recordings will use this local Whisper model."
+        }
+    }
+
+    private var idleReadyMessage: String {
+        switch model.provisioning {
+        case .download:
+            return "Installed and ready. Select this model whenever you want to switch."
+        case .localFolder:
+            return "Validated and ready. Select this model whenever you want to switch."
+        }
+    }
+
+    private func triggerPrimaryAction() {
+        switch model.provisioning {
+        case .download:
+            modelStore.install(model.id)
+        case .localFolder:
+            chooseLocalFolder()
+        }
+    }
+
+    private func chooseLocalFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        panel.prompt = "Choose Folder"
+        panel.message = "Select a WhisperKit/Core ML folder that contains MelSpectrogram, AudioEncoder, and TextDecoder."
+
+        guard panel.runModal() == .OK, let folderURL = panel.url else {
+            return
+        }
+
+        modelStore.connectLocalModel(model.id, folderURL: folderURL)
     }
 }
