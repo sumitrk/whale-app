@@ -18,9 +18,15 @@ enum BuiltInModelGroup: String, CaseIterable, Codable, Identifiable, Sendable {
     }
 }
 
+enum BuiltInModelProvisioning: String, Codable, Sendable {
+    case download
+    case localFolder
+}
+
 enum BuiltInModelID: String, CaseIterable, Codable, Identifiable, Sendable {
     case parakeetEnglishV2
     case whisperLargeV3Turbo
+    case whisperLocalFolder
 
     var id: String { rawValue }
 
@@ -32,12 +38,45 @@ enum BuiltInModelID: String, CaseIterable, Codable, Identifiable, Sendable {
 struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
     let id: BuiltInModelID
     let group: BuiltInModelGroup
+    let provisioning: BuiltInModelProvisioning
     let title: String
     let detail: String
     let markdownLabel: String
 
     var installationPrompt: String {
-        "\(title) is not installed. Open Settings > Model and install it."
+        switch provisioning {
+        case .download:
+            return "\(title) is not installed. Open Settings > Model and install it."
+        case .localFolder:
+            return "\(title) is not configured yet. Open Settings > Model, choose a WhisperKit/Core ML folder, and try again."
+        }
+    }
+
+    var actionTitle: String {
+        switch provisioning {
+        case .download:
+            return "Install"
+        case .localFolder:
+            return "Choose Folder"
+        }
+    }
+
+    var retryActionTitle: String {
+        switch provisioning {
+        case .download:
+            return "Retry"
+        case .localFolder:
+            return "Choose Another Folder"
+        }
+    }
+
+    var changeActionTitle: String? {
+        switch provisioning {
+        case .download:
+            return nil
+        case .localFolder:
+            return "Change Folder"
+        }
     }
 }
 
@@ -46,6 +85,7 @@ enum BuiltInModelCatalog {
         BuiltInModelDescriptor(
             id: .parakeetEnglishV2,
             group: .parakeet,
+            provisioning: .download,
             title: "FluidAudio English",
             detail: "Parakeet TDT v2 • English only • Runs locally on-device",
             markdownLabel: "FluidAudio Parakeet v2"
@@ -53,9 +93,18 @@ enum BuiltInModelCatalog {
         BuiltInModelDescriptor(
             id: .whisperLargeV3Turbo,
             group: .whisper,
+            provisioning: .download,
             title: "Whisper Large V3 Turbo",
             detail: "WhisperKit • OpenAI Whisper large-v3-turbo • Runs locally on-device",
             markdownLabel: "Whisper Large V3 Turbo"
+        ),
+        BuiltInModelDescriptor(
+            id: .whisperLocalFolder,
+            group: .whisper,
+            provisioning: .localFolder,
+            title: "Local Whisper Folder",
+            detail: "WhisperKit/Core ML • Choose a converted local model folder from your Mac",
+            markdownLabel: "Local Whisper Model"
         ),
     ]
 
@@ -101,6 +150,12 @@ enum NativeModelInstallState: Equatable {
     case downloading(progress: Double?, phase: String)
     case ready
     case failed(String)
+}
+
+struct WhisperModelValidationResult: Sendable {
+    let modelFolder: URL
+    let tokenizerFolder: URL?
+    let inferredModelName: String?
 }
 
 @MainActor
@@ -209,6 +264,49 @@ final class TranscriptionModelStore: ObservableObject {
         }
     }
 
+    func connectLocalModel(_ modelID: BuiltInModelID, folderURL: URL) {
+        guard !isDownloading(modelID) else { return }
+
+        installTasks[modelID]?.cancel()
+        setInstallState(.downloading(progress: nil, phase: "Validating local model folder…"), for: modelID)
+
+        installTasks[modelID] = Task { [weak self] in
+            guard let self else { return }
+
+            defer {
+                Task { @MainActor [weak self] in
+                    self?.installTasks[modelID] = nil
+                }
+            }
+
+            do {
+                try await service.connectLocalModel(modelID, folderURL: folderURL) { progress in
+                    Task { @MainActor [weak self] in
+                        self?.setInstallState(
+                            .downloading(
+                                progress: progress.fractionCompleted,
+                                phase: progress.phase
+                            ),
+                            for: modelID
+                        )
+                    }
+                }
+
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        self.setInstallState(.ready, for: modelID)
+                    }
+                }
+            } catch {
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        self.setInstallState(.failed(error.localizedDescription), for: modelID)
+                    }
+                }
+            }
+        }
+    }
+
     private func isDownloading(_ modelID: BuiltInModelID) -> Bool {
         if case .downloading = installState(for: modelID) {
             return true
@@ -218,6 +316,27 @@ final class TranscriptionModelStore: ObservableObject {
 
     private func setInstallState(_ state: NativeModelInstallState, for modelID: BuiltInModelID) {
         installStates[modelID] = state
+        reconcileSelection()
+    }
+
+    private func reconcileSelection() {
+        let selectedModelID = SettingsStore.shared.selectedBuiltInModelID
+        guard !isReady(for: selectedModelID) else { return }
+
+        let fallback = preferredReadyModelID()
+        guard let fallback, fallback != selectedModelID else { return }
+
+        SettingsStore.shared.selectedBuiltInModelID = fallback
+    }
+
+    private func preferredReadyModelID() -> BuiltInModelID? {
+        if isReady(for: .parakeetEnglishV2) {
+            return .parakeetEnglishV2
+        }
+
+        return BuiltInModelCatalog.allModels
+            .map(\.id)
+            .first(where: { isReady(for: $0) })
     }
 }
 
@@ -227,11 +346,26 @@ protocol BuiltInTranscriptionBackend: Sendable {
         modelID: BuiltInModelID,
         progressHandler: ModelInstallProgressHandler?
     ) async throws
+    func connectLocalModel(
+        modelID: BuiltInModelID,
+        folderURL: URL,
+        progressHandler: ModelInstallProgressHandler?
+    ) async throws
     func transcribe(
         modelID: BuiltInModelID,
         wavURL: URL,
         source: AudioSource
     ) async throws -> String
+}
+
+extension BuiltInTranscriptionBackend {
+    func connectLocalModel(
+        modelID: BuiltInModelID,
+        folderURL _: URL,
+        progressHandler _: ModelInstallProgressHandler?
+    ) async throws {
+        throw LocalTranscriptionError.unsupportedModel(modelID)
+    }
 }
 
 actor LocalTranscriptionService {
@@ -255,6 +389,18 @@ actor LocalTranscriptionService {
         progressHandler: ModelInstallProgressHandler? = nil
     ) async throws {
         try await backend(for: modelID).install(modelID: modelID, progressHandler: progressHandler)
+    }
+
+    func connectLocalModel(
+        _ modelID: BuiltInModelID,
+        folderURL: URL,
+        progressHandler: ModelInstallProgressHandler? = nil
+    ) async throws {
+        try await backend(for: modelID).connectLocalModel(
+            modelID: modelID,
+            folderURL: folderURL,
+            progressHandler: progressHandler
+        )
     }
 
     func transcribe(
@@ -360,7 +506,7 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
     private var loadedModelPath: String?
 
     func isInstalled(modelID: BuiltInModelID) async throws -> Bool {
-        guard case .whisperLargeV3Turbo = modelID else {
+        guard modelID.descriptor.group == .whisper else {
             throw LocalTranscriptionError.unsupportedModel(modelID)
         }
 
@@ -368,11 +514,11 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
             return false
         }
 
-        let isValid = Self.modelsExist(at: URL(fileURLWithPath: modelPath, isDirectory: true))
-        if !isValid {
-            await persistModelPath(nil, for: modelID)
-        }
-        return isValid
+        _ = try Self.validateStoredModelFolder(
+            for: modelID,
+            modelPath: modelPath
+        )
+        return true
     }
 
     func install(
@@ -398,7 +544,33 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
 
         await persistModelPath(modelFolder.path, for: modelID)
         progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Loading model…"))
-        _ = try await prepareWhisperKit(modelID: modelID, modelPath: modelFolder.path, forceReload: true)
+        let validation = try Self.validateStoredModelFolder(for: modelID, modelPath: modelFolder.path)
+        _ = try await prepareWhisperKit(
+            runtime: Self.runtimeConfiguration(for: modelID, validation: validation),
+            forceReload: true
+        )
+    }
+
+    func connectLocalModel(
+        modelID: BuiltInModelID,
+        folderURL: URL,
+        progressHandler: ModelInstallProgressHandler?
+    ) async throws {
+        guard case .whisperLocalFolder = modelID else {
+            throw LocalTranscriptionError.unsupportedModel(modelID)
+        }
+
+        progressHandler?(ModelInstallProgress(fractionCompleted: nil, phase: "Inspecting WhisperKit artifacts…"))
+        let validation = try Self.validateSelectedLocalModelFolder(
+            folderURL,
+            descriptor: modelID.descriptor
+        )
+        await persistModelPath(validation.modelFolder.path, for: modelID)
+        progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Loading model…"))
+        _ = try await prepareWhisperKit(
+            runtime: Self.runtimeConfiguration(for: modelID, validation: validation),
+            forceReload: true
+        )
     }
 
     func transcribe(
@@ -423,28 +595,26 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
             throw LocalTranscriptionError.modelNotInstalled(modelID.descriptor)
         }
 
-        guard Self.modelsExist(at: URL(fileURLWithPath: modelPath, isDirectory: true)) else {
-            await persistModelPath(nil, for: modelID)
-            throw LocalTranscriptionError.modelNotInstalled(modelID.descriptor)
-        }
-
-        return try await prepareWhisperKit(modelID: modelID, modelPath: modelPath)
+        let validation = try Self.validateStoredModelFolder(for: modelID, modelPath: modelPath)
+        return try await prepareWhisperKit(
+            runtime: Self.runtimeConfiguration(for: modelID, validation: validation)
+        )
     }
 
     private func prepareWhisperKit(
-        modelID _: BuiltInModelID,
-        modelPath: String,
+        runtime: WhisperRuntimeConfiguration,
         forceReload: Bool = false
     ) async throws -> WhisperKit {
-        if !forceReload, let whisperKit, loadedModelPath == modelPath {
+        if !forceReload, let whisperKit, loadedModelPath == runtime.modelFolderPath {
             return whisperKit
         }
 
         let whisperKit = try await WhisperKit(
             WhisperKitConfig(
-                model: WhisperBuiltInConfiguration.modelVariant,
-                modelRepo: WhisperBuiltInConfiguration.modelRepo,
-                modelFolder: modelPath,
+                model: runtime.modelName,
+                modelRepo: runtime.modelRepo,
+                modelFolder: runtime.modelFolderPath,
+                tokenizerFolder: runtime.tokenizerFolder,
                 verbose: false,
                 prewarm: true,
                 load: true,
@@ -453,7 +623,7 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
         )
 
         self.whisperKit = whisperKit
-        self.loadedModelPath = modelPath
+        self.loadedModelPath = runtime.modelFolderPath
         return whisperKit
     }
 
@@ -469,18 +639,101 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
         }
     }
 
-    private static func modelsExist(at folder: URL) -> Bool {
+    private static func validateStoredModelFolder(
+        for modelID: BuiltInModelID,
+        modelPath: String
+    ) throws -> WhisperModelValidationResult {
+        let folder = URL(fileURLWithPath: modelPath, isDirectory: true)
+
+        switch modelID {
+        case .whisperLargeV3Turbo:
+            return try validateModelFolder(at: folder, descriptor: modelID.descriptor)
+        case .whisperLocalFolder:
+            return try validateModelFolder(at: folder, descriptor: modelID.descriptor)
+        default:
+            throw LocalTranscriptionError.unsupportedModel(modelID)
+        }
+    }
+
+    private static func validateSelectedLocalModelFolder(
+        _ folder: URL,
+        descriptor: BuiltInModelDescriptor
+    ) throws -> WhisperModelValidationResult {
+        try validateModelFolder(at: folder, descriptor: descriptor)
+    }
+
+    static func validateModelFolder(
+        at folder: URL,
+        descriptor: BuiltInModelDescriptor
+    ) throws -> WhisperModelValidationResult {
+        let fileManager = FileManager.default
+
+        var issues: [String] = []
+
+        if !fileManager.fileExists(atPath: folder.path) {
+            issues.append("The selected folder no longer exists at \(folder.path).")
+        }
+
         let requiredModelNames = [
             "MelSpectrogram",
             "AudioEncoder",
             "TextDecoder",
         ]
 
-        return requiredModelNames.allSatisfy { name in
+        for name in requiredModelNames {
             let compiled = folder.appendingPathComponent("\(name).mlmodelc")
             let package = folder.appendingPathComponent("\(name).mlpackage")
-            return FileManager.default.fileExists(atPath: compiled.path)
-                || FileManager.default.fileExists(atPath: package.path)
+
+            if !fileManager.fileExists(atPath: compiled.path)
+                && !fileManager.fileExists(atPath: package.path) {
+                issues.append("Missing \(name).mlmodelc or \(name).mlpackage.")
+            }
+        }
+
+        let tokenizerURL = folder.appendingPathComponent("tokenizer.json")
+        if !issues.isEmpty {
+            throw LocalTranscriptionError.invalidWhisperModelFolder(
+                descriptor: descriptor,
+                folderPath: folder.path,
+                issues: issues
+            )
+        }
+
+        return WhisperModelValidationResult(
+            modelFolder: folder,
+            tokenizerFolder: fileManager.fileExists(atPath: tokenizerURL.path)
+                ? tokenizerURL.deletingLastPathComponent()
+                : nil,
+            inferredModelName: inferModelName(from: folder)
+        )
+    }
+
+    private static func runtimeConfiguration(
+        for modelID: BuiltInModelID,
+        validation: WhisperModelValidationResult
+    ) -> WhisperRuntimeConfiguration {
+        switch modelID {
+        case .whisperLargeV3Turbo:
+            return WhisperRuntimeConfiguration(
+                modelName: WhisperBuiltInConfiguration.modelVariant,
+                modelRepo: WhisperBuiltInConfiguration.modelRepo,
+                modelFolderPath: validation.modelFolder.path,
+                tokenizerFolder: validation.tokenizerFolder
+            )
+        case .whisperLocalFolder:
+            return WhisperRuntimeConfiguration(
+                modelName: validation.inferredModelName,
+                modelRepo: nil,
+                modelFolderPath: validation.modelFolder.path,
+                tokenizerFolder: validation.tokenizerFolder
+            )
+        default:
+            return WhisperRuntimeConfiguration(
+                modelName: WhisperBuiltInConfiguration.modelVariant,
+                modelRepo: WhisperBuiltInConfiguration.modelRepo,
+                modelFolderPath: validation.modelFolder.path,
+                tokenizerFolder: nil
+            )
         }
     }
 
@@ -491,12 +744,22 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
         }
         return "Downloading model files…"
     }
+
+    private static func inferModelName(from folder: URL) -> String? {
+        let folderName = folder.lastPathComponent
+        return folderName.isEmpty ? nil : folderName
+    }
 }
 
 enum LocalTranscriptionError: LocalizedError {
     case modelNotInstalled(BuiltInModelDescriptor)
     case notInitialized(BuiltInModelDescriptor)
     case unsupportedModel(BuiltInModelID)
+    case invalidWhisperModelFolder(
+        descriptor: BuiltInModelDescriptor,
+        folderPath: String,
+        issues: [String]
+    )
 
     var errorDescription: String? {
         switch self {
@@ -506,6 +769,27 @@ enum LocalTranscriptionError: LocalizedError {
             return "\(descriptor.title) is not ready yet."
         case .unsupportedModel(let modelID):
             return "Unsupported transcription model: \(modelID.rawValue)"
+        case .invalidWhisperModelFolder(let descriptor, let folderPath, let issues):
+            let bulletList = issues.map { "• \($0)" }.joined(separator: "\n")
+
+            return """
+            \(descriptor.title) could not be loaded.
+
+            Folder:
+            \(folderPath)
+
+            Problems:
+            \(bulletList)
+
+            Choose a WhisperKit/Core ML folder that contains MelSpectrogram, AudioEncoder, and TextDecoder.
+            """
         }
     }
+}
+
+private struct WhisperRuntimeConfiguration: Sendable {
+    let modelName: String?
+    let modelRepo: String?
+    let modelFolderPath: String
+    let tokenizerFolder: URL?
 }

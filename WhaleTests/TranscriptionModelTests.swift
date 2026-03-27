@@ -26,7 +26,10 @@ final class TranscriptionModelTests: XCTestCase {
     func testCatalogGroupsContainExpectedBuiltInModels() {
         XCTAssertEqual(BuiltInModelGroup.allCases, [.parakeet, .whisper])
         XCTAssertEqual(BuiltInModelCatalog.models(in: .parakeet).map(\.id), [.parakeetEnglishV2])
-        XCTAssertEqual(BuiltInModelCatalog.models(in: .whisper).map(\.id), [.whisperLargeV3Turbo])
+        XCTAssertEqual(
+            BuiltInModelCatalog.models(in: .whisper).map(\.id),
+            [.whisperLargeV3Turbo, .whisperLocalFolder]
+        )
     }
 
     func testCoordinatorRoutesByModelGroup() async throws {
@@ -39,6 +42,10 @@ final class TranscriptionModelTests: XCTestCase {
 
         _ = try await service.isModelInstalled(.parakeetEnglishV2)
         try await service.installModel(.whisperLargeV3Turbo)
+        try await service.connectLocalModel(
+            .whisperLocalFolder,
+            folderURL: URL(fileURLWithPath: "/tmp/local-whisper-model", isDirectory: true)
+        )
         _ = try await service.transcribe(
             modelID: .parakeetEnglishV2,
             wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
@@ -51,6 +58,7 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(parakeetCalls.checked, [.parakeetEnglishV2])
         XCTAssertEqual(parakeetCalls.transcribed, [.parakeetEnglishV2])
         XCTAssertEqual(whisperCalls.installed, [.whisperLargeV3Turbo])
+        XCTAssertEqual(whisperCalls.connected, [.whisperLocalFolder])
     }
 
     func testSelectedModelTextComesFromDescriptor() {
@@ -77,11 +85,92 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertFalse(options.detectLanguage)
         XCTAssertEqual(options.task, .transcribe)
     }
+
+    func testLocalWhisperPromptMentionsChoosingFolder() {
+        let descriptor = BuiltInModelID.whisperLocalFolder.descriptor
+
+        XCTAssertEqual(descriptor.provisioning, .localFolder)
+        XCTAssertTrue(descriptor.installationPrompt.contains("choose a WhisperKit/Core ML folder"))
+    }
+
+    func testWhisperLocalFolderValidationSucceedsWhenArtifactsExist() throws {
+        let folder = try makeTemporaryWhisperModelFolder(function: #function)
+        try makeWhisperArtifacts(in: folder, includeTokenizer: true)
+
+        let validation = try WhisperTranscriptionBackend.validateModelFolder(
+            at: folder,
+            descriptor: .init(
+                id: .whisperLocalFolder,
+                group: .whisper,
+                provisioning: .localFolder,
+                title: "Local Whisper Folder",
+                detail: "",
+                markdownLabel: ""
+            )
+        )
+
+        XCTAssertEqual(validation.modelFolder.path, folder.path)
+        XCTAssertEqual(validation.tokenizerFolder?.path, folder.path)
+        XCTAssertEqual(validation.inferredModelName, folder.lastPathComponent)
+    }
+
+    func testWhisperLocalFolderValidationSucceedsWithoutTokenizer() throws {
+        let folder = try makeTemporaryWhisperModelFolder(function: #function)
+        try makeWhisperArtifacts(in: folder, includeTokenizer: false)
+
+        let validation = try WhisperTranscriptionBackend.validateModelFolder(
+            at: folder,
+            descriptor: BuiltInModelID.whisperLocalFolder.descriptor
+        )
+
+        XCTAssertNil(validation.tokenizerFolder)
+        XCTAssertEqual(validation.inferredModelName, folder.lastPathComponent)
+    }
+
+    func testWhisperLocalFolderValidationReportsMissingArtifacts() throws {
+        let folder = try makeTemporaryWhisperModelFolder(function: #function)
+
+        XCTAssertThrowsError(
+            try WhisperTranscriptionBackend.validateModelFolder(
+                at: folder,
+                descriptor: BuiltInModelID.whisperLocalFolder.descriptor
+            )
+        ) { error in
+            let message = error.localizedDescription
+            XCTAssertTrue(message.contains("Local Whisper Folder could not be loaded."))
+            XCTAssertTrue(message.contains("Folder:"))
+            XCTAssertTrue(message.contains("Problems:"))
+            XCTAssertTrue(message.contains("Missing MelSpectrogram.mlmodelc or MelSpectrogram.mlpackage."))
+            XCTAssertTrue(message.contains("Missing AudioEncoder.mlmodelc or AudioEncoder.mlpackage."))
+            XCTAssertTrue(message.contains("Missing TextDecoder.mlmodelc or TextDecoder.mlpackage."))
+            XCTAssertTrue(message.contains("Choose a WhisperKit/Core ML folder"))
+        }
+    }
+
+    private func makeTemporaryWhisperModelFolder(function: String) throws -> URL {
+        let base = FileManager.default.temporaryDirectory
+        let folder = base.appendingPathComponent("Whale-\(function)-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    private func makeWhisperArtifacts(in folder: URL, includeTokenizer: Bool) throws {
+        for name in ["MelSpectrogram", "AudioEncoder", "TextDecoder"] {
+            let path = folder.appendingPathComponent("\(name).mlmodelc", isDirectory: true)
+            try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        }
+
+        if includeTokenizer {
+            let tokenizer = folder.appendingPathComponent("tokenizer.json")
+            try Data("{}".utf8).write(to: tokenizer)
+        }
+    }
 }
 
 actor RecordingBackend: BuiltInTranscriptionBackend {
     private(set) var checked: [BuiltInModelID] = []
     private(set) var installed: [BuiltInModelID] = []
+    private(set) var connected: [BuiltInModelID] = []
     private(set) var transcribed: [BuiltInModelID] = []
 
     func isInstalled(modelID: BuiltInModelID) async throws -> Bool {
@@ -96,6 +185,14 @@ actor RecordingBackend: BuiltInTranscriptionBackend {
         installed.append(modelID)
     }
 
+    func connectLocalModel(
+        modelID: BuiltInModelID,
+        folderURL _: URL,
+        progressHandler _: ModelInstallProgressHandler?
+    ) async throws {
+        connected.append(modelID)
+    }
+
     func transcribe(
         modelID: BuiltInModelID,
         wavURL _: URL,
@@ -105,7 +202,12 @@ actor RecordingBackend: BuiltInTranscriptionBackend {
         return "ok"
     }
 
-    func snapshot() -> (checked: [BuiltInModelID], installed: [BuiltInModelID], transcribed: [BuiltInModelID]) {
-        (checked, installed, transcribed)
+    func snapshot() -> (
+        checked: [BuiltInModelID],
+        installed: [BuiltInModelID],
+        connected: [BuiltInModelID],
+        transcribed: [BuiltInModelID]
+    ) {
+        (checked, installed, connected, transcribed)
     }
 }
