@@ -5,26 +5,28 @@ struct ModelSettingsView: View {
     @ObservedObject private var modelStore = TranscriptionModelStore.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Transcription model")
-                    .font(.title3.bold())
-                Text("Choose which local speech model Whale should use. Install models explicitly, then switch whenever you want.")
-                    .foregroundStyle(.secondary)
-                    .font(.callout)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Transcription model")
+                        .font(.title3.bold())
+                    Text("Choose which local speech model Whale should use. Install models explicitly, then switch whenever you want.")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                }
+                .padding(.horizontal, 18)
+
+                TranscriptionModelGroupsView(horizontalPadding: 18, contentPadding: 18)
+
+                if modelStore.isReady {
+                    Text("The native Swift build currently exports raw Markdown transcripts. AI cleanup returns in a later release.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 18)
+                }
+
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 18)
-
-            TranscriptionModelGroupsView(horizontalPadding: 18, contentPadding: 18)
-
-            if modelStore.isReady {
-                Text("The native Swift build currently exports raw Markdown transcripts. AI cleanup returns in a later release.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 18)
-            }
-
-            Spacer()
         }
         .padding(.vertical, 18)
         .task { await modelStore.refreshNow() }

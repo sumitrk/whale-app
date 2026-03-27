@@ -86,6 +86,30 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(options.task, .transcribe)
     }
 
+    func testRefreshKeepsSelectedWhisperModelWhileChecking() async {
+        let originalSelection = SettingsStore.shared.selectedBuiltInModelID
+        defer {
+            SettingsStore.shared.selectedBuiltInModelID = originalSelection
+        }
+
+        let parakeet = RecordingBackend()
+        let whisper = RecordingBackend()
+        let service = LocalTranscriptionService(backends: [
+            .parakeet: parakeet,
+            .whisper: whisper,
+        ])
+        let store = TranscriptionModelStore(service: service)
+
+        await store.refresh(.parakeetEnglishV2)
+        await store.refresh(.whisperLargeV3Turbo)
+
+        SettingsStore.shared.selectedBuiltInModelID = .whisperLargeV3Turbo
+
+        await store.refresh(.whisperLargeV3Turbo)
+
+        XCTAssertEqual(SettingsStore.shared.selectedBuiltInModelID, .whisperLargeV3Turbo)
+    }
+
     func testLocalWhisperPromptMentionsChoosingFolder() {
         let descriptor = BuiltInModelID.whisperLocalFolder.descriptor
 

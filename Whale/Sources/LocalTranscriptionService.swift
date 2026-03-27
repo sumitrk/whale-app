@@ -321,7 +321,12 @@ final class TranscriptionModelStore: ObservableObject {
 
     private func reconcileSelection() {
         let selectedModelID = SettingsStore.shared.selectedBuiltInModelID
-        guard !isReady(for: selectedModelID) else { return }
+        switch installState(for: selectedModelID) {
+        case .ready, .checking, .downloading:
+            return
+        case .notInstalled, .failed:
+            break
+        }
 
         let fallback = preferredReadyModelID()
         guard let fallback, fallback != selectedModelID else { return }
