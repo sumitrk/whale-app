@@ -26,9 +26,6 @@ class AppState: ObservableObject {
     @Published var lastMeetingPath: String? = nil
     /// Set after every transcription — observed by the onboarding test screen.
     @Published var lastTranscript: String = ""
-    /// When true, transcription result is shown in lastTranscript but NOT pasted.
-    /// Set during onboarding so the test box works without pasting into other apps.
-    var suppressPaste = false
 
     let recorder = AudioRecorder()
     let hotkey   = HotkeyManager()
@@ -38,6 +35,7 @@ class AppState: ObservableObject {
     private let transcriber = LocalTranscriptionService.shared
     private var cancellables = Set<AnyCancellable>()
     private var onboardingWindow: NSWindow?
+    private var onboardingWindowCloseObserver: NSObjectProtocol?
 
     private var recordingStartedAt: Date?
     private var currentMode: RecordingMode = .markdown
@@ -80,11 +78,8 @@ class AppState: ObservableObject {
 
     func showOnboardingWindow() {
         if onboardingWindow != nil { onboardingWindow?.makeKeyAndOrderFront(nil); return }
-        suppressPaste = true   // don't paste into other apps during onboarding test
         let view = OnboardingView { [weak self] in
-            self?.suppressPaste = false
-            self?.onboardingWindow?.close()
-            self?.onboardingWindow = nil
+            self?.closeOnboardingWindow()
         }
         let hosting = NSHostingView(
             rootView: view
@@ -106,7 +101,32 @@ class AppState: ObservableObject {
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        observeOnboardingWindow(window)
         onboardingWindow = window
+    }
+
+    private func observeOnboardingWindow(_ window: NSWindow) {
+        clearOnboardingWindowObserver()
+
+        onboardingWindowCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.onboardingWindow = nil
+            self.clearOnboardingWindowObserver()
+        }
+    }
+
+    private func closeOnboardingWindow() {
+        onboardingWindow?.close()
+    }
+
+    private func clearOnboardingWindowObserver() {
+        guard let onboardingWindowCloseObserver else { return }
+        NotificationCenter.default.removeObserver(onboardingWindowCloseObserver)
+        self.onboardingWindowCloseObserver = nil
     }
 
     var isReady: Bool { status == .ready }
@@ -282,7 +302,7 @@ class AppState: ObservableObject {
 
             case .paste:
                 status = .ready
-                if !suppressPaste { copyAndPaste(rawTranscript) }
+                copyAndPaste(rawTranscript)
                 playSound("Bottle")
                 try? FileManager.default.removeItem(at: wavURL)
 

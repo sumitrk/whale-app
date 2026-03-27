@@ -199,25 +199,29 @@ private struct ModelStep: View {
     @ObservedObject private var settings = SettingsStore.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Choose and install a model")
-                    .font(.title2.bold())
-                Text("Models are stored on your Mac. Install the one you want to use, then continue.")
-                    .foregroundStyle(.secondary)
-                    .font(.callout)
-            }
-            .padding(.horizontal, 28)
-            .padding(.top, 28)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Choose and install a model")
+                        .font(.title2.bold())
+                    Text("Models are stored on your Mac. Install the one you want to use, then continue.")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                }
+                .padding(.horizontal, 28)
+                .padding(.top, 28)
 
-            TranscriptionModelGroupsView(horizontalPadding: 28, contentPadding: 16)
+                TranscriptionModelGroupsView(horizontalPadding: 28, contentPadding: 16)
 
-            if modelStore.isReady(for: settings.selectedBuiltInModelID) {
-                Text("Selected model installed. Continue to configure your shortcut and test dictation.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 28)
+                if modelStore.isReady(for: settings.selectedBuiltInModelID) {
+                    Text("Selected model installed. Continue to configure your shortcut and test dictation.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 28)
+                }
             }
+            .padding(.bottom, 20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await syncModelState() }
