@@ -7,7 +7,7 @@ import SwiftUI
 /// Non-activating HUD that floats above all windows near the cursor.
 /// Shows a live audio waveform driven by the microphone RMS level.
 final class RecordingIndicatorWindow: NSPanel {
-    enum PasteHintReason {
+    enum PasteHintReason: Equatable {
         case manualPasteOnly
         case accessibilityMissing
     }

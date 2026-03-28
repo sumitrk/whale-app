@@ -37,6 +37,11 @@
 		EA62496C0185BEEC105B2E85 /* PTTRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */; };
 		EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8416E07055CA131C50C9B6F6 /* SettingsStore.swift */; };
 		F0F812B0EA8E670D04878BDD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB407F215A4729F95EBD5AA /* SettingsView.swift */; };
+		PP0000000000000000000012 /* TranscriptionPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000002 /* TranscriptionPipeline.swift */; };
+		PP0000000000000000000013 /* TranscriptionStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000003 /* TranscriptionStage.swift */; };
+		PP0000000000000000000014 /* TextInsertionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000004 /* TextInsertionManager.swift */; };
+		PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000005 /* TranscriptionPipelineTests.swift */; };
+		PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000006 /* TextInsertionManagerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +73,11 @@
 		E30A00EEB7141B3BFD0B065B /* TranscribeMeeting.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TranscribeMeeting.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EC32008B10AB2F3A32901A8F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		F9355D4C305CC2A5F0A0E16D /* ModelSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSettingsView.swift; sourceTree = "<group>"; };
+		PP0000000000000000000002 /* TranscriptionPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipeline.swift; sourceTree = "<group>"; };
+		PP0000000000000000000003 /* TranscriptionStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionStage.swift; sourceTree = "<group>"; };
+		PP0000000000000000000004 /* TextInsertionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManager.swift; sourceTree = "<group>"; };
+		PP0000000000000000000005 /* TranscriptionPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipelineTests.swift; sourceTree = "<group>"; };
+		PP0000000000000000000006 /* TextInsertionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManagerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,6 +115,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		PP0000000000000000000001 /* Pipeline */ = {
+			isa = PBXGroup;
+			children = (
+				PP0000000000000000000002 /* TranscriptionPipeline.swift */,
+				PP0000000000000000000003 /* TranscriptionStage.swift */,
+			);
+			path = Pipeline;
+			sourceTree = "<group>";
+		};
 		1FF43984F054E7654B1EEA37 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
@@ -121,12 +140,14 @@
 				F9355D4C305CC2A5F0A0E16D /* ModelSettingsView.swift */,
 				EC32008B10AB2F3A32901A8F /* OnboardingView.swift */,
 				4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */,
+				PP0000000000000000000001 /* Pipeline */,
 				8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */,
 				1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */,
 				D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */,
 				8416E07055CA131C50C9B6F6 /* SettingsStore.swift */,
 				5EB407F215A4729F95EBD5AA /* SettingsView.swift */,
 				4ABD2DA0658FF2189FE2CD1C /* ShortcutsSettingsView.swift */,
+				PP0000000000000000000004 /* TextInsertionManager.swift */,
 				617C5598D1998EE5F01350BC /* TranscribeMeetingApp.swift */,
 			);
 			name = Sources;
@@ -156,7 +177,9 @@
 		AA0000000000000000000021 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				PP0000000000000000000006 /* TextInsertionManagerTests.swift */,
 				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
+				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
 			);
 			path = WhaleTests;
 			sourceTree = "<group>";
@@ -287,7 +310,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */,
 				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
+				PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -314,7 +339,10 @@
 				EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */,
 				F0F812B0EA8E670D04878BDD /* SettingsView.swift in Sources */,
 				94E2FF4554D92D4265DAFE60 /* ShortcutsSettingsView.swift in Sources */,
+				PP0000000000000000000014 /* TextInsertionManager.swift in Sources */,
 				84740FA4C22131C091BD729B /* TranscribeMeetingApp.swift in Sources */,
+				PP0000000000000000000012 /* TranscriptionPipeline.swift in Sources */,
+				PP0000000000000000000013 /* TranscriptionStage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

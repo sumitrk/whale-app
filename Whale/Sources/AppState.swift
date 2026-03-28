@@ -33,6 +33,7 @@ class AppState: ObservableObject {
 
     private let settings = SettingsStore.shared
     private let transcriber = LocalTranscriptionService.shared
+    private let pipeline: TranscriptionPipeline
     private var cancellables = Set<AnyCancellable>()
     private var onboardingWindow: NSWindow?
     private var onboardingWindowCloseObserver: NSObjectProtocol?
@@ -43,8 +44,11 @@ class AppState: ObservableObject {
     private var isPTTArming = false
     private var stopPTTAfterStart = false
 
-    init(accessibility: AccessibilityController) {
+    init(accessibility: AccessibilityController, pipeline: TranscriptionPipeline? = nil) {
         self.accessibility = accessibility
+        self.pipeline = pipeline ?? TranscriptionPipeline(stages: [
+            TranscriptionStage(transcriber: LocalTranscriptionService.shared),
+        ])
         recorder.onRecordingReady = { [weak self] in
             self?.handleRecorderReady()
         }
@@ -290,19 +294,20 @@ class AppState: ObservableObject {
 
             status = .transcribing
             let audioSource: AudioSource = mode == .paste ? .microphone : .system
-            let rawTranscript = try await transcriber.transcribe(
-                modelID: currentModelID,
+            let result = try await pipeline.process(
                 wavURL: wavURL,
-                source: audioSource
+                modelID: currentModelID,
+                audioSource: audioSource
             )
-            print("Transcript ready (\(rawTranscript.count) chars)")
-            lastTranscript = rawTranscript
+            let transcript = result.transcript
+            print("Transcript ready (\(transcript.count) chars, stages: \(result.stagesExecuted.joined(separator: " → ")))")
+            lastTranscript = transcript
 
             switch mode {
 
             case .paste:
                 status = .ready
-                copyAndPaste(rawTranscript)
+                TextInsertionManager.insertOrCopy(transcript)
                 playSound("Bottle")
                 try? FileManager.default.removeItem(at: wavURL)
 
@@ -319,7 +324,7 @@ class AppState: ObservableObject {
                     date: startedAt,
                     duration: duration,
                     model: currentModelID.descriptor,
-                    transcript: rawTranscript
+                    transcript: transcript
                 )
 
                 try md.write(to: mdURL, atomically: true, encoding: .utf8)
@@ -350,57 +355,6 @@ class AppState: ObservableObject {
         let duration = sound.duration
         sound.play()
         return duration
-    }
-
-    // MARK: - Clipboard + paste
-
-    private func copyAndPaste(_ text: String) {
-        let focusedElement = FocusedElementInspector.snapshot()
-        let canAutoPaste = focusedElement?.isWritableTextTarget == true
-
-        logPasteDecision(snapshot: focusedElement, attemptedAutoPaste: canAutoPaste)
-
-        if canAutoPaste {
-            // A text input is active — copy transcript and auto-paste it.
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                let src  = CGEventSource(stateID: .combinedSessionState)
-                let down = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: true)
-                let up   = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: false)
-                down?.flags = .maskCommand
-                up?.flags   = .maskCommand
-                down?.post(tap: .cghidEventTap)
-                usleep(10_000)
-                up?.post(tap: .cghidEventTap)
-            }
-        } else {
-            // No focused text input — copy to clipboard and nudge the user to paste manually.
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-            let reason: RecordingIndicatorWindow.PasteHintReason = AXIsProcessTrusted()
-                ? .manualPasteOnly
-                : .accessibilityMissing
-            RecordingIndicatorWindow.shared.showHint(reason: reason)
-        }
-    }
-
-    private func logPasteDecision(snapshot: FocusedElementSnapshot?, attemptedAutoPaste: Bool) {
-        let appName = snapshot?.appName ?? "unknown"
-        let bundle = snapshot?.bundleIdentifier ?? "unknown"
-        let role = snapshot?.role ?? "nil"
-        let subrole = snapshot?.subrole ?? "nil"
-        let roleDesc = snapshot?.roleDescription ?? "nil"
-        let editable = snapshot?.isEditable ?? false
-        let selectedTextRange = snapshot?.supportsSelectedTextRange ?? false
-        let hasAXValue = snapshot?.supportsAXValue ?? false
-        let attrs = snapshot?.attributeNames.joined(separator: ",") ?? "none"
-        let decision = attemptedAutoPaste ? "auto-paste" : "clipboard-only"
-
-        let message = "AutoPaste decision=\(decision) app=\(appName) bundle=\(bundle) role=\(role) subrole=\(subrole) roleDesc=\(roleDesc) editable=\(editable) selectedTextRange=\(selectedTextRange) hasAXValue=\(hasAXValue) attributes=[\(attrs)]"
-        print(message)
-        DiagnosticLog.log(message)
     }
 
     // MARK: - Markdown builder
