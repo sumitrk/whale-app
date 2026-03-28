@@ -13,6 +13,7 @@ struct TranscriptionStage: PipelineStage {
         )
 
         var updated = context
+        updated.rawTranscript = text
         updated.transcript = text
         return updated
     }

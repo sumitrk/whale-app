@@ -42,6 +42,9 @@
 		PP0000000000000000000014 /* TextInsertionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000004 /* TextInsertionManager.swift */; };
 		PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000005 /* TranscriptionPipelineTests.swift */; };
 		PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000006 /* TextInsertionManagerTests.swift */; };
+		VAD000000000000000000011 /* VoiceActivityEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000001 /* VoiceActivityEditor.swift */; };
+		VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */; };
+		VAD000000000000000000013 /* VoiceActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000003 /* VoiceActivityTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -78,6 +81,9 @@
 		PP0000000000000000000004 /* TextInsertionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManager.swift; sourceTree = "<group>"; };
 		PP0000000000000000000005 /* TranscriptionPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipelineTests.swift; sourceTree = "<group>"; };
 		PP0000000000000000000006 /* TextInsertionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManagerTests.swift; sourceTree = "<group>"; };
+		VAD000000000000000000001 /* VoiceActivityEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityEditor.swift; sourceTree = "<group>"; };
+		VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityDetectionStage.swift; sourceTree = "<group>"; };
+		VAD000000000000000000003 /* VoiceActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +126,8 @@
 			children = (
 				PP0000000000000000000002 /* TranscriptionPipeline.swift */,
 				PP0000000000000000000003 /* TranscriptionStage.swift */,
+				VAD000000000000000000001 /* VoiceActivityEditor.swift */,
+				VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */,
 			);
 			path = Pipeline;
 			sourceTree = "<group>";
@@ -180,6 +188,7 @@
 				PP0000000000000000000006 /* TextInsertionManagerTests.swift */,
 				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
 				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
+				VAD000000000000000000003 /* VoiceActivityTests.swift */,
 			);
 			path = WhaleTests;
 			sourceTree = "<group>";
@@ -313,6 +322,7 @@
 				PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */,
 				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
 				PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */,
+				VAD000000000000000000013 /* VoiceActivityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -343,6 +353,8 @@
 				84740FA4C22131C091BD729B /* TranscribeMeetingApp.swift in Sources */,
 				PP0000000000000000000012 /* TranscriptionPipeline.swift in Sources */,
 				PP0000000000000000000013 /* TranscriptionStage.swift in Sources */,
+				VAD000000000000000000011 /* VoiceActivityEditor.swift in Sources */,
+				VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

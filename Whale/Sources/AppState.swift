@@ -47,6 +47,7 @@ class AppState: ObservableObject {
     init(accessibility: AccessibilityController, pipeline: TranscriptionPipeline? = nil) {
         self.accessibility = accessibility
         self.pipeline = pipeline ?? TranscriptionPipeline(stages: [
+            VoiceActivityDetectionStage(),
             TranscriptionStage(transcriber: LocalTranscriptionService.shared),
         ])
         recorder.onRecordingReady = { [weak self] in
@@ -299,9 +300,19 @@ class AppState: ObservableObject {
                 modelID: currentModelID,
                 audioSource: audioSource
             )
-            let transcript = result.transcript
+            let transcript = result.processedTranscript
             print("Transcript ready (\(transcript.count) chars, stages: \(result.stagesExecuted.joined(separator: " → ")))")
+            if result.rawTranscript != result.processedTranscript {
+                print("Raw transcript (\(result.rawTranscript.count) chars) differs from processed")
+            }
             lastTranscript = transcript
+
+            defer {
+                try? FileManager.default.removeItem(at: wavURL)
+                for artifact in result.artifactsToDelete {
+                    try? FileManager.default.removeItem(at: artifact)
+                }
+            }
 
             switch mode {
 
@@ -309,7 +320,6 @@ class AppState: ObservableObject {
                 status = .ready
                 TextInsertionManager.insertOrCopy(transcript)
                 playSound("Bottle")
-                try? FileManager.default.removeItem(at: wavURL)
 
             case .markdown:
                 let duration = Int(Date().timeIntervalSince(startedAt) / 60)
@@ -333,7 +343,6 @@ class AppState: ObservableObject {
                 lastMeetingPath = mdURL.path
                 status = .ready
                 playSound("Bottle")
-                try? FileManager.default.removeItem(at: wavURL)
 
                 NSWorkspace.shared.selectFile(mdURL.path, inFileViewerRootedAtPath: "")
             }

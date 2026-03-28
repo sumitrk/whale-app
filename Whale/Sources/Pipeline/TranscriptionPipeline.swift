@@ -11,9 +11,19 @@ protocol PipelineStage: Sendable {
 // MARK: - Pipeline Context
 
 struct PipelineContext: Sendable {
-    let wavURL: URL
+    let originalWavURL: URL
+    var wavURL: URL
     let modelID: BuiltInModelID
     let audioSource: AudioSource
+
+    /// Files created by pre-transcription stages (e.g. VAD-trimmed WAV)
+    /// that should be deleted after the pipeline completes.
+    var temporaryArtifacts: [URL]
+
+    /// Raw transcript text produced by the transcription stage, before any
+    /// post-processing. Stored separately so later stages can refine without
+    /// losing the original.
+    var rawTranscript: String
 
     /// Accumulated transcript text. Empty before the transcription stage runs,
     /// then progressively refined by subsequent stages (text cleanup, LLM, etc.).
@@ -23,8 +33,10 @@ struct PipelineContext: Sendable {
 // MARK: - Pipeline Result
 
 struct PipelineResult: Sendable {
-    let transcript: String
+    let rawTranscript: String
+    let processedTranscript: String
     let stagesExecuted: [String]
+    let artifactsToDelete: [URL]
 }
 
 // MARK: - Pipeline
@@ -43,9 +55,12 @@ final class TranscriptionPipeline: @unchecked Sendable {
         audioSource: AudioSource
     ) async throws -> PipelineResult {
         var context = PipelineContext(
+            originalWavURL: wavURL,
             wavURL: wavURL,
             modelID: modelID,
             audioSource: audioSource,
+            temporaryArtifacts: [],
+            rawTranscript: "",
             transcript: ""
         )
 
@@ -57,8 +72,10 @@ final class TranscriptionPipeline: @unchecked Sendable {
         }
 
         return PipelineResult(
-            transcript: context.transcript,
-            stagesExecuted: executedStages
+            rawTranscript: context.rawTranscript,
+            processedTranscript: context.transcript,
+            stagesExecuted: executedStages,
+            artifactsToDelete: context.temporaryArtifacts
         )
     }
 }

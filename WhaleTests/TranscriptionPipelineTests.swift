@@ -60,7 +60,7 @@ final class TranscriptionPipelineTests: XCTestCase {
             audioSource: dummySource
         )
 
-        XCTAssertEqual(result.transcript, "Hello world")
+        XCTAssertEqual(result.processedTranscript, "Hello world")
         XCTAssertEqual(result.stagesExecuted, ["Transcription"])
     }
 
@@ -79,7 +79,7 @@ final class TranscriptionPipelineTests: XCTestCase {
             audioSource: dummySource
         )
 
-        XCTAssertEqual(result.transcript, "raw text [cleaned] [formatted]")
+        XCTAssertEqual(result.processedTranscript, "raw text [cleaned] [formatted]")
         XCTAssertEqual(result.stagesExecuted, ["Transcription", "Cleanup", "Format"])
     }
 
@@ -137,7 +137,7 @@ final class TranscriptionPipelineTests: XCTestCase {
             audioSource: dummySource
         )
 
-        XCTAssertEqual(result.transcript, "")
+        XCTAssertEqual(result.processedTranscript, "")
         XCTAssertEqual(result.stagesExecuted, [])
     }
 
@@ -160,7 +160,7 @@ final class TranscriptionPipelineTests: XCTestCase {
             audioSource: expectedSource
         )
 
-        XCTAssertEqual(result.transcript, "verified")
+        XCTAssertEqual(result.processedTranscript, "verified")
     }
 
     // MARK: - Integration with RecordingBackend
@@ -180,7 +180,7 @@ final class TranscriptionPipelineTests: XCTestCase {
             audioSource: .microphone
         )
 
-        XCTAssertEqual(result.transcript, "ok")
+        XCTAssertEqual(result.processedTranscript, "ok")
         XCTAssertEqual(result.stagesExecuted, ["Transcription"])
 
         let calls = await backend.snapshot()
