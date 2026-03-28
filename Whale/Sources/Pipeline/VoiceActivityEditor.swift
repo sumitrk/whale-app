@@ -26,14 +26,15 @@ enum VADPolicy {
     static let frameSamples: Int = 320       // 20 ms at 16 kHz
     static let hopSamples: Int = 160         // 10 ms hop
     static let minSpeechSamples: Int = 2_400 // 150 ms
-    static let mergeGapSamples: Int = 4_000  // 250 ms
+    static let mergeGapSamples: Int = 12_800 // 800 ms — dictation pauses can easily be 500ms+
     static let preRollSamples: Int = 1_920   // 120 ms
     static let postRollSamples: Int = 2_880  // 180 ms
-    static let collapseThresholdSamples: Int = 9_600  // 600 ms
-    static let spacerSamples: Int = 2_400    // 150 ms spacer replaces long gaps
+    static let collapseThresholdSamples: Int = 24_000 // 1500 ms — only collapse truly long dead air
+    static let spacerSamples: Int = 3_200    // 200 ms spacer replaces long gaps
     static let minOutputSamples: Int = 16_800 // ~1.05 s — FluidAudio requires >= 1 s of 16 kHz audio
     static let absoluteFloorDBFS: Float = -45.0
-    static let noiseMarginDB: Float = 10.0
+    static let noiseFloorCapDBFS: Float = -40.0 // cap so speech-heavy starts don't inflate the threshold
+    static let noiseMarginDB: Float = 6.0    // margin above noise floor to set speech threshold
 }
 
 // MARK: - VoiceActivityEditor
@@ -66,9 +67,11 @@ enum VoiceActivityEditor {
         guard count >= VADPolicy.frameSamples else { return [] }
 
         let noiseFloor = estimateNoiseFloor(samples)
-        let thresholdLinear = dbfsToLinear(
-            max(noiseFloor + VADPolicy.noiseMarginDB, VADPolicy.absoluteFloorDBFS)
-        )
+        let thresholdDB = max(noiseFloor + VADPolicy.noiseMarginDB, VADPolicy.absoluteFloorDBFS)
+        let thresholdLinear = dbfsToLinear(thresholdDB)
+
+        print("[VAD] noiseFloor=\(String(format: "%.1f", noiseFloor)) dBFS, "
+              + "threshold=\(String(format: "%.1f", thresholdDB)) dBFS")
 
         var rawSpans: [SpeechSpan] = []
         var speechStart: Int?
@@ -92,7 +95,11 @@ enum VoiceActivityEditor {
         }
 
         let filtered = rawSpans.filter { $0.sampleCount >= VADPolicy.minSpeechSamples }
-        return mergeCloseSpans(filtered, maxGap: VADPolicy.mergeGapSamples)
+        let merged = mergeCloseSpans(filtered, maxGap: VADPolicy.mergeGapSamples)
+
+        print("[VAD] \(rawSpans.count) raw spans → \(filtered.count) after min-length → \(merged.count) after merge")
+
+        return merged
     }
 
     /// Rebuilds a waveform from detected speech spans, collapsing long internal
@@ -245,23 +252,36 @@ enum VoiceActivityEditor {
     }
 
     private static func estimateNoiseFloor(_ samples: [Float]) -> Float {
-        let analysisFrames = min(50, samples.count / VADPolicy.frameSamples)
-        guard analysisFrames > 0 else { return VADPolicy.absoluteFloorDBFS }
+        let totalFrames = samples.count / VADPolicy.frameSamples
+        guard totalFrames > 0 else { return VADPolicy.absoluteFloorDBFS }
+
+        // Sample up to 200 frames evenly distributed across the entire recording
+        // so the estimate isn't contaminated by speech at the start.
+        let maxFramesToSample = min(200, totalFrames)
+        let step = max(1, totalFrames / maxFramesToSample)
 
         var energies: [Float] = []
-        for i in 0..<analysisFrames {
-            let offset = i * VADPolicy.frameSamples
+        var frameIdx = 0
+        while frameIdx < totalFrames {
+            let offset = frameIdx * VADPolicy.frameSamples
             let rms = frameRMS(samples, offset: offset, length: VADPolicy.frameSamples)
             if rms > 0 {
                 energies.append(linearToDBFS(rms))
             }
+            frameIdx += step
         }
 
         guard !energies.isEmpty else { return VADPolicy.absoluteFloorDBFS }
         energies.sort()
 
-        let percentile10 = energies[max(0, energies.count / 10)]
-        return percentile10
+        // 10th percentile of the quietest frames. In a mostly-speech recording
+        // this will still pick up the pauses/breaths between words.
+        let idx = max(0, energies.count / 10)
+        let raw = energies[idx]
+
+        // Cap so a speech-heavy recording (e.g. user starts talking immediately)
+        // can't push the threshold unreasonably high.
+        return min(raw, VADPolicy.noiseFloorCapDBFS)
     }
 
     private static func linearToDBFS(_ linear: Float) -> Float {

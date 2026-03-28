@@ -39,10 +39,10 @@ final class SpeechSpanDetectionTests: XCTestCase {
     }
 
     func testShortPausesArePreservedBySpanMerge() {
-        // Two speech segments separated by 200ms gap (< 250ms merge threshold)
+        // Two speech segments separated by 500ms gap (< 800ms merge threshold)
         let samples = silence(seconds: 0.2)
             + tone(seconds: 0.3)
-            + silence(seconds: 0.2) // short gap — should merge
+            + silence(seconds: 0.5) // short gap — should merge
             + tone(seconds: 0.3)
             + silence(seconds: 0.2)
 
@@ -52,10 +52,10 @@ final class SpeechSpanDetectionTests: XCTestCase {
     }
 
     func testLongPauseCreatesSeparateSpans() {
-        // Two speech segments separated by 500ms gap (> 250ms merge threshold)
+        // Two speech segments separated by 1.2s gap (> 800ms merge threshold)
         let samples = silence(seconds: 0.1)
             + tone(seconds: 0.3)
-            + silence(seconds: 0.5) // long gap — should NOT merge
+            + silence(seconds: 1.2) // long gap — should NOT merge
             + tone(seconds: 0.3)
             + silence(seconds: 0.1)
 
