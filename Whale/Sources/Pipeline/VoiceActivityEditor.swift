@@ -29,7 +29,7 @@ enum VADPolicy {
     static let splitSilenceSamples: Int = 7_200 // 450 ms of silence ends a speech span
     static let mergeGapSamples: Int = 2_400 // 150 ms — only stitch threshold chatter
     static let preRollSamples: Int = 1_920   // 120 ms
-    static let postRollSamples: Int = 2_880  // 180 ms
+    static let postRollSamples: Int = 19_200 // 1.2 s keeps trailing dictation from getting clipped
     static let minOutputSamples: Int = 16_800 // ~1.05 s — FluidAudio requires >= 1 s of 16 kHz audio
     static let absoluteFloorDBFS: Float = -48.0
     static let noiseFloorCapDBFS: Float = -48.0 // keep speech-heavy starts from inflating the threshold

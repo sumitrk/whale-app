@@ -47,7 +47,7 @@ class AppState: ObservableObject {
     init(accessibility: AccessibilityController, pipeline: TranscriptionPipeline? = nil) {
         self.accessibility = accessibility
         self.pipeline = pipeline ?? TranscriptionPipeline(stages: [
-            VoiceActivityDetectionStage(),
+            // VoiceActivityDetectionStage(),
             TranscriptionStage(transcriber: LocalTranscriptionService.shared),
         ])
         recorder.onRecordingReady = { [weak self] in

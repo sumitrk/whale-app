@@ -471,7 +471,10 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
             throw LocalTranscriptionError.notInitialized(modelID.descriptor)
         }
 
-        let result = try await manager.transcribe(wavURL, source: source)
+        // Route Parakeet file transcription through the chunked path unconditionally.
+        // FluidAudio's short-audio single-window path does not mark the input as the
+        // final chunk, which can drop trailing tokens at the end of dictation.
+        let result = try await manager.transcribeStreaming(wavURL, source: source)
         return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

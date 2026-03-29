@@ -133,7 +133,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             print("AudioRecorder: engine started (\(modeLabel))")
         } catch {
             stopSystemAudioCapture()
-            stopMicCapture()
+            await stopMicCapture()
             stopMicLevelDecay()
             isRecording = false
             throw error
@@ -145,7 +145,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         guard isRecording else { throw RecorderError.notRecording }
 
         stopSystemAudioCapture()
-        stopMicCapture()
+        await stopMicCapture()
         stopMicLevelDecay()
         micLevel = 0
         isMicActive = false
@@ -483,13 +483,14 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         }
     }
 
-    private func stopMicCapture() {
+    private func stopMicCapture() async {
         micRestartWorkItem?.cancel()
         micRestartWorkItem = nil
         bluetoothStartupValidationWorkItem?.cancel()
         bluetoothStartupValidationWorkItem = nil
         isRestartingMicCapture = false
         teardownMicCapture()
+        await drainPendingMicCaptureCallbacks()
     }
 
     private func teardownMicCapture() {
@@ -498,13 +499,21 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             NotificationCenter.default.removeObserver(token)
             captureDeviceDisconnectObserver = nil
         }
-        micCaptureOutput?.setSampleBufferDelegate(nil, queue: nil)
         micCaptureSession?.stopRunning()
+        micCaptureOutput?.setSampleBufferDelegate(nil, queue: nil)
         micCaptureOutput = nil
         micCaptureInput = nil
         micCaptureSession = nil
         currentInputDeviceUniqueID = nil
         clearMicReadyState()
+    }
+
+    private func drainPendingMicCaptureCallbacks() async {
+        await withCheckedContinuation { continuation in
+            micCaptureQueue.async {
+                continuation.resume()
+            }
+        }
     }
 
     private func handleUsableMicSamples() {

@@ -171,6 +171,32 @@ final class WaveformRebuildTests: XCTestCase {
         XCTAssertTrue(rebuilt.isEmpty)
     }
 
+    func testTrailingLowEnergyTailIsPreservedByPostRoll() {
+        let leadingSilence = silence(seconds: 0.8)
+        let loudSpeech = noisyTone(seconds: 0.6, amplitude: 0.35)
+        let quietTrailingTail = tone(seconds: 0.85, amplitude: 0.004)
+        let trailingSilence = silence(seconds: 0.6)
+        let samples = leadingSilence + loudSpeech + quietTrailingTail + trailingSilence
+
+        let spans = VoiceActivityEditor.detectSpeechSpans(in: samples)
+        XCTAssertEqual(spans.count, 1)
+
+        let loudSpeechEnd = leadingSilence.count + loudSpeech.count
+        XCTAssertLessThanOrEqual(
+            spans[0].endSample,
+            loudSpeechEnd + VADPolicy.frameSamples,
+            "Quiet trailing speech should fall below the detector threshold in this fixture"
+        )
+
+        let rebuilt = VoiceActivityEditor.rebuildWaveform(samples: samples, spans: spans)
+        let rebuiltDuration = Double(rebuilt.count) / VADPolicy.sampleRate
+        XCTAssertGreaterThan(
+            rebuiltDuration,
+            1.5,
+            "Post-roll should preserve trailing low-energy dictation instead of clipping the tail"
+        )
+    }
+
     func testSingleSpanProducesOutput() {
         let samples = tone(seconds: 0.5)
         let spans = [SpeechSpan(startSample: 0, endSample: samples.count)]
