@@ -30,8 +30,6 @@ enum VADPolicy {
     static let mergeGapSamples: Int = 2_400 // 150 ms — only stitch threshold chatter
     static let preRollSamples: Int = 1_920   // 120 ms
     static let postRollSamples: Int = 2_880  // 180 ms
-    static let collapseThresholdSamples: Int = 24_000 // 1500 ms — only collapse truly long dead air
-    static let spacerSamples: Int = 3_200    // 200 ms spacer replaces long gaps
     static let minOutputSamples: Int = 16_800 // ~1.05 s — FluidAudio requires >= 1 s of 16 kHz audio
     static let absoluteFloorDBFS: Float = -48.0
     static let noiseFloorCapDBFS: Float = -48.0 // keep speech-heavy starts from inflating the threshold
@@ -118,41 +116,20 @@ enum VoiceActivityEditor {
         return filtered
     }
 
-    /// Rebuilds a waveform from detected speech spans, collapsing long internal
-    /// silence to a fixed spacer and applying pre/post roll padding.
+    /// Rebuilds a waveform by trimming only the leading and trailing silence
+    /// around the detected speech. All audio between the first and last speech
+    /// span is preserved verbatim, including long pauses.
     static func rebuildWaveform(
         samples: [Float],
         spans: [SpeechSpan]
     ) -> [Float] {
-        guard !spans.isEmpty else { return [] }
+        guard let firstSpan = spans.first, let lastSpan = spans.last else { return [] }
 
-        var output: [Float] = []
-        let totalSamples = samples.count
+        let start = max(0, firstSpan.startSample - VADPolicy.preRollSamples)
+        let end = min(samples.count, lastSpan.endSample + VADPolicy.postRollSamples)
+        guard start < end else { return [] }
 
-        for (i, span) in spans.enumerated() {
-            let paddedStart = max(0, span.startSample - VADPolicy.preRollSamples)
-            let paddedEnd = min(totalSamples, span.endSample + VADPolicy.postRollSamples)
-
-            if i > 0 {
-                let prevEnd = min(
-                    totalSamples,
-                    spans[i - 1].endSample + VADPolicy.postRollSamples
-                )
-                let gapBetween = paddedStart - prevEnd
-
-                if gapBetween >= VADPolicy.collapseThresholdSamples {
-                    output.append(contentsOf: [Float](repeating: 0, count: VADPolicy.spacerSamples))
-                } else if gapBetween > 0 {
-                    let gapStart = prevEnd
-                    let gapEnd = paddedStart
-                    output.append(contentsOf: samples[gapStart..<gapEnd])
-                }
-            }
-
-            output.append(contentsOf: samples[paddedStart..<paddedEnd])
-        }
-
-        return output
+        return Array(samples[start..<end])
     }
 
     /// Writes float samples as a mono 16 kHz 16-bit PCM WAV file.

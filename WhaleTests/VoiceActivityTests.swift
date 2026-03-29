@@ -124,7 +124,7 @@ final class SpeechSpanDetectionTests: XCTestCase {
 
 final class WaveformRebuildTests: XCTestCase {
 
-    func testLongPauseIsCollapsedToSpacer() {
+    func testLongPauseBetweenSpeechSegmentsIsPreserved() {
         let speech1 = tone(seconds: 0.3)
         let longSilence = silence(seconds: 1.0)
         let speech2 = tone(seconds: 0.3)
@@ -137,11 +137,10 @@ final class WaveformRebuildTests: XCTestCase {
 
         let rebuilt = VoiceActivityEditor.rebuildWaveform(samples: samples, spans: spans)
 
-        // Rebuilt should be significantly shorter than original due to collapsed silence
         let originalDuration = Double(samples.count) / VADPolicy.sampleRate
         let rebuiltDuration = Double(rebuilt.count) / VADPolicy.sampleRate
-        XCTAssertLessThan(rebuiltDuration, originalDuration * 0.8,
-                          "Collapsed silence should make rebuilt waveform noticeably shorter")
+        XCTAssertGreaterThan(rebuiltDuration, originalDuration * 0.95,
+                             "Mid-recording pauses should be preserved when trimming only edges")
     }
 
     func testShortGapPreservesOriginalAudio() {
@@ -160,8 +159,11 @@ final class WaveformRebuildTests: XCTestCase {
 
         let rebuilt = VoiceActivityEditor.rebuildWaveform(samples: samples, spans: spans)
 
-        // Short gap + pre/post roll means rebuilt should be roughly the same length
+        let originalDuration = Double(samples.count) / VADPolicy.sampleRate
+        let rebuiltDuration = Double(rebuilt.count) / VADPolicy.sampleRate
         XCTAssertGreaterThan(rebuilt.count, 0)
+        XCTAssertGreaterThan(rebuiltDuration, originalDuration * 0.95,
+                             "Internal gaps should stay intact when trimming edges only")
     }
 
     func testNoSpansProducesEmptyOutput() {
@@ -294,6 +296,26 @@ final class VADProcessTests: XCTestCase {
         XCTAssertLessThan(stats.retainedDuration, stats.originalDuration)
         XCTAssertTrue(FileManager.default.fileExists(atPath: outputURL.path),
                       "VAD output file should be written")
+    }
+
+    func testLongMidRecordingPauseIsPreservedWhileEdgesAreTrimmed() throws {
+        let inputURL = tempDir.appendingPathComponent("pause.wav")
+        let outputURL = tempDir.appendingPathComponent("pause-vad.wav")
+
+        let samples = silence(seconds: 1.0)
+            + noisyTone(seconds: 0.6, amplitude: 0.4)
+            + silence(seconds: 1.4)
+            + noisyTone(seconds: 0.6, amplitude: 0.4)
+            + silence(seconds: 1.0)
+        try VoiceActivityEditor.writeSamples(samples, to: inputURL)
+        let stats = try VoiceActivityEditor.processWAV(inputURL: inputURL, outputURL: outputURL)
+
+        XCTAssertFalse(stats.skipped)
+        XCTAssertEqual(stats.spanCount, 2)
+        XCTAssertGreaterThan(stats.retainedDuration, 2.2,
+                             "Mid-recording pauses should remain in the VAD output")
+        XCTAssertLessThan(stats.retainedDuration, stats.originalDuration,
+                          "Leading and trailing silence should still be trimmed")
     }
 }
 
