@@ -1,15 +1,28 @@
 import AppKit
 import ApplicationServices
 
+struct FocusedElementContext {
+    let snapshot: FocusedElementSnapshot
+    let element: AXUIElement
+    let placeholderValue: String?
+    let numberOfCharacters: Int?
+}
+
 struct FocusedElementSnapshot {
     let appName: String?
     let bundleIdentifier: String?
     let role: String?
     let subrole: String?
     let roleDescription: String?
+    let placeholderValue: String?
+    let numberOfCharacters: Int?
     let isEditable: Bool
     let supportsSelectedTextRange: Bool
     let supportsAXValue: Bool
+    let canReadAXValueAsString: Bool
+    let isAXValueSettable: Bool
+    let canReadSelectedTextRange: Bool
+    let isSelectedTextRangeSettable: Bool
     let frame: NSRect?
     /// AX attributes found on the focused element (for diagnostics).
     let attributeNames: [String]
@@ -36,6 +49,30 @@ struct FocusedElementSnapshot {
     private var isBrowserApp: Bool {
         guard let bundle = bundleIdentifier else { return false }
         return Self.chromiumBundlePrefixes.contains(where: { bundle.hasPrefix($0) })
+    }
+
+    var prefersSimulatedPasteOverDirectAX: Bool {
+        isBrowserApp || hasChromiumAccessibilityMarkers
+    }
+
+    var canDirectInsertSafely: Bool {
+        isWritableTextTarget
+            && !prefersSimulatedPasteOverDirectAX
+            && canReadAXValueAsString
+            && isAXValueSettable
+            && canReadSelectedTextRange
+            && isSelectedTextRangeSettable
+    }
+
+    var directInsertBlockers: [String] {
+        var blockers: [String] = []
+        if !isWritableTextTarget { blockers.append("not-writable-target") }
+        if prefersSimulatedPasteOverDirectAX { blockers.append("browser-like-editor") }
+        if !canReadAXValueAsString { blockers.append("value-not-readable-as-string") }
+        if !isAXValueSettable { blockers.append("value-not-settable") }
+        if !canReadSelectedTextRange { blockers.append("selected-range-not-readable") }
+        if !isSelectedTextRangeSettable { blockers.append("selected-range-not-settable") }
+        return blockers
     }
 
     var isWritableTextTarget: Bool {
@@ -72,10 +109,26 @@ struct FocusedElementSnapshot {
         }
         return false
     }
+
+    private var hasChromiumAccessibilityMarkers: Bool {
+        let chromiumMarkers: Set<String> = [
+            "ChromeAXNodeId",
+            "AXDOMIdentifier",
+            "AXDOMClassList",
+            "AXStartTextMarker",
+            "AXEndTextMarker",
+            "AXSelectedTextMarkerRange",
+        ]
+        return !chromiumMarkers.isDisjoint(with: Set(attributeNames))
+    }
 }
 
 enum FocusedElementInspector {
     static func snapshot() -> FocusedElementSnapshot? {
+        focusedElementContext()?.snapshot
+    }
+
+    static func focusedElementContext() -> FocusedElementContext? {
         guard AXIsProcessTrusted() else { return nil }
 
         let system = AXUIElementCreateSystemWide()
@@ -93,22 +146,43 @@ enum FocusedElementInspector {
         let role = stringAttribute(kAXRoleAttribute as CFString, of: element)
         let subrole = stringAttribute(kAXSubroleAttribute as CFString, of: element)
         let roleDescription = stringAttribute(kAXRoleDescriptionAttribute as CFString, of: element)
+        let placeholderValue = stringAttribute("AXPlaceholderValue" as CFString, of: element)
+        let numberOfCharacters = intAttribute("AXNumberOfCharacters" as CFString, of: element)
         let isEditable = boolAttribute("AXEditable" as CFString, of: element)
         let supportsSelectedTextRange = names.contains(kAXSelectedTextRangeAttribute as String)
         let supportsAXValue = names.contains(kAXValueAttribute as String)
+        let canReadAXValueAsString = stringAttribute(kAXValueAttribute as CFString, of: element) != nil
+        let isAXValueSettable = supportsAXValue
+            && isAttributeSettable(kAXValueAttribute as CFString, of: element)
+        let canReadSelectedTextRange = selectedTextRangeAttribute(of: element) != nil
+        let isSelectedTextRangeSettable = supportsSelectedTextRange
+            && isAttributeSettable(kAXSelectedTextRangeAttribute as CFString, of: element)
         let frame = frameAttribute(of: element)
 
-        return FocusedElementSnapshot(
+        let snapshot = FocusedElementSnapshot(
             appName: NSWorkspace.shared.frontmostApplication?.localizedName,
             bundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
             role: role,
             subrole: subrole,
             roleDescription: roleDescription,
+            placeholderValue: placeholderValue,
+            numberOfCharacters: numberOfCharacters,
             isEditable: isEditable,
             supportsSelectedTextRange: supportsSelectedTextRange,
             supportsAXValue: supportsAXValue,
+            canReadAXValueAsString: canReadAXValueAsString,
+            isAXValueSettable: isAXValueSettable,
+            canReadSelectedTextRange: canReadSelectedTextRange,
+            isSelectedTextRangeSettable: isSelectedTextRangeSettable,
             frame: frame,
             attributeNames: names
+        )
+
+        return FocusedElementContext(
+            snapshot: snapshot,
+            element: element,
+            placeholderValue: placeholderValue,
+            numberOfCharacters: numberOfCharacters
         )
     }
 
@@ -139,10 +213,46 @@ enum FocusedElementInspector {
         return false
     }
 
+    private static func intAttribute(_ name: CFString, of element: AXUIElement) -> Int? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, name, &value) == .success,
+              let value else { return nil }
+
+        if let number = value as? NSNumber {
+            return number.intValue
+        }
+        return nil
+    }
+
+    private static func isAttributeSettable(_ name: CFString, of element: AXUIElement) -> Bool {
+        var settable = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(element, name, &settable) == .success else { return false }
+        return settable.boolValue
+    }
+
+    private static func selectedTextRangeAttribute(of element: AXUIElement) -> CFRange? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &value
+        ) == .success,
+              let value,
+              CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+
+        let axValue = value as! AXValue
+        guard AXValueGetType(axValue) == .cfRange else { return nil }
+
+        var range = CFRange(location: 0, length: 0)
+        guard AXValueGetValue(axValue, .cfRange, &range) else { return nil }
+        return range
+    }
+
     private static func frameAttribute(of element: AXUIElement) -> NSRect? {
         var frameRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, "AXFrame" as CFString, &frameRef) == .success,
-              let frameRef else { return nil }
+              let frameRef,
+              CFGetTypeID(frameRef) == AXValueGetTypeID() else { return nil }
 
         var axRect = CGRect.zero
         guard AXValueGetValue(frameRef as! AXValue, .cgRect, &axRect) else { return nil }
