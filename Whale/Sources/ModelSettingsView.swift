@@ -17,14 +17,6 @@ struct ModelSettingsView: View {
                 .padding(.horizontal, 18)
 
                 TranscriptionModelGroupsView(horizontalPadding: 18, contentPadding: 18)
-
-                if modelStore.isReady {
-                    Text("The native Swift build currently exports raw Markdown transcripts. AI cleanup returns in a later release.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 18)
-                }
-
                 Spacer(minLength: 0)
             }
         }

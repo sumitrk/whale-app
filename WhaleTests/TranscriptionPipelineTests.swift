@@ -10,6 +10,7 @@ struct MockTranscriptionStage: PipelineStage {
 
     func process(_ context: PipelineContext) async throws -> PipelineContext {
         var ctx = context
+        ctx.rawTranscript = output
         ctx.transcript = output
         return ctx
     }
@@ -29,6 +30,7 @@ struct AppendingStage: PipelineStage {
 struct FailingStage: PipelineStage {
     let name: String
     let error: Error
+    let isRecoverable: Bool
 
     func process(_ context: PipelineContext) async throws -> PipelineContext {
         throw error
@@ -57,7 +59,10 @@ final class TranscriptionPipelineTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: dummyWAV,
             modelID: dummyModel,
-            audioSource: dummySource
+            audioSource: dummySource,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
         XCTAssertEqual(result.processedTranscript, "Hello world")
@@ -76,7 +81,10 @@ final class TranscriptionPipelineTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: dummyWAV,
             modelID: dummyModel,
-            audioSource: dummySource
+            audioSource: dummySource,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
         XCTAssertEqual(result.processedTranscript, "raw text [cleaned] [formatted]")
@@ -88,7 +96,7 @@ final class TranscriptionPipelineTests: XCTestCase {
     func testErrorInStagePropagates() async {
         let pipeline = TranscriptionPipeline(stages: [
             MockTranscriptionStage(name: "Transcription", output: "some text"),
-            FailingStage(name: "BrokenStage", error: TestError.stageFailed("boom")),
+            FailingStage(name: "BrokenStage", error: TestError.stageFailed("boom"), isRecoverable: false),
             AppendingStage(name: "NeverReached", suffix: " [should not appear]"),
         ])
 
@@ -96,7 +104,10 @@ final class TranscriptionPipelineTests: XCTestCase {
             _ = try await pipeline.process(
                 wavURL: dummyWAV,
                 modelID: dummyModel,
-                audioSource: dummySource
+                audioSource: dummySource,
+                outputMode: .paste,
+                postProcessingSettings: .stub(),
+                focusedAppContext: nil
             )
             XCTFail("Expected error to be thrown")
         } catch let error as TestError {
@@ -108,7 +119,7 @@ final class TranscriptionPipelineTests: XCTestCase {
 
     func testErrorInFirstStageStopsExecution() async {
         let pipeline = TranscriptionPipeline(stages: [
-            FailingStage(name: "FailFirst", error: TestError.stageFailed("first")),
+            FailingStage(name: "FailFirst", error: TestError.stageFailed("first"), isRecoverable: false),
             MockTranscriptionStage(name: "NeverReached", output: "should not run"),
         ])
 
@@ -116,7 +127,10 @@ final class TranscriptionPipelineTests: XCTestCase {
             _ = try await pipeline.process(
                 wavURL: dummyWAV,
                 modelID: dummyModel,
-                audioSource: dummySource
+                audioSource: dummySource,
+                outputMode: .paste,
+                postProcessingSettings: .stub(),
+                focusedAppContext: nil
             )
             XCTFail("Expected error to be thrown")
         } catch let error as TestError {
@@ -134,7 +148,10 @@ final class TranscriptionPipelineTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: dummyWAV,
             modelID: dummyModel,
-            audioSource: dummySource
+            audioSource: dummySource,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
         XCTAssertEqual(result.processedTranscript, "")
@@ -157,7 +174,10 @@ final class TranscriptionPipelineTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: expectedURL,
             modelID: expectedModel,
-            audioSource: expectedSource
+            audioSource: expectedSource,
+            outputMode: .markdown,
+            postProcessingSettings: .stub(),
+            focusedAppContext: FocusedAppContext(appName: "Notes", bundleIdentifier: "com.apple.Notes")
         )
 
         XCTAssertEqual(result.processedTranscript, "verified")
@@ -177,7 +197,10 @@ final class TranscriptionPipelineTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: dummyWAV,
             modelID: .parakeetEnglishV2,
-            audioSource: .microphone
+            audioSource: .microphone,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
         XCTAssertEqual(result.processedTranscript, "ok")
@@ -185,6 +208,57 @@ final class TranscriptionPipelineTests: XCTestCase {
 
         let calls = await backend.snapshot()
         XCTAssertEqual(calls.transcribed, [.parakeetEnglishV2])
+    }
+
+    func testRecoverableStageRecordsWarningAndContinues() async throws {
+        let pipeline = TranscriptionPipeline(stages: [
+            MockTranscriptionStage(name: "Transcription", output: "raw text"),
+            FailingStage(name: LocalLLMCleanupStage.stageName, error: TestError.stageFailed("llm"), isRecoverable: true),
+            AppendingStage(name: "Suffix", suffix: " [kept]"),
+        ])
+
+        let result = try await pipeline.process(
+            wavURL: dummyWAV,
+            modelID: dummyModel,
+            audioSource: dummySource,
+            outputMode: .paste,
+            postProcessingSettings: .stub(cleanupLevel: .medium),
+            focusedAppContext: nil
+        )
+
+        XCTAssertEqual(result.processedTranscript, "raw text [kept]")
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertTrue(result.didFallbackFromLocalLLM)
+    }
+
+    func testStageObserverReceivesUpdatedContextAfterEachStage() async throws {
+        let observedStages = ObservedStageEvents()
+        let pipeline = TranscriptionPipeline(stages: [
+            MockTranscriptionStage(name: "Transcription", output: "raw text"),
+            AppendingStage(name: "Cleanup", suffix: " [cleaned]"),
+        ])
+
+        _ = try await pipeline.process(
+            wavURL: dummyWAV,
+            modelID: dummyModel,
+            audioSource: dummySource,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil,
+            stageObserver: { stageName, context in
+                observedStages.append(
+                    name: stageName,
+                    rawTranscript: context.rawTranscript,
+                    transcript: context.transcript
+                )
+            }
+        )
+
+        let events = observedStages.value
+        XCTAssertEqual(events.map(\.name), ["Transcription", "Cleanup"])
+        XCTAssertEqual(events.first?.rawTranscript, "raw text")
+        XCTAssertEqual(events.first?.transcript, "raw text")
+        XCTAssertEqual(events.last?.transcript, "raw text [cleaned]")
     }
 }
 
@@ -202,8 +276,47 @@ private struct ContextVerifyingStage: PipelineStage {
         guard context.modelID == expectedModelID else {
             throw TestError.stageFailed("modelID mismatch: \(context.modelID) != \(expectedModelID)")
         }
+        guard context.focusedAppContext?.bundleIdentifier == "com.apple.Notes" else {
+            throw TestError.stageFailed("focused app context missing")
+        }
         var ctx = context
         ctx.transcript = "verified"
         return ctx
+    }
+}
+
+private final class ObservedStageEvents: @unchecked Sendable {
+    struct Event: Equatable {
+        let name: String
+        let rawTranscript: String
+        let transcript: String
+    }
+
+    private let lock = NSLock()
+    private var events: [Event] = []
+
+    func append(name: String, rawTranscript: String, transcript: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        events.append(Event(name: name, rawTranscript: rawTranscript, transcript: transcript))
+    }
+
+    var value: [Event] {
+        lock.lock()
+        defer { lock.unlock() }
+        return events
+    }
+}
+
+private extension TextCleanupSettings {
+    static func stub(
+        enabled: Bool = true,
+        cleanupLevel: CleanupLevel = .light
+    ) -> TextCleanupSettings {
+        TextCleanupSettings(
+            enabled: enabled,
+            cleanupLevel: cleanupLevel,
+            localLLMModelID: .qwen3_0_6b_4bit
+        )
     }
 }

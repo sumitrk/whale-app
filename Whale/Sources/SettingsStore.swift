@@ -75,6 +75,20 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(builtInModelLocalPaths, forKey: Keys.builtInModelLocalPaths) }
     }
 
+    // MARK: - Post-Processing
+
+    @Published var postProcessingEnabled: Bool {
+        didSet { ud.set(postProcessingEnabled, forKey: Keys.postProcessingEnabled) }
+    }
+
+    @Published var cleanupLevel: CleanupLevel {
+        didSet { ud.set(cleanupLevel.rawValue, forKey: Keys.cleanupLevel) }
+    }
+
+    @Published var selectedLocalLLMModelID: LocalLLMModelID? {
+        didSet { ud.set(selectedLocalLLMModelID?.rawValue, forKey: Keys.selectedLocalLLMModelID) }
+    }
+
     // MARK: - Init
 
     private let ud: UserDefaults
@@ -94,6 +108,13 @@ class SettingsStore: ObservableObject {
             rawValue: ud.string(forKey: Keys.selectedBuiltInModelID) ?? ""
         ) ?? .parakeetEnglishV2
         builtInModelLocalPaths   = ud.dictionary(forKey: Keys.builtInModelLocalPaths) as? [String: String] ?? [:]
+        postProcessingEnabled    = ud.object(forKey: Keys.postProcessingEnabled) as? Bool ?? true
+        cleanupLevel             = CleanupLevel(
+            rawValue: ud.string(forKey: Keys.cleanupLevel) ?? ""
+        ) ?? .light
+        selectedLocalLLMModelID  = LocalLLMModelID(
+            rawValue: ud.string(forKey: Keys.selectedLocalLLMModelID) ?? ""
+        ) ?? .qwen3_0_6b_4bit
     }
 
     func localModelPath(for modelID: BuiltInModelID) -> String? {
@@ -142,5 +163,8 @@ class SettingsStore: ObservableObject {
         static let pttModifiers          = "pttModifiers"
         static let selectedBuiltInModelID = "selectedBuiltInModelID"
         static let builtInModelLocalPaths = "builtInModelLocalPaths"
+        static let postProcessingEnabled = "postProcessingEnabled"
+        static let cleanupLevel = "cleanupLevel"
+        static let selectedLocalLLMModelID = "selectedLocalLLMModelID"
     }
 }

@@ -20,6 +20,7 @@ private struct SettingsWindowAccessor: NSViewRepresentable {
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general     = "General"
+    case postProcessing = "Post-Processing"
     case shortcuts   = "Shortcuts"
     case model       = "Model"
     case permissions = "Permissions"
@@ -29,6 +30,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .general:     return "gearshape"
+        case .postProcessing: return "sparkles"
         case .shortcuts:   return "keyboard"
         case .model:       return "cpu"
         case .permissions: return "lock.shield"
@@ -55,6 +57,7 @@ struct SettingsView: View {
             Group {
                 switch settingsCoordinator.selection {
                 case .general:     GeneralSettingsView()
+                case .postProcessing: PostProcessingSettingsView()
                 case .shortcuts:   ShortcutsSettingsView()
                 case .model:       ModelSettingsView()
                 case .permissions: PermissionsSettingsView()
@@ -62,7 +65,7 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(width: 620, height: 460)
+        .frame(width: 760, height: 560)
         .background(
             SettingsWindowAccessor { window in
                 settingsCoordinator.registerSettingsWindow(window)

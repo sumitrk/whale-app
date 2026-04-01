@@ -6,6 +6,7 @@ import SwiftUI
 
 /// Non-activating HUD that floats above all windows near the cursor.
 /// Shows a live audio waveform driven by the microphone RMS level.
+@MainActor
 final class RecordingIndicatorWindow: NSPanel {
     enum PasteHintReason: Equatable {
         case manualPasteOnly
@@ -37,6 +38,18 @@ final class RecordingIndicatorWindow: NSPanel {
         host.frame = NSRect(x: 0, y: 0, width: 48, height: 36)
         contentView = host
         setContentSize(host.frame.size)
+
+        positionNearCursor()
+        orderFront(nil)
+    }
+
+    func showProcessing(message: String) {
+        let view = ProcessingIndicatorView(message: message)
+        let host = NSHostingView(rootView: view)
+        let size = host.fittingSize
+        host.frame = NSRect(origin: .zero, size: size)
+        contentView = host
+        setContentSize(size)
 
         positionNearCursor()
         orderFront(nil)
@@ -91,6 +104,25 @@ final class RecordingIndicatorWindow: NSPanel {
         let x  = max(vf.minX + 4, min(origin.x, vf.maxX - sz.width  - 4))
         let y  = max(vf.minY + 4, min(origin.y, vf.maxY - sz.height - 4))
         setFrameOrigin(NSPoint(x: x, y: y))
+    }
+}
+
+private struct ProcessingIndicatorView: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+                .tint(.white)
+            Text(message)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.72)))
     }
 }
 

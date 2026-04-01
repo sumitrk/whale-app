@@ -7,18 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */; };
-		AA0000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000072 /* WhisperKit */; };
-		AA0000000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000011 /* XCTest.framework */; };
-		AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000013 /* TranscriptionModelTests.swift */; };
-		AA0000000000000000000004 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C91A4D72C0C4A0B9F20A111 /* FluidAudio */; };
 		0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */; };
+		173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */; };
 		1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */; };
 		1C91A4D62C0C4A0B9F20A111 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C91A4D72C0C4A0B9F20A111 /* FluidAudio */; };
-		173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */; };
 		225A0771E3382915CC101010 /* PermissionsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */; };
 		26F65C1A9D4E4F21A8B7C6D5 /* FocusedElementInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26F65C1A9D4E4F21A8B7C6D4 /* FocusedElementInspector.swift */; };
-		D1A9B0C2E3F45678A0B1C2D3 /* DiagnosticLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A9B0C2E3F45678A0B1C2D2 /* DiagnosticLog.swift */; };
 		29A65EDEADEA0F1B5158FD69 /* KeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E38A11A0F59E213976F5390 /* KeyRecorderView.swift */; };
 		44B72D2C29F587378408A9BA /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */; };
 		458667B43F9AE26431333EA6 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2954E642B3BA0DC9A23C8B0 /* MenuBarView.swift */; };
@@ -30,9 +24,15 @@
 		89E3B9353ADD0FFF6610144B /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5228B35E5BC11AB86698BDC /* AppState.swift */; };
 		94E2FF4554D92D4265DAFE60 /* ShortcutsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ABD2DA0658FF2189FE2CD1C /* ShortcutsSettingsView.swift */; };
 		99A09F84D12D5E5B2A3D164D /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC32008B10AB2F3A32901A8F /* OnboardingView.swift */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */; };
 		A5F1E893C1214A87B9A5BDFC /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D46A1ED1172B492709C538FC /* AudioToolbox.framework */; };
+		AA0000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000072 /* WhisperKit */; };
+		AA0000000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000011 /* XCTest.framework */; };
+		AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000013 /* TranscriptionModelTests.swift */; };
+		AA0000000000000000000004 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C91A4D72C0C4A0B9F20A111 /* FluidAudio */; };
 		C6A3D56B2F7023BB00A16DA0 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C6A3D56A2F7023BB00A16DA0 /* Sparkle */; };
 		CCA720AE0BE461180105FE92 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D450792BC5E0CE42F90269FE /* GeneralSettingsView.swift */; };
+		D1A9B0C2E3F45678A0B1C2D3 /* DiagnosticLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A9B0C2E3F45678A0B1C2D2 /* DiagnosticLog.swift */; };
 		D4E5F60718293A4B5C6D7E8F /* SettingsCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */; };
 		EA62496C0185BEEC105B2E85 /* PTTRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */; };
 		EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8416E07055CA131C50C9B6F6 /* SettingsStore.swift */; };
@@ -42,21 +42,35 @@
 		PP0000000000000000000014 /* TextInsertionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000004 /* TextInsertionManager.swift */; };
 		PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000005 /* TranscriptionPipelineTests.swift */; };
 		PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000006 /* TextInsertionManagerTests.swift */; };
+		PST000000000000000000011 /* PostProcessingTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = PST000000000000000000101 /* PostProcessingTypes.swift */; };
+		PST000000000000000000013 /* PromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = PST000000000000000000103 /* PromptBuilder.swift */; };
+		PST000000000000000000014 /* LocalLLMCleanupStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = PST000000000000000000104 /* LocalLLMCleanupStage.swift */; };
+		PST000000000000000000015 /* LocalLLMService.swift in Sources */ = {isa = PBXBuildFile; fileRef = PST000000000000000000105 /* LocalLLMService.swift */; };
+		PST000000000000000000016 /* PostProcessingSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PST000000000000000000106 /* PostProcessingSettingsView.swift */; };
+		PST000000000000000000022 /* PromptBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PST000000000000000000112 /* PromptBuilderTests.swift */; };
+		PST000000000000000000023 /* LocalLLMCleanupStageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PST000000000000000000113 /* LocalLLMCleanupStageTests.swift */; };
+		PST000000000000000000024 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = PST000000000000000000302 /* MLXLLM */; };
+		PST000000000000000000025 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = PST000000000000000000303 /* MLXLMCommon */; };
 		VAD000000000000000000011 /* VoiceActivityEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000001 /* VoiceActivityEditor.swift */; };
 		VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */; };
 		VAD000000000000000000013 /* VoiceActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000003 /* VoiceActivityTests.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		AA0000000000000000000051 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49FAB7016FB2C5DDF4EB5204 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 92FC86E1A1F73D62CBA0B22D;
+			remoteInfo = Whale;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
-		AA0000000000000000000011 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
-		AA0000000000000000000012 /* WhaleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhaleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA0000000000000000000013 /* TranscriptionModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionModelTests.swift; sourceTree = "<group>"; };
-		B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityController.swift; sourceTree = "<group>"; };
 		1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicatorWindow.swift; sourceTree = "<group>"; };
 		1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionService.swift; sourceTree = "<group>"; };
 		26F65C1A9D4E4F21A8B7C6D4 /* FocusedElementInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusedElementInspector.swift; sourceTree = "<group>"; };
-		D1A9B0C2E3F45678A0B1C2D2 /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
 		4ABD2DA0658FF2189FE2CD1C /* ShortcutsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutsSettingsView.swift; sourceTree = "<group>"; };
 		4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsSettingsView.swift; sourceTree = "<group>"; };
 		5EB407F215A4729F95EBD5AA /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -66,14 +80,19 @@
 		8EEEF1DF5515540F6788EFF8 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		9E38A11A0F59E213976F5390 /* KeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyRecorderView.swift; sourceTree = "<group>"; };
 		A24AEF266FF0BBF055AB8CFB /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		AA0000000000000000000011 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		AA0000000000000000000012 /* WhaleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhaleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000013 /* TranscriptionModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionModelTests.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
 		C2954E642B3BA0DC9A23C8B0 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
-		D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCoordinator.swift; sourceTree = "<group>"; };
+		D1A9B0C2E3F45678A0B1C2D2 /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
 		D450792BC5E0CE42F90269FE /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		D46A1ED1172B492709C538FC /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCoordinator.swift; sourceTree = "<group>"; };
 		D5228B35E5BC11AB86698BDC /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		D7ECD4881167C564AC493E67 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
-		E30A00EEB7141B3BFD0B065B /* TranscribeMeeting.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TranscribeMeeting.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E30A00EEB7141B3BFD0B065B /* Whale.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whale.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EC32008B10AB2F3A32901A8F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		F9355D4C305CC2A5F0A0E16D /* ModelSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSettingsView.swift; sourceTree = "<group>"; };
 		PP0000000000000000000002 /* TranscriptionPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipeline.swift; sourceTree = "<group>"; };
@@ -81,6 +100,13 @@
 		PP0000000000000000000004 /* TextInsertionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManager.swift; sourceTree = "<group>"; };
 		PP0000000000000000000005 /* TranscriptionPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipelineTests.swift; sourceTree = "<group>"; };
 		PP0000000000000000000006 /* TextInsertionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManagerTests.swift; sourceTree = "<group>"; };
+		PST000000000000000000101 /* PostProcessingTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostProcessingTypes.swift; sourceTree = "<group>"; };
+		PST000000000000000000103 /* PromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptBuilder.swift; sourceTree = "<group>"; };
+		PST000000000000000000104 /* LocalLLMCleanupStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLLMCleanupStage.swift; sourceTree = "<group>"; };
+		PST000000000000000000105 /* LocalLLMService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLLMService.swift; sourceTree = "<group>"; };
+		PST000000000000000000106 /* PostProcessingSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostProcessingSettingsView.swift; sourceTree = "<group>"; };
+		PST000000000000000000112 /* PromptBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptBuilderTests.swift; sourceTree = "<group>"; };
+		PST000000000000000000113 /* LocalLLMCleanupStageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLLMCleanupStageTests.swift; sourceTree = "<group>"; };
 		VAD000000000000000000001 /* VoiceActivityEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityEditor.swift; sourceTree = "<group>"; };
 		VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityDetectionStage.swift; sourceTree = "<group>"; };
 		VAD000000000000000000003 /* VoiceActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityTests.swift; sourceTree = "<group>"; };
@@ -102,6 +128,8 @@
 			files = (
 				7A61089AAB7BD42A35D460B5 /* CoreAudio.framework in Frameworks */,
 				1C91A4D62C0C4A0B9F20A111 /* FluidAudio in Frameworks */,
+				PST000000000000000000024 /* MLXLLM in Frameworks */,
+				PST000000000000000000025 /* MLXLMCommon in Frameworks */,
 				AA0000000000000000000001 /* WhisperKit in Frameworks */,
 				C6A3D56B2F7023BB00A16DA0 /* Sparkle in Frameworks */,
 				A5F1E893C1214A87B9A5BDFC /* AudioToolbox.framework in Frameworks */,
@@ -115,21 +143,10 @@
 		1DB310FC63230A872DF63309 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E30A00EEB7141B3BFD0B065B /* TranscribeMeeting.app */,
+				E30A00EEB7141B3BFD0B065B /* Whale.app */,
 				AA0000000000000000000012 /* WhaleTests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		PP0000000000000000000001 /* Pipeline */ = {
-			isa = PBXGroup;
-			children = (
-				PP0000000000000000000002 /* TranscriptionPipeline.swift */,
-				PP0000000000000000000003 /* TranscriptionStage.swift */,
-				VAD000000000000000000001 /* VoiceActivityEditor.swift */,
-				VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */,
-			);
-			path = Pipeline;
 			sourceTree = "<group>";
 		};
 		1FF43984F054E7654B1EEA37 /* Sources */ = {
@@ -144,11 +161,13 @@
 				B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */,
 				9E38A11A0F59E213976F5390 /* KeyRecorderView.swift */,
 				1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */,
+				PST000000000000000000105 /* LocalLLMService.swift */,
 				C2954E642B3BA0DC9A23C8B0 /* MenuBarView.swift */,
 				F9355D4C305CC2A5F0A0E16D /* ModelSettingsView.swift */,
 				EC32008B10AB2F3A32901A8F /* OnboardingView.swift */,
 				4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */,
 				PP0000000000000000000001 /* Pipeline */,
+				PST000000000000000000106 /* PostProcessingSettingsView.swift */,
 				8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */,
 				1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */,
 				D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */,
@@ -162,6 +181,30 @@
 			path = Whale/Sources;
 			sourceTree = "<group>";
 		};
+		8F2DCE44CE4C7CA0FB04F8BC = {
+			isa = PBXGroup;
+			children = (
+				1FF43984F054E7654B1EEA37 /* Sources */,
+				AA0000000000000000000021 /* WhaleTests */,
+				C3D4E5F6A7B8C9D0E1F2A3B5 /* Resources */,
+				FD08E838474B977A29696F57 /* Frameworks */,
+				1DB310FC63230A872DF63309 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000021 /* WhaleTests */ = {
+			isa = PBXGroup;
+			children = (
+				PST000000000000000000113 /* LocalLLMCleanupStageTests.swift */,
+				PST000000000000000000112 /* PromptBuilderTests.swift */,
+				PP0000000000000000000006 /* TextInsertionManagerTests.swift */,
+				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
+				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
+				VAD000000000000000000003 /* VoiceActivityTests.swift */,
+			);
+			path = WhaleTests;
+			sourceTree = "<group>";
+		};
 		C3D4E5F6A7B8C9D0E1F2A3B5 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -169,28 +212,6 @@
 			);
 			name = Resources;
 			path = Whale/Resources;
-			sourceTree = "<group>";
-		};
-		8F2DCE44CE4C7CA0FB04F8BC = {
-			isa = PBXGroup;
-			children = (
-				1FF43984F054E7654B1EEA37 /* Sources */,
-				AA0000000000000000000021 /* Tests */,
-				C3D4E5F6A7B8C9D0E1F2A3B5 /* Resources */,
-				FD08E838474B977A29696F57 /* Frameworks */,
-				1DB310FC63230A872DF63309 /* Products */,
-			);
-			sourceTree = "<group>";
-		};
-		AA0000000000000000000021 /* Tests */ = {
-			isa = PBXGroup;
-			children = (
-				PP0000000000000000000006 /* TextInsertionManagerTests.swift */,
-				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
-				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
-				VAD000000000000000000003 /* VoiceActivityTests.swift */,
-			);
-			path = WhaleTests;
 			sourceTree = "<group>";
 		};
 		FD08E838474B977A29696F57 /* Frameworks */ = {
@@ -204,22 +225,26 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		PP0000000000000000000001 /* Pipeline */ = {
+			isa = PBXGroup;
+			children = (
+				PP0000000000000000000002 /* TranscriptionPipeline.swift */,
+				PP0000000000000000000003 /* TranscriptionStage.swift */,
+				PST000000000000000000101 /* PostProcessingTypes.swift */,
+				PST000000000000000000103 /* PromptBuilder.swift */,
+				PST000000000000000000104 /* LocalLLMCleanupStage.swift */,
+				VAD000000000000000000001 /* VoiceActivityEditor.swift */,
+				VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */,
+			);
+			path = Pipeline;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
-/* Begin PBXContainerItemProxy section */
-		AA0000000000000000000051 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 49FAB7016FB2C5DDF4EB5204 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 92FC86E1A1F73D62CBA0B22D;
-			remoteInfo = Whale;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXNativeTarget section */
-		92FC86E1A1F73D62CBA0B22D /* TranscribeMeeting */ = {
+		92FC86E1A1F73D62CBA0B22D /* Whale */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 735A3DEFC8ED556C33117934 /* Build configuration list for PBXNativeTarget "Swift" */;
+			buildConfigurationList = 735A3DEFC8ED556C33117934 /* Build configuration list for PBXNativeTarget "Whale" */;
 			buildPhases = (
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* Resources */,
 				C9421B68B0297431CB7B7584 /* Sources */,
@@ -232,11 +257,13 @@
 			name = Whale;
 			packageProductDependencies = (
 				1C91A4D72C0C4A0B9F20A111 /* FluidAudio */,
+				PST000000000000000000302 /* MLXLLM */,
+				PST000000000000000000303 /* MLXLMCommon */,
 				AA0000000000000000000072 /* WhisperKit */,
 				C6A3D56A2F7023BB00A16DA0 /* Sparkle */,
 			);
 			productName = TranscribeMeeting;
-			productReference = E30A00EEB7141B3BFD0B065B /* TranscribeMeeting.app */;
+			productReference = E30A00EEB7141B3BFD0B065B /* Whale.app */;
 			productType = "com.apple.product-type.application";
 		};
 		AA0000000000000000000041 /* WhaleTests */ = {
@@ -266,7 +293,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					92FC86E1A1F73D62CBA0B22D = {
 						DevelopmentTeam = G6Z6DNHM33;
@@ -278,7 +305,7 @@
 					};
 				};
 			};
-			buildConfigurationList = E16D1E3FBFCDFDAC4957447A /* Build configuration list for PBXProject "Swift" */;
+			buildConfigurationList = E16D1E3FBFCDFDAC4957447A /* Build configuration list for PBXProject "Whale" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -289,6 +316,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+				PST000000000000000000301 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				AA0000000000000000000071 /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
@@ -297,7 +325,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				92FC86E1A1F73D62CBA0B22D /* TranscribeMeeting */,
+				92FC86E1A1F73D62CBA0B22D /* Whale */,
 				AA0000000000000000000041 /* WhaleTests */,
 			);
 		};
@@ -319,6 +347,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				PST000000000000000000023 /* LocalLLMCleanupStageTests.swift in Sources */,
+				PST000000000000000000022 /* PromptBuilderTests.swift in Sources */,
 				PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */,
 				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
 				PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */,
@@ -338,12 +368,17 @@
 				CCA720AE0BE461180105FE92 /* GeneralSettingsView.swift in Sources */,
 				44B72D2C29F587378408A9BA /* HotkeyManager.swift in Sources */,
 				29A65EDEADEA0F1B5158FD69 /* KeyRecorderView.swift in Sources */,
+				PST000000000000000000015 /* LocalLLMService.swift in Sources */,
 				1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */,
+				PST000000000000000000014 /* LocalLLMCleanupStage.swift in Sources */,
 				458667B43F9AE26431333EA6 /* MenuBarView.swift in Sources */,
 				6662ADC802438E2174FFF967 /* ModelSettingsView.swift in Sources */,
 				99A09F84D12D5E5B2A3D164D /* OnboardingView.swift in Sources */,
 				EA62496C0185BEEC105B2E85 /* PTTRecorderView.swift in Sources */,
 				225A0771E3382915CC101010 /* PermissionsSettingsView.swift in Sources */,
+				PST000000000000000000016 /* PostProcessingSettingsView.swift in Sources */,
+				PST000000000000000000011 /* PostProcessingTypes.swift in Sources */,
+				PST000000000000000000013 /* PromptBuilder.swift in Sources */,
 				0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */,
 				D4E5F60718293A4B5C6D7E8F /* SettingsCoordinator.swift in Sources */,
 				EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */,
@@ -360,6 +395,14 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		AA0000000000000000000052 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 92FC86E1A1F73D62CBA0B22D /* Whale */;
+			targetProxy = AA0000000000000000000051 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		049CF427F7D0878A8653DC89 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -367,6 +410,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Whale/TranscribeMeeting.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
 				INFOPLIST_FILE = Whale/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -375,44 +421,6 @@
 				LSUIElement = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meeting";
 				SDKROOT = macosx;
-			};
-			name = Release;
-		};
-		AA0000000000000000000062 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = G6Z6DNHM33;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.9;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Whale.app/Contents/MacOS/Whale";
-				TEST_TARGET_NAME = Whale;
-			};
-			name = Debug;
-		};
-		AA0000000000000000000063 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = G6Z6DNHM33;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.9;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Whale.app/Contents/MacOS/Whale";
-				TEST_TARGET_NAME = Whale;
 			};
 			name = Release;
 		};
@@ -451,10 +459,12 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = G6Z6DNHM33;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -475,11 +485,52 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = Whale;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.9;
 			};
 			name = Debug;
+		};
+		AA0000000000000000000062 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = G6Z6DNHM33;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Whale.app/Contents/MacOS/Whale";
+				TEST_TARGET_NAME = Whale;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000063 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = G6Z6DNHM33;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Whale.app/Contents/MacOS/Whale";
+				TEST_TARGET_NAME = Whale;
+			};
+			name = Release;
 		};
 		C866EA18967FF7E30CC0E1BB /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -516,10 +567,12 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = G6Z6DNHM33;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -533,6 +586,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = Whale;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.9;
@@ -543,8 +597,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Whale/TranscribeMeeting.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_APP_SANDBOX = NO;
 				INFOPLIST_FILE = Whale/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -559,7 +614,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		735A3DEFC8ED556C33117934 /* Build configuration list for PBXNativeTarget "Swift" */ = {
+		735A3DEFC8ED556C33117934 /* Build configuration list for PBXNativeTarget "Whale" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F20472710C3A8133233B4605 /* Debug */,
@@ -577,7 +632,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		E16D1E3FBFCDFDAC4957447A /* Build configuration list for PBXProject "Swift" */ = {
+		E16D1E3FBFCDFDAC4957447A /* Build configuration list for PBXProject "Whale" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				9FC4A6876AF74C06224D9F2C /* Debug */,
@@ -613,6 +668,14 @@
 				minimumVersion = 2.9.0;
 			};
 		};
+		PST000000000000000000301 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm.git";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 2.29.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -631,15 +694,17 @@
 			package = C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
-/* End XCSwiftPackageProductDependency section */
-
-/* Begin PBXTargetDependency section */
-		AA0000000000000000000052 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 92FC86E1A1F73D62CBA0B22D /* TranscribeMeeting */;
-			targetProxy = AA0000000000000000000051 /* PBXContainerItemProxy */;
+		PST000000000000000000302 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PST000000000000000000301 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
 		};
-/* End PBXTargetDependency section */
+		PST000000000000000000303 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PST000000000000000000301 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLMCommon;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 49FAB7016FB2C5DDF4EB5204 /* Project object */;
 }

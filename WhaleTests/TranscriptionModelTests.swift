@@ -72,10 +72,12 @@ final class TranscriptionModelTests: XCTestCase {
             duration: 3,
             model: descriptor,
             transcript: "Hello world",
-            formattedDate: "Jan 1, 1970 at 12:00 AM"
+            formattedDate: "Jan 1, 1970 at 12:00 AM",
+            cleanupSummary: "light (Qwen 3 0.6B)"
         )
 
         XCTAssertTrue(markdown.contains("**Model:** Whisper Large V3 Turbo"))
+        XCTAssertTrue(markdown.contains("**Cleanup:** light (Qwen 3 0.6B)"))
     }
 
     func testWhisperBuiltInDefaultsToEnglish() {

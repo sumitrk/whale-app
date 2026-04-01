@@ -10,11 +10,12 @@ enum AppStatus: Equatable {
     case ready
     case recording
     case transcribing
+    case processing(String)
     case error(String)
 }
 
 /// Tracks how the current recording was triggered.
-fileprivate enum RecordingMode {
+fileprivate enum RecordingMode: Sendable {
     case markdown   // ⌘⇧T: Transcribe → .md file → Finder
     case paste      // Fn:   Transcribe only → clipboard + auto-paste
 }
@@ -26,6 +27,8 @@ class AppState: ObservableObject {
     @Published var lastMeetingPath: String? = nil
     /// Set after every transcription — observed by the onboarding test screen.
     @Published var lastTranscript: String = ""
+    @Published var lastRawTranscript: String = ""
+    @Published var lastProcessingWarnings: [String] = []
 
     let recorder = AudioRecorder()
     let hotkey   = HotkeyManager()
@@ -33,7 +36,7 @@ class AppState: ObservableObject {
 
     private let settings = SettingsStore.shared
     private let transcriber = LocalTranscriptionService.shared
-    private let pipeline: TranscriptionPipeline
+    private let pipelineFactory: @Sendable (TextCleanupSettings) -> TranscriptionPipeline
     private var cancellables = Set<AnyCancellable>()
     private var onboardingWindow: NSWindow?
     private var onboardingWindowCloseObserver: NSObjectProtocol?
@@ -43,13 +46,25 @@ class AppState: ObservableObject {
     private var currentModelID: BuiltInModelID = .parakeetEnglishV2
     private var isPTTArming = false
     private var stopPTTAfterStart = false
+    private var processingTask: Task<PipelineResult, Error>?
 
-    init(accessibility: AccessibilityController, pipeline: TranscriptionPipeline? = nil) {
+    init(
+        accessibility: AccessibilityController,
+        pipelineFactory: ((TextCleanupSettings) -> TranscriptionPipeline)? = nil
+    ) {
         self.accessibility = accessibility
-        self.pipeline = pipeline ?? TranscriptionPipeline(stages: [
-            // VoiceActivityDetectionStage(),
-            TranscriptionStage(transcriber: LocalTranscriptionService.shared),
-        ])
+        self.pipelineFactory = pipelineFactory ?? { settings in
+            var stages: [PipelineStage] = [
+                // VoiceActivityDetectionStage(),
+                TranscriptionStage(transcriber: LocalTranscriptionService.shared),
+            ]
+
+            if settings.enabled {
+                stages.append(LocalLLMCleanupStage())
+            }
+
+            return TranscriptionPipeline(stages: stages)
+        }
         recorder.onRecordingReady = { [weak self] in
             self?.handleRecorderReady()
         }
@@ -71,6 +86,17 @@ class AppState: ObservableObject {
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.rebuildHotkeys() }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest3(
+            settings.$postProcessingEnabled,
+            settings.$cleanupLevel,
+            settings.$selectedLocalLLMModelID
+        )
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _, _, _ in
+                self?.maybeWarmLocalLLM()
+            }
             .store(in: &cancellables)
 
         accessibility.startMonitoring(promptOnLaunch: settings.hasCompletedOnboarding)
@@ -118,9 +144,11 @@ class AppState: ObservableObject {
             object: window,
             queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            self.onboardingWindow = nil
-            self.clearOnboardingWindowObserver()
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.onboardingWindow = nil
+                self.clearOnboardingWindowObserver()
+            }
         }
     }
 
@@ -145,6 +173,7 @@ class AppState: ObservableObject {
                 ? "Dictating…  (release Fn to stop)"
                 : "Recording…  (⌘⇧T to stop)"
         case .transcribing:  return "Transcribing…"
+        case .processing(let message): return message
         case .error(let m):  return "Error: \(m)"
         }
     }
@@ -240,6 +269,13 @@ class AppState: ObservableObject {
             recordingStartedAt = nil
         }
 
+        processingTask?.cancel()
+        processingTask = nil
+        lastProcessingWarnings = []
+        if status != .starting {
+            status = .ready
+        }
+
         do {
             let modelID = settings.selectedBuiltInModelID
             guard try await transcriber.isModelInstalled(modelID) else {
@@ -287,28 +323,63 @@ class AppState: ObservableObject {
         do {
             let recording = try await recorder.stopRecording()
             let wavURL = recording.wavURL
+            defer {
+                try? FileManager.default.removeItem(at: wavURL)
+            }
             print(
                 "WAV saved: \(wavURL.path) " +
                 "[captured=\(recording.capturedSampleCount16k) written=\(recording.writtenSampleCount16k) " +
                 "padded=\(recording.wasPaddedForASR) bluetooth=\(recording.isBluetoothInput)]"
             )
 
-            status = .transcribing
+            let cleanupSettings = TextCleanupSettings(store: settings)
+            let focusedAppContext = mode == .paste ? FocusedAppContext.capture() : nil
+            let outputMode: OutputMode = mode == .paste ? .paste : .markdown
             let audioSource: AudioSource = mode == .paste ? .microphone : .system
-            let result = try await pipeline.process(
-                wavURL: wavURL,
-                modelID: currentModelID,
-                audioSource: audioSource
-            )
+            let pipeline = pipelineFactory(cleanupSettings)
+            let activeModelID = currentModelID
+
+            lastRawTranscript = ""
+            lastProcessingWarnings = []
+            if mode == .markdown {
+                status = cleanupSettings.enabled ? .processing("Processing…") : .transcribing
+            } else {
+                status = .ready
+            }
+
+            let task = Task.detached(priority: .userInitiated) {
+                try await pipeline.process(
+                    wavURL: wavURL,
+                    modelID: activeModelID,
+                    audioSource: audioSource,
+                    outputMode: outputMode,
+                    postProcessingSettings: cleanupSettings,
+                    focusedAppContext: focusedAppContext,
+                    progressHandler: { [weak self] message in
+                        Task { @MainActor [weak self] in
+                            guard let self else { return }
+                            guard mode == .markdown else { return }
+                            self.status = .processing(message)
+                        }
+                    }
+                )
+            }
+            processingTask = task
+            let result = try await task.value
+            processingTask = nil
             let transcript = result.processedTranscript
             print("Transcript ready (\(transcript.count) chars, stages: \(result.stagesExecuted.joined(separator: " → ")))")
             if result.rawTranscript != result.processedTranscript {
                 print("Raw transcript (\(result.rawTranscript.count) chars) differs from processed")
             }
+            if !result.warnings.isEmpty {
+                print("Pipeline warnings: \(result.warnings.joined(separator: " | "))")
+            }
+            lastRawTranscript = result.rawTranscript
             lastTranscript = transcript
+            lastProcessingWarnings = result.warnings
 
             defer {
-                try? FileManager.default.removeItem(at: wavURL)
                 for artifact in result.artifactsToDelete {
                     try? FileManager.default.removeItem(at: artifact)
                 }
@@ -334,7 +405,8 @@ class AppState: ObservableObject {
                     date: startedAt,
                     duration: duration,
                     model: currentModelID.descriptor,
-                    transcript: transcript
+                    transcript: transcript,
+                    cleanupSummary: cleanupSummary(for: cleanupSettings, result: result)
                 )
 
                 try md.write(to: mdURL, atomically: true, encoding: .utf8)
@@ -347,9 +419,14 @@ class AppState: ObservableObject {
                 NSWorkspace.shared.selectFile(mdURL.path, inFileViewerRootedAtPath: "")
             }
 
+        } catch is CancellationError {
+            processingTask = nil
+            status = .ready
+            print("Processing cancelled")
         } catch RecorderError.noAudioCaptured where mode == .paste {
             status = .ready
         } catch {
+            processingTask = nil
             isRecording = false
             status = .error(error.localizedDescription)
             print("Recording error: \(error.localizedDescription)")
@@ -372,15 +449,32 @@ class AppState: ObservableObject {
         date: Date,
         duration: Int,
         model: BuiltInModelDescriptor,
-        transcript: String
+        transcript: String,
+        cleanupSummary: String
     ) -> String {
         TranscriptMarkdownBuilder.build(
             date: date,
             duration: duration,
             model: model,
             transcript: transcript,
-            formattedDate: formattedDate(date)
+            formattedDate: formattedDate(date),
+            cleanupSummary: cleanupSummary
         )
+    }
+
+    private func cleanupSummary(for settings: TextCleanupSettings, result: PipelineResult) -> String {
+        guard settings.enabled else {
+            return "off (raw transcript)"
+        }
+
+        if result.didRunLocalLLM && !result.didFallbackFromLocalLLM {
+            let title = settings.localLLMModelID?.descriptor.title
+                ?? settings.localLLMModelID?.rawValue
+                ?? "Local AI"
+            return "\(settings.cleanupLevel.rawValue) (\(title))"
+        }
+
+        return "off (raw transcript fallback)"
     }
 
     private func formattedDate(_ date: Date) -> String {
@@ -394,7 +488,26 @@ class AppState: ObservableObject {
 
     private func prepareApp() async {
         await TranscriptionModelStore.shared.refreshNow()
+        maybeWarmLocalLLM()
         status = .ready
+    }
+
+    private func maybeWarmLocalLLM() {
+        guard LocalLLMService.isSupported,
+              settings.postProcessingEnabled,
+              let modelID = settings.selectedLocalLLMModelID else {
+            Task {
+                await LocalLLMService.shared.unloadModel()
+            }
+            return
+        }
+
+        Task.detached(priority: .utility) {
+            guard (try? await LocalLLMService.shared.isModelInstalled(modelID)) == true else {
+                return
+            }
+            try? await LocalLLMService.shared.prewarmModel(modelID)
+        }
     }
 }
 
@@ -404,13 +517,13 @@ enum TranscriptMarkdownBuilder {
         duration: Int,
         model: BuiltInModelDescriptor,
         transcript: String,
-        formattedDate: String
+        formattedDate: String,
+        cleanupSummary: String
     ) -> String {
         let sections: [String] = [
             "# Meeting — \(formattedDate)",
             "**Duration:** ~\(max(1, duration)) min  |  **Model:** \(model.markdownLabel)",
-            "",
-            "> AI cleanup and summarisation are temporarily disabled in the native build. This file contains the raw transcript.",
+            "**Cleanup:** \(cleanupSummary)",
             "",
             "## Transcript",
             "",

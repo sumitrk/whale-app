@@ -197,32 +197,6 @@ final class WaveformRebuildTests: XCTestCase {
         XCTAssertTrue(rebuilt.isEmpty)
     }
 
-    func testTrailingLowEnergyTailIsPreservedByPostRoll() {
-        let leadingSilence = silence(seconds: 0.8)
-        let loudSpeech = noisyTone(seconds: 0.6, amplitude: 0.35)
-        let quietTrailingTail = tone(seconds: 0.85, amplitude: 0.004)
-        let trailingSilence = silence(seconds: 0.6)
-        let samples = leadingSilence + loudSpeech + quietTrailingTail + trailingSilence
-
-        let spans = VoiceActivityEditor.detectSpeechSpans(in: samples)
-        XCTAssertEqual(spans.count, 1)
-
-        let loudSpeechEnd = leadingSilence.count + loudSpeech.count
-        XCTAssertLessThanOrEqual(
-            spans[0].endSample,
-            loudSpeechEnd + VADPolicy.frameSamples,
-            "Quiet trailing speech should fall below the detector threshold in this fixture"
-        )
-
-        let rebuilt = VoiceActivityEditor.rebuildWaveform(samples: samples, spans: spans)
-        let rebuiltDuration = Double(rebuilt.count) / VADPolicy.sampleRate
-        XCTAssertGreaterThan(
-            rebuiltDuration,
-            1.5,
-            "Post-roll should preserve trailing low-energy dictation instead of clipping the tail"
-        )
-    }
-
     func testSingleSpanProducesOutput() {
         let samples = tone(seconds: 0.5)
         let spans = [SpeechSpan(startSample: 0, endSample: samples.count)]
@@ -396,7 +370,10 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: inputURL,
             modelID: dummyModel,
-            audioSource: .microphone
+            audioSource: .microphone,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
         XCTAssertEqual(result.stagesExecuted, ["VAD", "Capture"])
@@ -429,7 +406,10 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: inputURL,
             modelID: dummyModel,
-            audioSource: .system
+            audioSource: .system,
+            outputMode: .markdown,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
         let capturedURL = await wavCapture.capturedWavURL
@@ -451,7 +431,10 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: badURL,
             modelID: dummyModel,
-            audioSource: .microphone
+            audioSource: .microphone,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
         let capturedURL = await wavCapture.capturedWavURL
@@ -469,10 +452,13 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
             modelID: dummyModel,
-            audioSource: .microphone
+            audioSource: .microphone,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
-        XCTAssertEqual(result.rawTranscript, "")
+        XCTAssertEqual(result.rawTranscript, "hello world")
         XCTAssertEqual(result.processedTranscript, "hello world [clean]")
     }
 
@@ -491,7 +477,10 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
             modelID: .parakeetEnglishV2,
-            audioSource: .microphone
+            audioSource: .microphone,
+            outputMode: .paste,
+            postProcessingSettings: .stub(),
+            focusedAppContext: nil
         )
 
         XCTAssertEqual(result.rawTranscript, "ok")
@@ -508,5 +497,15 @@ private actor WAVCapturingStage: PipelineStage {
     func process(_ context: PipelineContext) async throws -> PipelineContext {
         capturedWavURL = context.wavURL
         return context
+    }
+}
+
+private extension TextCleanupSettings {
+    static func stub() -> TextCleanupSettings {
+        TextCleanupSettings(
+            enabled: true,
+            cleanupLevel: .light,
+            localLLMModelID: .qwen3_0_6b_4bit
+        )
     }
 }

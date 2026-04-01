@@ -171,8 +171,6 @@ enum TextInsertionManager {
         let snapshot = focusedElement?.snapshot
         let strategy = insertionStrategy(for: snapshot)
 
-        logInsertionDecision(snapshot: snapshot, strategy: strategy)
-
         switch strategy {
         case .directAX:
             guard let focusedElement else {
@@ -196,38 +194,6 @@ enum TextInsertionManager {
         }
     }
 
-    private static func logInsertionDecision(
-        snapshot: FocusedElementSnapshot?,
-        strategy: InsertionStrategy
-    ) {
-        let appName = snapshot?.appName ?? "unknown"
-        let bundle = snapshot?.bundleIdentifier ?? "unknown"
-        let role = snapshot?.role ?? "nil"
-        let subrole = snapshot?.subrole ?? "nil"
-        let roleDesc = snapshot?.roleDescription ?? "nil"
-        let placeholderValue = snapshot?.placeholderValue ?? "nil"
-        let numberOfCharacters = snapshot?.numberOfCharacters.map(String.init) ?? "nil"
-        let editable = snapshot?.isEditable ?? false
-        let selectedTextRange = snapshot?.supportsSelectedTextRange ?? false
-        let hasAXValue = snapshot?.supportsAXValue ?? false
-        let canReadAXValue = snapshot?.canReadAXValueAsString ?? false
-        let valueSettable = snapshot?.isAXValueSettable ?? false
-        let canReadSelectedRange = snapshot?.canReadSelectedTextRange ?? false
-        let selectedRangeSettable = snapshot?.isSelectedTextRangeSettable ?? false
-        let directInsertBlockers = snapshot?.directInsertBlockers.joined(separator: ",") ?? "none"
-        let attrs = snapshot?.attributeNames.joined(separator: ",") ?? "none"
-        let strategyLabel: String
-        switch strategy {
-        case .directAX: strategyLabel = "direct-ax"
-        case .simulatedPaste: strategyLabel = "simulated-paste"
-        case .copyOnly: strategyLabel = "copy-only"
-        }
-
-        let message = "TextInsertion strategy=\(strategyLabel) app=\(appName) bundle=\(bundle) role=\(role) subrole=\(subrole) roleDesc=\(roleDesc) placeholder=\(placeholderValue) numberOfCharacters=\(numberOfCharacters) editable=\(editable) selectedTextRange=\(selectedTextRange) selectedRangeReadable=\(canReadSelectedRange) selectedRangeSettable=\(selectedRangeSettable) hasAXValue=\(hasAXValue) valueReadable=\(canReadAXValue) valueSettable=\(valueSettable) directAXBlockers=[\(directInsertBlockers)] attributes=[\(attrs)]"
-        print(message)
-        DiagnosticLog.log(message)
-    }
-
     private static func insertViaDirectAX(_ text: String, into context: FocusedElementContext) throws {
         guard let currentValue = stringValue(of: context.element) else {
             throw DirectAXInsertionError.valueUnavailable
@@ -240,13 +206,6 @@ enum TextInsertionManager {
             ? .unsupported
             : probeFirstCharacter(of: context.element)
 
-        let probeLabel: String
-        switch characterProbe {
-        case .realContent(let ch): probeLabel = "real(\(ch))"
-        case .empty: probeLabel = "empty(phantom-placeholder)"
-        case .unsupported: probeLabel = "unsupported"
-        }
-
         let normalizedState = normalizedEditingState(
             currentValue: currentValue,
             selectedRange: selectedRange,
@@ -254,10 +213,6 @@ enum TextInsertionManager {
             numberOfCharacters: context.numberOfCharacters,
             characterProbe: characterProbe
         )
-
-        let message = "DirectAX probe=\(probeLabel) originalValue=\(currentValue.prefix(60)) normalizedValueLen=\(normalizedState.currentValue.count) normalizedRange={\(normalizedState.selectedRange.location),\(normalizedState.selectedRange.length)}"
-        print(message)
-        DiagnosticLog.log(message)
 
         guard let replacement = replacingSelectedRange(
             in: normalizedState.currentValue,
