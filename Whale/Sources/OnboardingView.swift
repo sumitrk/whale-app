@@ -351,6 +351,26 @@ private struct TryItStep: View {
                     }
                 }
 
+                OnboardingCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Optional AI cleanup")
+                                .fontWeight(.semibold)
+                            Text("Light cleanup works immediately. Medium cleanup needs the Qwen local AI model installed from Settings.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Where to install it")
+                                .foregroundStyle(.secondary)
+                                .font(.callout)
+                            Text("Settings → Post-Processing → Local AI Model")
+                                .font(.callout)
+                        }
+                    }
+                }
+
             }
             .padding(24)
         }
