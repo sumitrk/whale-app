@@ -81,24 +81,51 @@ struct PostProcessingSettingsView: View {
 
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Last transcription preview")
+            Text("Recent transcription previews")
                 .font(.headline)
 
-            HStack(alignment: .top, spacing: 12) {
-                previewColumn(title: "Raw", text: appState.lastRawTranscript)
-                previewColumn(title: "Cleaned", text: appState.lastTranscript)
-            }
-
-            if !appState.lastProcessingWarnings.isEmpty {
-                Text(appState.lastProcessingWarnings.joined(separator: "\n"))
-                    .font(.caption)
+            if appState.recentTranscriptionPreviews.isEmpty {
+                Text("No transcriptions yet.")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(appState.recentTranscriptionPreviews.enumerated()), id: \.element.id) { index, entry in
+                        previewEntry(entry, index: index)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color(NSColor.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func previewEntry(_ entry: TranscriptionPreviewEntry, index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(index == 0 ? "Latest" : "Recent #\(index + 1)")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                previewColumn(title: "Raw", text: entry.rawTranscript)
+                previewColumn(title: "Cleaned", text: entry.cleanedTranscript)
+            }
+
+            if !entry.warnings.isEmpty {
+                Text(entry.warnings.joined(separator: "\n"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(12)
+        .background(Color(NSColor.windowBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private func previewColumn(title: String, text: String) -> some View {
@@ -110,7 +137,7 @@ struct PostProcessingSettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
             }
-            .frame(minHeight: 140, maxHeight: 180)
+            .frame(minHeight: 90, maxHeight: 140)
             .padding(10)
             .background(Color(NSColor.textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
         }

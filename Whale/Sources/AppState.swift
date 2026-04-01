@@ -20,6 +20,14 @@ fileprivate enum RecordingMode: Sendable {
     case paste      // Fn:   Transcribe only → clipboard + auto-paste
 }
 
+struct TranscriptionPreviewEntry: Identifiable, Equatable {
+    let id = UUID()
+    let createdAt: Date
+    let rawTranscript: String
+    let cleanedTranscript: String
+    let warnings: [String]
+}
+
 @MainActor
 class AppState: ObservableObject {
     @Published var status: AppStatus = .starting
@@ -29,6 +37,7 @@ class AppState: ObservableObject {
     @Published var lastTranscript: String = ""
     @Published var lastRawTranscript: String = ""
     @Published var lastProcessingWarnings: [String] = []
+    @Published var recentTranscriptionPreviews: [TranscriptionPreviewEntry] = []
 
     let recorder = AudioRecorder()
     let hotkey   = HotkeyManager()
@@ -378,6 +387,18 @@ class AppState: ObservableObject {
             lastRawTranscript = result.rawTranscript
             lastTranscript = transcript
             lastProcessingWarnings = result.warnings
+            recentTranscriptionPreviews.insert(
+                TranscriptionPreviewEntry(
+                    createdAt: Date(),
+                    rawTranscript: result.rawTranscript,
+                    cleanedTranscript: transcript,
+                    warnings: result.warnings
+                ),
+                at: 0
+            )
+            if recentTranscriptionPreviews.count > 10 {
+                recentTranscriptionPreviews.removeLast(recentTranscriptionPreviews.count - 10)
+            }
 
             defer {
                 for artifact in result.artifactsToDelete {

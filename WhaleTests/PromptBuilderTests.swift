@@ -36,4 +36,16 @@ final class PromptBuilderTests: XCTestCase {
         XCTAssertTrue(prompt.contains("Text to clean:\nhello world"))
         XCTAssertFalse(prompt.contains("Preserve natural Hindi-English code-switching."))
     }
+
+    func testPromptUsesConciseCleanupInstructions() {
+        let prompt = PromptBuilder.buildCleanupPrompt(
+            transcript: "there are errors when i'm encountering in the log not sure how important they are",
+            focusedAppContext: nil,
+            cleanupLevel: .medium
+        )
+
+        XCTAssertTrue(prompt.contains("Apply concise cleanup for direct insertion into another app."))
+        XCTAssertTrue(prompt.contains("Keep only the final intended wording when the speaker self-corrects."))
+        XCTAssertFalse(prompt.contains("Do not omit, compress, summarize, or paraphrase any spoken content."))
+    }
 }
