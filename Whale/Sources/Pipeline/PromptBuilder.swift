@@ -1,12 +1,7 @@
 import Foundation
 
 enum PromptBuilder {
-    static func buildCleanupInstructions(
-        focusedAppContext: FocusedAppContext?,
-        cleanupLevel: CleanupLevel
-    ) -> String {
-        _ = focusedAppContext
-
+    static func defaultCleanupInstructions(cleanupLevel: CleanupLevel) -> String {
         let levelInstruction = switch cleanupLevel {
         case .light:
             "Apply only minimal cleanup."
@@ -23,6 +18,19 @@ enum PromptBuilder {
         Do not add facts or extra content.
         Return only the cleaned text.
         """
+    }
+
+    static func buildCleanupInstructions(
+        focusedAppContext: FocusedAppContext?,
+        cleanupLevel: CleanupLevel,
+        customInstructions: String = ""
+    ) -> String {
+        _ = focusedAppContext
+        let trimmed = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return defaultCleanupInstructions(cleanupLevel: cleanupLevel)
+        }
+        return trimmed
     }
 
     static func buildCleanupUserPrompt(transcript: String) -> String {
@@ -48,11 +56,13 @@ enum PromptBuilder {
     static func buildCleanupPrompt(
         transcript: String,
         focusedAppContext: FocusedAppContext?,
-        cleanupLevel: CleanupLevel
+        cleanupLevel: CleanupLevel,
+        customInstructions: String = ""
     ) -> String {
         let instructions = buildCleanupInstructions(
             focusedAppContext: focusedAppContext,
-            cleanupLevel: cleanupLevel
+            cleanupLevel: cleanupLevel,
+            customInstructions: customInstructions
         )
         let userPrompt = buildCleanupUserPrompt(transcript: transcript)
 

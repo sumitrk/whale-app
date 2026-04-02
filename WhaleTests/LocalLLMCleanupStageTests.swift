@@ -125,7 +125,8 @@ private extension PipelineContext {
             postProcessingSettings: TextCleanupSettings(
                 enabled: true,
                 cleanupLevel: cleanupLevel,
-                localLLMModelID: .qwen3_0_6b_4bit
+                localLLMModelID: .qwen3_0_6b_4bit,
+                cleanupPromptOverride: ""
             ),
             focusedAppContext: nil,
             progressHandler: { _ in },
@@ -144,7 +145,8 @@ private extension TextCleanupSettings {
         TextCleanupSettings(
             enabled: true,
             cleanupLevel: cleanupLevel,
-            localLLMModelID: .qwen3_0_6b_4bit
+            localLLMModelID: .qwen3_0_6b_4bit,
+            cleanupPromptOverride: ""
         )
     }
 }

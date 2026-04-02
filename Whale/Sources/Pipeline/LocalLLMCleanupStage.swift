@@ -35,6 +35,7 @@ struct LocalLLMCleanupStage: PipelineStage {
                     transcript: transcript,
                     focusedAppContext: context.focusedAppContext,
                     cleanupLevel: context.postProcessingSettings.cleanupLevel,
+                    cleanupPromptOverride: context.postProcessingSettings.cleanupPromptOverride,
                     modelID: modelID,
                     outputMode: context.outputMode,
                     timeout: timeout

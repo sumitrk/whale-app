@@ -5,6 +5,21 @@ struct PostProcessingSettingsView: View {
     @ObservedObject private var store = SettingsStore.shared
     @ObservedObject private var modelStore = LocalLLMModelStore.shared
 
+    private var editablePromptBinding: Binding<String> {
+        Binding(
+            get: {
+                let override = store.cleanupPromptOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+                if override.isEmpty {
+                    return PromptBuilder.defaultCleanupInstructions(cleanupLevel: .medium)
+                }
+                return store.cleanupPromptOverride
+            },
+            set: { newValue in
+                store.cleanupPromptOverride = newValue
+            }
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -28,24 +43,37 @@ struct PostProcessingSettingsView: View {
             }
             .padding(18)
         }
-        .task { await modelStore.refreshNow() }
+        .onAppear {
+            modelStore.refresh()
+        }
     }
 
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle("Clean up transcriptions", isOn: $store.postProcessingEnabled)
 
-            Picker("Cleanup level", selection: $store.cleanupLevel) {
-                ForEach(CleanupLevel.allCases) { level in
-                    Text(level.title).tag(level)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Cleanup prompt")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Button("Reset") {
+                        store.cleanupPromptOverride = ""
+                    }
+                    .disabled(store.cleanupPromptOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-            }
-            .pickerStyle(.segmented)
-            .disabled(!store.postProcessingEnabled)
 
-            Text(store.cleanupLevel.detail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text("This edits the instruction prompt sent to the local LLM. The transcript text is appended automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextEditor(text: editablePromptBinding)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(minHeight: 150, maxHeight: 220)
+                    .padding(8)
+                    .background(Color(NSColor.textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .disabled(!store.postProcessingEnabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -245,7 +273,7 @@ private struct LocalLLMModelCard: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
         case .notInstalled:
-            Text("Install this model to enable medium cleanup.")
+            Text("Install this model to enable AI cleanup.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         case .downloading(_, let phase):
@@ -253,7 +281,7 @@ private struct LocalLLMModelCard: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
         case .ready:
-            Text(isSelected ? "Selected for medium cleanup." : "Installed and ready.")
+            Text(isSelected ? "Selected for AI cleanup." : "Installed and ready.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         case .failed(let message):

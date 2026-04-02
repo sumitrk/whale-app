@@ -505,7 +505,8 @@ private extension TextCleanupSettings {
         TextCleanupSettings(
             enabled: true,
             cleanupLevel: .light,
-            localLLMModelID: .qwen3_0_6b_4bit
+            localLLMModelID: .qwen3_0_6b_4bit,
+            cleanupPromptOverride: ""
         )
     }
 }

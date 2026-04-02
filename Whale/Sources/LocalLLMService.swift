@@ -16,7 +16,7 @@ enum LocalLLMError: LocalizedError {
         case .insufficientMemory:
             return "Not enough memory available for local AI cleanup."
         case .modelNotInstalled(let title):
-            return "\(title) is not installed yet. Install it in Settings > Post-Processing before using medium cleanup."
+            return "\(title) is not installed yet. Install it in Settings > Post-Processing before using AI cleanup."
         case .emptyResponse:
             return "The local cleanup model returned an empty response."
         case .timedOut:
@@ -83,6 +83,7 @@ actor LocalLLMService {
         transcript: String,
         focusedAppContext: FocusedAppContext?,
         cleanupLevel: CleanupLevel,
+        cleanupPromptOverride: String,
         modelID: LocalLLMModelID,
         outputMode: OutputMode,
         timeout: TimeInterval?
@@ -106,6 +107,7 @@ actor LocalLLMService {
                 transcript: trimmedTranscript,
                 focusedAppContext: focusedAppContext,
                 cleanupLevel: cleanupLevel,
+                cleanupPromptOverride: cleanupPromptOverride,
                 modelID: modelID,
                 outputMode: outputMode
             )
@@ -144,6 +146,7 @@ actor LocalLLMService {
             transcript: "ok",
             focusedAppContext: nil,
             cleanupLevel: .medium,
+            cleanupPromptOverride: "",
             modelID: modelID,
             outputMode: .paste,
             maxTokensOverride: 8
@@ -163,6 +166,7 @@ actor LocalLLMService {
         transcript: String,
         focusedAppContext: FocusedAppContext?,
         cleanupLevel: CleanupLevel,
+        cleanupPromptOverride: String,
         modelID: LocalLLMModelID,
         outputMode: OutputMode,
         maxTokensOverride: Int? = nil
@@ -171,7 +175,8 @@ actor LocalLLMService {
         let container = try await modelContainer(for: modelID)
         let instructions = PromptBuilder.buildCleanupInstructions(
             focusedAppContext: focusedAppContext,
-            cleanupLevel: cleanupLevel
+            cleanupLevel: cleanupLevel,
+            customInstructions: cleanupPromptOverride
         )
         let prompt = PromptBuilder.buildCleanupUserPrompt(transcript: transcript)
         let maxTokens = maxTokensOverride

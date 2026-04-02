@@ -88,15 +88,18 @@ struct TextCleanupSettings: Sendable, Equatable {
     let enabled: Bool
     let cleanupLevel: CleanupLevel
     let localLLMModelID: LocalLLMModelID?
+    let cleanupPromptOverride: String
 
     init(
         enabled: Bool,
         cleanupLevel: CleanupLevel,
-        localLLMModelID: LocalLLMModelID?
+        localLLMModelID: LocalLLMModelID?,
+        cleanupPromptOverride: String
     ) {
         self.enabled = enabled
         self.cleanupLevel = cleanupLevel
         self.localLLMModelID = localLLMModelID
+        self.cleanupPromptOverride = cleanupPromptOverride
     }
 
     @MainActor
@@ -104,5 +107,6 @@ struct TextCleanupSettings: Sendable, Equatable {
         self.enabled = store.postProcessingEnabled
         self.cleanupLevel = store.cleanupLevel
         self.localLLMModelID = store.selectedLocalLLMModelID
+        self.cleanupPromptOverride = store.cleanupPromptOverride
     }
 }

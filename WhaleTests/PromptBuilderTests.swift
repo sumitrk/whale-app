@@ -48,4 +48,16 @@ final class PromptBuilderTests: XCTestCase {
         XCTAssertTrue(prompt.contains("Keep only the final intended wording when the speaker self-corrects."))
         XCTAssertFalse(prompt.contains("Do not omit, compress, summarize, or paraphrase any spoken content."))
     }
+
+    func testPromptUsesCustomInstructionsWhenProvided() {
+        let prompt = PromptBuilder.buildCleanupPrompt(
+            transcript: "hello world",
+            focusedAppContext: nil,
+            cleanupLevel: .medium,
+            customInstructions: "Fix grammar only.\nReturn only the cleaned text."
+        )
+
+        XCTAssertTrue(prompt.contains("Fix grammar only."))
+        XCTAssertFalse(prompt.contains("Apply concise cleanup for direct insertion into another app."))
+    }
 }

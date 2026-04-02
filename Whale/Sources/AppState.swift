@@ -97,17 +97,6 @@ class AppState: ObservableObject {
             .sink { [weak self] _ in self?.rebuildHotkeys() }
             .store(in: &cancellables)
 
-        Publishers.CombineLatest3(
-            settings.$postProcessingEnabled,
-            settings.$cleanupLevel,
-            settings.$selectedLocalLLMModelID
-        )
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _, _, _ in
-                self?.maybeWarmLocalLLM()
-            }
-            .store(in: &cancellables)
-
         accessibility.startMonitoring(promptOnLaunch: settings.hasCompletedOnboarding)
         rebuildHotkeys()
 
@@ -492,7 +481,7 @@ class AppState: ObservableObject {
             let title = settings.localLLMModelID?.descriptor.title
                 ?? settings.localLLMModelID?.rawValue
                 ?? "Local AI"
-            return "\(settings.cleanupLevel.rawValue) (\(title))"
+            return "AI (\(title))"
         }
 
         return "off (raw transcript fallback)"
@@ -509,26 +498,7 @@ class AppState: ObservableObject {
 
     private func prepareApp() async {
         await TranscriptionModelStore.shared.refreshNow()
-        maybeWarmLocalLLM()
         status = .ready
-    }
-
-    private func maybeWarmLocalLLM() {
-        guard LocalLLMService.isSupported,
-              settings.postProcessingEnabled,
-              let modelID = settings.selectedLocalLLMModelID else {
-            Task {
-                await LocalLLMService.shared.unloadModel()
-            }
-            return
-        }
-
-        Task.detached(priority: .utility) {
-            guard (try? await LocalLLMService.shared.isModelInstalled(modelID)) == true else {
-                return
-            }
-            try? await LocalLLMService.shared.prewarmModel(modelID)
-        }
     }
 }
 
