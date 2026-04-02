@@ -497,6 +497,15 @@ class AppState: ObservableObject {
     // MARK: - Startup
 
     private func prepareApp() async {
+        if AppRuntimeInfo.current.shouldResetParakeetCacheOnLaunch {
+            do {
+                try await transcriber.resetModel(.parakeetEnglishV2)
+                DiagnosticLog.log("[Parakeet] Reset model cache on launch via \(AppRuntimeInfo.resetParakeetCacheEnvironmentKey).")
+            } catch {
+                DiagnosticLog.log("[Parakeet] Failed to reset model cache on launch: \(error.localizedDescription)")
+            }
+        }
+
         await TranscriptionModelStore.shared.refreshNow()
         status = .ready
     }

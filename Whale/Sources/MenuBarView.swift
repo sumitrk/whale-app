@@ -6,7 +6,7 @@ struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject private var accessibility: AccessibilityController
     @EnvironmentObject private var settingsCoordinator: SettingsCoordinator
-    let updater: SPUUpdater
+    let updater: SPUUpdater?
 
     var body: some View {
         if !accessibility.isTrusted {
@@ -35,12 +35,14 @@ struct MenuBarView: View {
             Divider()
         }
 
-        Button("Check for Updates…") {
-            updater.checkForUpdates()
-        }
-        .disabled(!updater.canCheckForUpdates)
+        if let updater {
+            Button("Check for Updates…") {
+                updater.checkForUpdates()
+            }
+            .disabled(!updater.canCheckForUpdates)
 
-        Divider()
+            Divider()
+        }
 
         Button("Settings…") {
             openSettingsWindow(section: settingsCoordinator.selection)

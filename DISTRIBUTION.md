@@ -77,6 +77,24 @@ Branch behavior:
 
 ## Verification Contract
 
+## Sandboxed Dev QA
+
+Use the shared `Whale Sandbox` scheme in Xcode to exercise the same app sandbox and entitlements as distribution builds without going through the DMG flow first.
+
+- `Whale` scheme: fast unsandboxed local iteration
+- `Whale Sandbox` scheme: `DebugSandbox` with `Whale/TranscribeMeeting.entitlements` and the production bundle identifier
+- `WHALE_DISABLE_SPARKLE=1`: enabled in the sandboxed scheme so updater startup does not interfere with model-install QA
+- `WHALE_RESET_PARAKEET_CACHE_ON_LAUNCH=1`: available in the sandboxed scheme and disabled by default; enable it when you want each run to start from an empty Parakeet cache
+
+Recommended smoke path before packaging:
+
+1. Run the `Whale Sandbox` scheme from Xcode.
+2. Open Settings and go to Model.
+3. Install Parakeet.
+4. Confirm the model lands under the app container's Application Support path.
+5. Run a short transcription from the same sandboxed app session.
+6. Repeat with the normal `Whale` scheme when you want to compare unsandboxed behavior.
+
 These commands should pass on the packaged app:
 
 ```bash

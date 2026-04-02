@@ -209,6 +209,13 @@ struct TranscriptionModelCard: View {
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                if let resetActionTitle = model.resetActionTitle {
+                    Button(resetActionTitle) {
+                        modelStore.reset(model.id)
+                    }
+                    .buttonStyle(.link)
+                }
             }
         case .failed(let message):
             VStack(alignment: .leading, spacing: 6) {
@@ -225,6 +232,13 @@ struct TranscriptionModelCard: View {
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                if let resetActionTitle = model.resetActionTitle {
+                    Button(resetActionTitle) {
+                        modelStore.reset(model.id)
+                    }
+                    .buttonStyle(.link)
+                }
             }
         }
     }
@@ -238,8 +252,12 @@ struct TranscriptionModelCard: View {
     }
 
     private var localModelPath: String? {
-        guard model.provisioning == .localFolder else { return nil }
-        return settings.localModelPath(for: model.id)
+        switch model.id {
+        case .parakeetEnglishV2:
+            return AppRuntimeInfo.current.parakeetEnglishV2DirectoryURL.path
+        case .whisperLargeV3Turbo, .whisperLocalFolder:
+            return settings.localModelPath(for: model.id)
+        }
     }
 
     private var readyMessage: String {

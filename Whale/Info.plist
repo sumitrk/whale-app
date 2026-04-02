@@ -22,6 +22,8 @@
 	<string>TranscribeMeeting records your microphone during meetings.</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/sumitrk/whale-app/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>

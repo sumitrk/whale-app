@@ -1,3 +1,4 @@
+import CoreML
 import FluidAudio
 import Foundation
 import WhisperKit
@@ -78,6 +79,15 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
             return "Change Folder"
         }
     }
+
+    var resetActionTitle: String? {
+        switch id {
+        case .parakeetEnglishV2:
+            return "Reset Cache"
+        case .whisperLargeV3Turbo, .whisperLocalFolder:
+            return nil
+        }
+    }
 }
 
 enum BuiltInModelCatalog {
@@ -156,6 +166,35 @@ struct WhisperModelValidationResult: Sendable {
     let modelFolder: URL
     let tokenizerFolder: URL?
     let inferredModelName: String?
+}
+
+enum ParakeetInstallStep: String, Sendable {
+    case resolvingStorage
+    case downloading
+    case validatingFiles
+    case loadingModels
+    case preparingRuntime
+    case firstUse
+    case resettingCache
+
+    var title: String {
+        switch self {
+        case .resolvingStorage:
+            return "Resolving model storage"
+        case .downloading:
+            return "Downloading model files"
+        case .validatingFiles:
+            return "Validating model files"
+        case .loadingModels:
+            return "Loading model files"
+        case .preparingRuntime:
+            return "Preparing model runtime"
+        case .firstUse:
+            return "Running Parakeet"
+        case .resettingCache:
+            return "Resetting model cache"
+        }
+    }
 }
 
 @MainActor
@@ -252,6 +291,39 @@ final class TranscriptionModelStore: ObservableObject {
                 if !Task.isCancelled {
                     await MainActor.run {
                         self.setInstallState(.ready, for: modelID)
+                    }
+                }
+            } catch {
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        self.setInstallState(.failed(error.localizedDescription), for: modelID)
+                    }
+                }
+            }
+        }
+    }
+
+    func reset(_ modelID: BuiltInModelID) {
+        guard !isDownloading(modelID) else { return }
+
+        installTasks[modelID]?.cancel()
+        setInstallState(.checking, for: modelID)
+
+        installTasks[modelID] = Task { [weak self] in
+            guard let self else { return }
+
+            defer {
+                Task { @MainActor [weak self] in
+                    self?.installTasks[modelID] = nil
+                }
+            }
+
+            do {
+                try await service.resetModel(modelID)
+
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        self.setInstallState(.notInstalled, for: modelID)
                     }
                 }
             } catch {
@@ -361,6 +433,7 @@ protocol BuiltInTranscriptionBackend: Sendable {
         wavURL: URL,
         source: AudioSource
     ) async throws -> String
+    func resetModel(modelID: BuiltInModelID) async throws
 }
 
 extension BuiltInTranscriptionBackend {
@@ -369,6 +442,10 @@ extension BuiltInTranscriptionBackend {
         folderURL _: URL,
         progressHandler _: ModelInstallProgressHandler?
     ) async throws {
+        throw LocalTranscriptionError.unsupportedModel(modelID)
+    }
+
+    func resetModel(modelID: BuiltInModelID) async throws {
         throw LocalTranscriptionError.unsupportedModel(modelID)
     }
 }
@@ -416,6 +493,10 @@ actor LocalTranscriptionService {
         try await backend(for: modelID).transcribe(modelID: modelID, wavURL: wavURL, source: source)
     }
 
+    func resetModel(_ modelID: BuiltInModelID) async throws {
+        try await backend(for: modelID).resetModel(modelID: modelID)
+    }
+
     private func backend(for modelID: BuiltInModelID) -> any BuiltInTranscriptionBackend {
         let group = modelID.descriptor.group
 
@@ -427,37 +508,208 @@ actor LocalTranscriptionService {
     }
 }
 
+protocol ParakeetManaging: Sendable {
+    func transcribe(_ wavURL: URL, source: AudioSource) async throws -> String
+    func transcribeStreaming(_ wavURL: URL, source: AudioSource) async throws -> String
+}
+
+protocol ParakeetModelRuntime: Sendable {
+    func modelsExist(at modelDirectory: URL) async -> Bool
+    func downloadModels(
+        to modelDirectory: URL,
+        progressHandler: DownloadUtils.ProgressHandler?
+    ) async throws
+    func validateModels(at modelDirectory: URL) async throws
+    func prepareManager(at modelDirectory: URL) async throws -> any ParakeetManaging
+}
+
+struct FluidAudioParakeetRuntime: ParakeetModelRuntime {
+    func modelsExist(at modelDirectory: URL) async -> Bool {
+        AsrModels.modelsExist(at: modelDirectory, version: .v2)
+    }
+
+    func downloadModels(
+        to modelDirectory: URL,
+        progressHandler: DownloadUtils.ProgressHandler?
+    ) async throws {
+        _ = try await AsrModels.download(
+            to: modelDirectory,
+            version: .v2,
+            progressHandler: progressHandler
+        )
+    }
+
+    func validateModels(at modelDirectory: URL) async throws {
+        let configuration = MLModelConfiguration()
+        configuration.computeUnits = .cpuOnly
+        _ = try await AsrModels.load(
+            from: modelDirectory,
+            configuration: configuration,
+            version: .v2
+        )
+    }
+
+    func prepareManager(at modelDirectory: URL) async throws -> any ParakeetManaging {
+        let models: AsrModels
+
+        do {
+            models = try await AsrModels.load(from: modelDirectory, version: .v2)
+        } catch {
+            throw LocalTranscriptionError.parakeetSetupFailed(
+                step: .loadingModels,
+                modelDirectory: modelDirectory.path,
+                reason: error.localizedDescription
+            )
+        }
+
+        let manager = AsrManager(config: .default)
+
+        do {
+            try await manager.initialize(models: models)
+        } catch {
+            throw LocalTranscriptionError.parakeetSetupFailed(
+                step: .preparingRuntime,
+                modelDirectory: modelDirectory.path,
+                reason: error.localizedDescription
+            )
+        }
+
+        return FluidAudioParakeetManager(manager: manager)
+    }
+}
+
+private final class FluidAudioParakeetManager: @unchecked Sendable, ParakeetManaging {
+    private let manager: AsrManager
+
+    init(manager: AsrManager) {
+        self.manager = manager
+    }
+
+    func transcribe(_ wavURL: URL, source: AudioSource) async throws -> String {
+        let result = try await manager.transcribe(wavURL, source: source)
+        return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func transcribeStreaming(_ wavURL: URL, source: AudioSource) async throws -> String {
+        let result = try await manager.transcribeStreaming(wavURL, source: source)
+        return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
-    private var manager: AsrManager?
+    private let runtime: any ParakeetModelRuntime
+    private let runtimeInfoProvider: @Sendable () -> AppRuntimeInfo
+    private var manager: (any ParakeetManaging)?
+    private var loadedModelDirectory: URL?
+
+    init(
+        runtime: any ParakeetModelRuntime = FluidAudioParakeetRuntime(),
+        runtimeInfoProvider: @escaping @Sendable () -> AppRuntimeInfo = { AppRuntimeInfo.current }
+    ) {
+        self.runtime = runtime
+        self.runtimeInfoProvider = runtimeInfoProvider
+    }
 
     func isInstalled(modelID: BuiltInModelID) async throws -> Bool {
-        guard case .parakeetEnglishV2 = modelID else {
-            throw LocalTranscriptionError.unsupportedModel(modelID)
+        let context = try modelContext(for: modelID)
+        Self.log("Checking install state at \(context.modelDirectory.path) (\(context.runtimeInfo.storageDescription))")
+
+        guard await runtime.modelsExist(at: context.modelDirectory) else {
+            Self.log("Model files missing at \(context.modelDirectory.path)")
+            return false
         }
-        return try await AsrModels.isModelValid(version: .v2)
+
+        do {
+            try await runtime.validateModels(at: context.modelDirectory)
+            Self.log("Validated model files at \(context.modelDirectory.path)")
+            return true
+        } catch {
+            Self.log("Validation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .validatingFiles,
+                modelDirectory: context.modelDirectory.path
+            )
+        }
     }
 
     func install(
         modelID: BuiltInModelID,
         progressHandler: ModelInstallProgressHandler?
     ) async throws {
-        guard case .parakeetEnglishV2 = modelID else {
-            throw LocalTranscriptionError.unsupportedModel(modelID)
+        let context = try modelContext(for: modelID)
+        progressHandler?(ModelInstallProgress(fractionCompleted: nil, phase: "Resolving model storage…"))
+        Self.log("Installing model at \(context.modelDirectory.path) (\(context.runtimeInfo.storageDescription))")
+
+        do {
+            try prepareStorageDirectories(for: context.runtimeInfo)
+        } catch {
+            Self.log("Storage resolution failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .resolvingStorage,
+                modelDirectory: context.modelDirectory.path
+            )
         }
 
-        let models = try await AsrModels.downloadAndLoad(
-            version: .v2,
-            progressHandler: { progress in
-                progressHandler?(
-                    ModelInstallProgress(
-                        fractionCompleted: progress.fractionCompleted,
-                        phase: Self.phaseLabel(for: progress.phase)
+        do {
+            try await runtime.downloadModels(
+                to: context.modelDirectory,
+                progressHandler: { progress in
+                    progressHandler?(
+                        ModelInstallProgress(
+                            fractionCompleted: progress.fractionCompleted,
+                            phase: Self.phaseLabel(for: progress.phase)
+                        )
                     )
-                )
-            }
-        )
+                }
+            )
+        } catch {
+            Self.log("Download failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .downloading,
+                modelDirectory: context.modelDirectory.path
+            )
+        }
 
-        try await prepareManager(with: models)
+        progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Validating model files…"))
+
+        guard await runtime.modelsExist(at: context.modelDirectory) else {
+            let reason = "Expected Parakeet model files were not found after download."
+            Self.log("Validation failed at \(context.modelDirectory.path): \(reason)")
+            throw LocalTranscriptionError.parakeetSetupFailed(
+                step: .validatingFiles,
+                modelDirectory: context.modelDirectory.path,
+                reason: reason
+            )
+        }
+
+        do {
+            try await runtime.validateModels(at: context.modelDirectory)
+        } catch {
+            Self.log("Validation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .validatingFiles,
+                modelDirectory: context.modelDirectory.path
+            )
+        }
+
+        progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Preparing model for first use…"))
+
+        do {
+            manager = try await runtime.prepareManager(at: context.modelDirectory)
+            loadedModelDirectory = context.modelDirectory
+            Self.log("Model runtime prepared at \(context.modelDirectory.path)")
+        } catch {
+            Self.log("Runtime preparation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .preparingRuntime,
+                modelDirectory: context.modelDirectory.path
+            )
+        }
     }
 
     func transcribe(
@@ -465,6 +717,8 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         wavURL: URL,
         source: AudioSource
     ) async throws -> String {
+        let context = try modelContext(for: modelID)
+        Self.log("Transcribing with model at \(context.modelDirectory.path)")
         try await ensureReady(modelID: modelID)
 
         guard let manager else {
@@ -473,37 +727,82 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
 
         do {
             let result = try await manager.transcribe(wavURL, source: source)
-            let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !text.isEmpty {
-                return text
+            if !result.isEmpty {
+                return result
             }
 
-            print("Parakeet transcription returned empty text; retrying in streaming mode")
+            Self.log("Standard transcription returned empty text at \(context.modelDirectory.path); retrying in streaming mode")
         } catch {
-            print("Parakeet standard transcription failed; retrying in streaming mode: \(error.localizedDescription)")
+            Self.log("Standard transcription failed at \(context.modelDirectory.path): \(error.localizedDescription)")
         }
 
-        let streamingResult = try await manager.transcribeStreaming(wavURL, source: source)
-        return streamingResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            return try await manager.transcribeStreaming(wavURL, source: source)
+        } catch {
+            Self.log("Streaming transcription failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .firstUse,
+                modelDirectory: context.modelDirectory.path
+            )
+        }
+    }
+
+    func resetModel(modelID: BuiltInModelID) async throws {
+        let context = try modelContext(for: modelID)
+        Self.log("Resetting model cache at \(context.modelDirectory.path)")
+        manager = nil
+        loadedModelDirectory = nil
+
+        do {
+            if FileManager.default.fileExists(atPath: context.modelDirectory.path) {
+                try FileManager.default.removeItem(at: context.modelDirectory)
+            }
+        } catch {
+            Self.log("Reset failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .resettingCache,
+                modelDirectory: context.modelDirectory.path
+            )
+        }
     }
 
     private func ensureReady(modelID: BuiltInModelID) async throws {
-        if manager != nil {
+        let context = try modelContext(for: modelID)
+
+        if manager != nil, loadedModelDirectory == context.modelDirectory {
             return
         }
 
-        guard try await isInstalled(modelID: modelID) else {
+        Self.log("Ensuring model runtime is ready at \(context.modelDirectory.path)")
+
+        guard await runtime.modelsExist(at: context.modelDirectory) else {
             throw LocalTranscriptionError.modelNotInstalled(modelID.descriptor)
         }
 
-        let models = try await AsrModels.loadFromCache(version: .v2)
-        try await prepareManager(with: models)
-    }
+        do {
+            try await runtime.validateModels(at: context.modelDirectory)
+        } catch {
+            Self.log("Validation failed while preparing runtime at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .validatingFiles,
+                modelDirectory: context.modelDirectory.path
+            )
+        }
 
-    private func prepareManager(with models: AsrModels) async throws {
-        let manager = self.manager ?? AsrManager(config: .default)
-        try await manager.initialize(models: models)
-        self.manager = manager
+        do {
+            manager = try await runtime.prepareManager(at: context.modelDirectory)
+            loadedModelDirectory = context.modelDirectory
+        } catch {
+            Self.log("Runtime preparation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            throw Self.wrapError(
+                error,
+                step: .preparingRuntime,
+                modelDirectory: context.modelDirectory.path
+            )
+        }
     }
 
     private static func phaseLabel(for phase: DownloadUtils.DownloadPhase) -> String {
@@ -515,6 +814,47 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         case .compiling(let modelName):
             return "Compiling \(modelName)…"
         }
+    }
+
+    private func modelContext(for modelID: BuiltInModelID) throws -> (runtimeInfo: AppRuntimeInfo, modelDirectory: URL) {
+        guard case .parakeetEnglishV2 = modelID else {
+            throw LocalTranscriptionError.unsupportedModel(modelID)
+        }
+
+        let runtimeInfo = runtimeInfoProvider()
+        return (
+            runtimeInfo: runtimeInfo,
+            modelDirectory: runtimeInfo.parakeetEnglishV2DirectoryURL
+        )
+    }
+
+    private func prepareStorageDirectories(for runtimeInfo: AppRuntimeInfo) throws {
+        try FileManager.default.createDirectory(
+            at: runtimeInfo.modelsDirectoryURL,
+            withIntermediateDirectories: true
+        )
+    }
+
+    private static func wrapError(
+        _ error: Error,
+        step: ParakeetInstallStep,
+        modelDirectory: String
+    ) -> Error {
+        if let localError = error as? LocalTranscriptionError {
+            return localError
+        }
+
+        return LocalTranscriptionError.parakeetSetupFailed(
+            step: step,
+            modelDirectory: modelDirectory,
+            reason: error.localizedDescription
+        )
+    }
+
+    private static func log(_ message: String) {
+        let line = "[Parakeet] \(message)"
+        print(line)
+        DiagnosticLog.log(line)
     }
 }
 
@@ -784,6 +1124,11 @@ enum LocalTranscriptionError: LocalizedError {
     case modelNotInstalled(BuiltInModelDescriptor)
     case notInitialized(BuiltInModelDescriptor)
     case unsupportedModel(BuiltInModelID)
+    case parakeetSetupFailed(
+        step: ParakeetInstallStep,
+        modelDirectory: String,
+        reason: String
+    )
     case invalidWhisperModelFolder(
         descriptor: BuiltInModelDescriptor,
         folderPath: String,
@@ -798,6 +1143,21 @@ enum LocalTranscriptionError: LocalizedError {
             return "\(descriptor.title) is not ready yet."
         case .unsupportedModel(let modelID):
             return "Unsupported transcription model: \(modelID.rawValue)"
+        case .parakeetSetupFailed(let step, let modelDirectory, let reason):
+            return """
+            FluidAudio English could not be prepared.
+
+            Step:
+            \(step.title)
+
+            Storage:
+            \(modelDirectory)
+
+            Reason:
+            \(reason)
+
+            Use Reset Cache in Settings > Model, then install Parakeet again.
+            """
         case .invalidWhisperModelFolder(let descriptor, let folderPath, let issues):
             let bulletList = issues.map { "• \($0)" }.joined(separator: "\n")
 

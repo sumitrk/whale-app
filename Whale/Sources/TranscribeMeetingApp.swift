@@ -6,7 +6,7 @@ struct TranscribeMeetingApp: App {
     @StateObject private var appState: AppState
     @StateObject private var accessibilityController: AccessibilityController
     @StateObject private var settingsCoordinator: SettingsCoordinator
-    private let updaterController: SPUStandardUpdaterController
+    private let updaterController: SPUStandardUpdaterController?
 
     init() {
         let accessibilityController = AccessibilityController()
@@ -18,11 +18,15 @@ struct TranscribeMeetingApp: App {
                 accessibility: accessibilityController
             )
         )
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
+        if AppRuntimeInfo.current.sparkleDisabled {
+            updaterController = nil
+        } else {
+            updaterController = SPUStandardUpdaterController(
+                startingUpdater: true,
+                updaterDelegate: nil,
+                userDriverDelegate: nil
+            )
+        }
     }
 
     private var menuBarIconName: String {
@@ -37,7 +41,7 @@ struct TranscribeMeetingApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(updater: updaterController.updater)
+            MenuBarView(updater: updaterController?.updater)
                 .environmentObject(appState)
                 .environmentObject(accessibilityController)
                 .environmentObject(settingsCoordinator)
