@@ -281,12 +281,14 @@ class AppState: ObservableObject {
                     isPTTArming = false
                     stopPTTAfterStart = false
                 }
+                DiagnosticLog.log("[Recording] Selected model \(modelID.rawValue) is not installed.")
                 status = .error(modelID.descriptor.installationPrompt)
                 return
             }
 
             currentModelID = modelID
             currentMode = mode
+            DiagnosticLog.log("[Recording] Starting \(mode == .paste ? "paste" : "markdown") capture with model \(modelID.rawValue).")
             try await recorder.startRecording(captureSystemAudio: mode == .markdown)
             if mode == .markdown {
                 isRecording = true
@@ -324,6 +326,9 @@ class AppState: ObservableObject {
             defer {
                 try? FileManager.default.removeItem(at: wavURL)
             }
+            DiagnosticLog.log(
+                "[Recording] Stopped capture. WAV=\(wavURL.path) captured=\(recording.capturedSampleCount16k) written=\(recording.writtenSampleCount16k) padded=\(recording.wasPaddedForASR)"
+            )
             print(
                 "WAV saved: \(wavURL.path) " +
                 "[captured=\(recording.capturedSampleCount16k) written=\(recording.writtenSampleCount16k) " +
@@ -366,12 +371,16 @@ class AppState: ObservableObject {
             let result = try await task.value
             processingTask = nil
             let transcript = result.processedTranscript
+            DiagnosticLog.log(
+                "[Recording] Transcript ready (\(transcript.count) chars, stages: \(result.stagesExecuted.joined(separator: " -> ")))."
+            )
             print("Transcript ready (\(transcript.count) chars, stages: \(result.stagesExecuted.joined(separator: " → ")))")
             if result.rawTranscript != result.processedTranscript {
                 print("Raw transcript (\(result.rawTranscript.count) chars) differs from processed")
             }
             if !result.warnings.isEmpty {
                 print("Pipeline warnings: \(result.warnings.joined(separator: " | "))")
+                DiagnosticLog.log("[Recording] Pipeline warnings: \(result.warnings.joined(separator: " | "))")
             }
             lastRawTranscript = result.rawTranscript
             lastTranscript = transcript
@@ -433,13 +442,16 @@ class AppState: ObservableObject {
             processingTask = nil
             status = .ready
             print("Processing cancelled")
+            DiagnosticLog.log("[Recording] Processing cancelled.")
         } catch RecorderError.noAudioCaptured where mode == .paste {
             status = .ready
+            DiagnosticLog.log("[Recording] No audio was captured in paste mode.")
         } catch {
             processingTask = nil
             isRecording = false
             status = .error(error.localizedDescription)
             print("Recording error: \(error.localizedDescription)")
+            DiagnosticLog.log("[Recording] Failed: \(error.localizedDescription)")
         }
     }
 
