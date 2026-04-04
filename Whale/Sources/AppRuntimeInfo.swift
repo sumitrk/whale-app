@@ -24,6 +24,14 @@ struct AppRuntimeInfo: Equatable, Sendable {
         whaleSupportDirectoryURL.appendingPathComponent("Models", isDirectory: true)
     }
 
+    var recordingsDirectoryURL: URL {
+        whaleSupportDirectoryURL.appendingPathComponent("Recordings", isDirectory: true)
+    }
+
+    var transcriptsDirectoryURL: URL {
+        whaleSupportDirectoryURL.appendingPathComponent("Transcripts", isDirectory: true)
+    }
+
     var parakeetEnglishV2DirectoryURL: URL {
         modelsDirectoryURL.appendingPathComponent("parakeet-tdt-0.6b-v2-coreml", isDirectory: true)
     }

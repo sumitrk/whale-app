@@ -179,18 +179,16 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         micLevelDecayTimer = nil
     }
 
-    // MARK: - Meetings folder
+    // MARK: - App-owned storage
+
+    static func recordingsFolder() -> URL {
+        let folder = AppRuntimeInfo.current.recordingsDirectoryURL
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
 
     static func meetingsFolder() -> URL {
-        let projectMeetings = URL(fileURLWithPath:
-            "/Users/sumitkumar/Downloads/Projects/transcribe-meetings/meetings")
-        if (try? FileManager.default.createDirectory(
-                at: projectMeetings, withIntermediateDirectories: true)) != nil
-            || FileManager.default.fileExists(atPath: projectMeetings.path) {
-            return projectMeetings
-        }
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let folder = docs.appendingPathComponent("TranscribeMeetings")
+        let folder = AppRuntimeInfo.current.transcriptsDirectoryURL
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder
     }
@@ -808,7 +806,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             .replacingOccurrences(of: ":", with: "-")
             .replacingOccurrences(of: "T", with: "_")
             .replacingOccurrences(of: "Z", with: "")
-        let url = Self.meetingsFolder().appendingPathComponent("meeting-\(stamp).wav")
+        let url = Self.recordingsFolder().appendingPathComponent("meeting-\(stamp).wav")
         try writeWAV(samples: int16, sampleRate: Int(targetSampleRate), to: url)
 
         let kb = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) ?? 0

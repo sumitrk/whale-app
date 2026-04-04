@@ -211,6 +211,8 @@ final class TranscriptionModelTests: XCTestCase {
 
         XCTAssertFalse(runtimeInfo.isSandboxed)
         XCTAssertEqual(runtimeInfo.whaleSupportDirectoryURL.path, "/Users/tester/Library/Application Support/Whale")
+        XCTAssertEqual(runtimeInfo.recordingsDirectoryURL.path, "/Users/tester/Library/Application Support/Whale/Recordings")
+        XCTAssertEqual(runtimeInfo.transcriptsDirectoryURL.path, "/Users/tester/Library/Application Support/Whale/Transcripts")
         XCTAssertEqual(
             runtimeInfo.parakeetEnglishV2DirectoryURL.path,
             "/Users/tester/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2-coreml"
@@ -231,6 +233,10 @@ final class TranscriptionModelTests: XCTestCase {
         )
 
         XCTAssertTrue(runtimeInfo.isSandboxed)
+        XCTAssertEqual(
+            runtimeInfo.transcriptsDirectoryURL.path,
+            "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data/Library/Application Support/Whale/Transcripts"
+        )
         XCTAssertEqual(
             runtimeInfo.parakeetEnglishV2DirectoryURL.path,
             "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2-coreml"
