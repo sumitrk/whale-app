@@ -299,11 +299,11 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					92FC86E1A1F73D62CBA0B22D = {
-						DevelopmentTeam = G6Z6DNHM33;
+						DevelopmentTeam = W23Z9F5RG4;
 						ProvisioningStyle = Automatic;
 					};
 					AA0000000000000000000041 = {
-						DevelopmentTeam = G6Z6DNHM33;
+						DevelopmentTeam = W23Z9F5RG4;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -413,15 +413,20 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Whale/TranscribeMeeting.entitlements;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = W23Z9F5RG4;
 				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Whale/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				LSUIElement = YES;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meeting";
 				SDKROOT = macosx;
 			};
@@ -464,7 +469,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = G6Z6DNHM33;
+				DEVELOPMENT_TEAM = W23Z9F5RG4;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -501,7 +506,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = G6Z6DNHM33;
+				DEVELOPMENT_TEAM = W23Z9F5RG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
@@ -521,7 +526,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = G6Z6DNHM33;
+				DEVELOPMENT_TEAM = W23Z9F5RG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
@@ -572,7 +577,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = G6Z6DNHM33;
+				DEVELOPMENT_TEAM = W23Z9F5RG4;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -652,16 +657,16 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.12.4;
+				kind = exactVersion;
+				version = 0.12.6;
 			};
 		};
 		AA0000000000000000000071 /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/argmaxinc/WhisperKit.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.9.0;
+				kind = exactVersion;
+				version = 1.0.0;
 			};
 		};
 		C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
@@ -676,8 +681,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm.git";
 			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 2.29.1;
+				kind = exactVersion;
+				version = 2.31.3;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
