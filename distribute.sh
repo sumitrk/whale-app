@@ -26,6 +26,7 @@ GITHUB_REPO="sumitrk/whale-app"
 RELEASE_MODE="${WHALE_RELEASE_MODE:-publish}"
 RUN_SMOKE_TEST="${WHALE_SMOKE_TEST:-0}"
 NOTARY_PROFILE="${WHALE_NOTARY_PROFILE:-Whale Notary}"
+SIGNING_IDENTITY="${WHALE_SIGNING_IDENTITY:-Developer ID Application}"
 CURRENT_BRANCH="$(git branch --show-current)"
 
 if [ "$RELEASE_MODE" != "local" ] && [ "$RELEASE_MODE" != "publish" ]; then
@@ -107,6 +108,37 @@ build_app() {
   echo "✅ Built: $APP_PATH"
 }
 
+sign_for_distribution() {
+  local sparkle_framework sparkle_version item
+
+  sparkle_framework="$APP_PATH/Contents/Frameworks/Sparkle.framework"
+  sparkle_version="$sparkle_framework/Versions/Current"
+
+  echo ""
+  echo "▶ Signing embedded code with Developer ID..."
+  for item in \
+    "$sparkle_version/Autoupdate" \
+    "$sparkle_version/Updater.app" \
+    "$sparkle_version/XPCServices/Downloader.xpc" \
+    "$sparkle_version/XPCServices/Installer.xpc" \
+    "$sparkle_framework"; do
+    codesign --force \
+      --options runtime \
+      --timestamp \
+      --preserve-metadata=identifier,entitlements,requirements \
+      --sign "$SIGNING_IDENTITY" \
+      "$item"
+  done
+
+  codesign --force \
+    --options runtime \
+    --timestamp \
+    --entitlements Whale/TranscribeMeeting.entitlements \
+    --sign "$SIGNING_IDENTITY" \
+    "$APP_PATH"
+  echo "✅ Embedded code signed with Developer ID"
+}
+
 verify_app_bundle() {
   local smoke_root smoke_app app_codesign_details app_requirement
 
@@ -159,15 +191,28 @@ create_dmg() {
     -ov -format UDZO \
     "$DMG_NAME" 2>&1 | tail -2
   rm -rf "$DIST_DIR"
-  echo "✅ Created ${DMG_NAME}"
+  codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG_NAME"
+  codesign --verify --verbose=2 "$DMG_NAME"
+  echo "✅ Created and signed ${DMG_NAME}"
 }
 
 notarize_dmg() {
+  local notarization_result notarization_status submission_id
+
   echo ""
   echo "▶ Notarizing DMG with Apple..."
-  xcrun notarytool submit "$DMG_NAME" \
+  notarization_result=$(xcrun notarytool submit "$DMG_NAME" \
     --keychain-profile "$NOTARY_PROFILE" \
-    --wait
+    --wait \
+    --output-format json)
+  printf "%s\n" "$notarization_result"
+  notarization_status=$(printf "%s" "$notarization_result" | plutil -extract status raw -o - -)
+  submission_id=$(printf "%s" "$notarization_result" | plutil -extract id raw -o - -)
+  if [ "$notarization_status" != "Accepted" ]; then
+    echo "❌ Apple notarization failed (submission: $submission_id, status: $notarization_status)"
+    echo "   Inspect it with: xcrun notarytool log $submission_id --keychain-profile '$NOTARY_PROFILE'"
+    exit 1
+  fi
 
   echo "▶ Stapling notarization ticket..."
   xcrun stapler staple "$DMG_NAME"
@@ -273,6 +318,7 @@ EOF
 
 sync_version_metadata
 build_app
+sign_for_distribution
 verify_app_bundle
 create_dmg
 notarize_dmg
