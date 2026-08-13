@@ -15,7 +15,7 @@ settings:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.2"
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: "G6Z6DNHM33"
+    DEVELOPMENT_TEAM: "W23Z9F5RG4"
 
 targets:
   TranscribeMeeting:

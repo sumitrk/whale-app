@@ -1,16 +1,13 @@
 # Whale Distribution Notes
 
-This repo currently supports a bridge distribution model for tester and hobby installs.
+This repo supports public distribution outside the Mac App Store.
 
 What is supported now:
 - A stable app identity for Accessibility/TCC across updates, as long as the bundle identifier and signing identity stay the same.
 - A signed app bundle that remains immutable after packaging.
 - Sparkle update signing for update authenticity.
-
-What is not supported yet:
-- Zero-friction public install on a clean Mac.
-- Gatekeeper acceptance of the DMG or app via Developer ID.
-- Notarization and stapling.
+- Developer ID Application signing with Hardened Runtime.
+- Apple notarization and ticket stapling for Gatekeeper acceptance.
 
 ## Source of Truth
 
@@ -37,13 +34,15 @@ Three independent properties must hold for distribution to behave correctly:
 
 3. Distribution Trust
 - Public "download and open normally" distribution requires Developer ID signing and notarization.
-- Apple Development signing is acceptable for bridge distribution and local testing, but Gatekeeper may still reject the app or DMG on a clean Mac.
+- Whale's Release configuration uses Developer ID Application signing and Hardened Runtime; `distribute.sh` notarizes and staples every DMG before publishing it.
+
+The Release app intentionally remains unsandboxed. A paid Apple Developer membership does not require App Sandbox for Developer ID distribution outside the Mac App Store, and Whale needs global hotkeys, Accessibility-driven text insertion, and user-selected filesystem access. App Sandbox would be required for Mac App Store distribution and would need a separate capability review.
 
 ## Build Pipeline
 
 Default publish flow:
 
-1. Build, verify, package, sign for Sparkle, update `appcast.xml`, and publish.
+1. Build, verify, package, notarize, staple, sign for Sparkle, update `appcast.xml`, and publish.
 ```bash
 ./distribute.sh
 ```
@@ -53,6 +52,8 @@ This default flow:
 - increments the build number
 - builds and verifies the app bundle
 - creates the DMG
+- notarizes the DMG with Apple and staples the ticket
+- verifies Gatekeeper acceptance
 - signs the DMG for Sparkle
 - updates `appcast.xml`
 - commits and pushes release metadata to the current branch
@@ -77,29 +78,6 @@ Branch behavior:
 
 ## Verification Contract
 
-## Sandboxed Dev QA
-
-Use the shared `Whale` scheme in Xcode to exercise the same app sandbox and entitlements as distribution builds without going through the DMG flow first.
-
-- `Whale` scheme: sandboxed `DebugSandbox` with `Whale/TranscribeMeeting.entitlements` and the production bundle identifier
-- `Whale Dev` scheme: fast unsandboxed local iteration
-- `WHALE_DISABLE_SPARKLE=1`: enabled in the sandboxed scheme so updater startup does not interfere with model-install QA
-- `WHALE_RESET_PARAKEET_CACHE_ON_LAUNCH=1`: available in the sandboxed scheme and disabled by default; enable it when you want each run to start from an empty Parakeet cache
-
-Recommended smoke path before packaging:
-
-1. Run the `Whale` scheme from Xcode.
-2. Open Settings and go to Model.
-3. Install Parakeet.
-4. Confirm the model lands under the app container's Application Support path.
-5. Run a short transcription from the same sandboxed app session.
-6. Repeat with the `Whale Dev` scheme when you want to compare unsandboxed behavior.
-
-Switching schemes in Xcode:
-- Click the scheme picker next to the Run button in the top toolbar.
-- Choose `Whale` for production-like sandboxed runs.
-- Choose `Whale Dev` only when you explicitly want the unsandboxed debug path.
-
 These commands should pass on the packaged app:
 
 ```bash
@@ -107,29 +85,14 @@ codesign --verify --deep --strict --verbose=4 /Applications/Whale.app
 codesign -dr - /Applications/Whale.app
 ```
 
-These commands are informative for the current bridge path:
+These commands must also pass for the packaged DMG:
 
 ```bash
-spctl -a -vvv /Applications/Whale.app
-spctl -a -vvv Whale.dmg
+xcrun stapler validate Whale.dmg
+spctl -a -vvv -t open --context context:primary-signature Whale.dmg
 ```
 
-Expected behavior today:
-- `codesign --verify ...` must pass.
-- `spctl` may still reject the app or DMG because the build is Apple Development signed, not Developer ID signed/notarized.
-
-## Manual Install Expectations
-
-For a clean tester machine:
-
-1. Remove any old Whale app from `/Applications`.
-2. Reset Accessibility trust if needed:
-```bash
-tccutil reset Accessibility com.sumitrk.transcribe-meeting
-```
-3. Install the new `Whale.app` from the DMG.
-4. If macOS blocks the first launch, use Finder `right-click > Open`, or remove quarantine manually if appropriate for your test setup.
-5. Grant Accessibility once after launch.
+The published DMG should open normally on a clean Mac. Users still need to grant Microphone and Accessibility permissions because those are runtime privacy permissions, not code-signing workarounds.
 
 ## Update Expectations
 
@@ -140,20 +103,15 @@ Stable Accessibility behavior across updates depends on:
 
 Sparkle EdDSA signing protects update authenticity, but it does not replace macOS code signing or notarization.
 
-## Future Public Distribution
-
-To support true "download and just use it" installs:
-
-1. Join the Apple Developer Program.
-2. Switch release signing from Apple Development to Developer ID Application.
-3. Notarize and staple the app or DMG.
-4. Keep Sparkle signing for update authenticity.
-
 ## Publish Prerequisites
 
 The default `./distribute.sh` flow expects:
 - `gh` is installed and authenticated
+- the `Developer ID Application: Firdaosh Bano (W23Z9F5RG4)` identity is available in the login Keychain
+- the `Whale Notary` notarytool profile is available in the login Keychain
 - the Sparkle private key is available in your keychain
 - Sparkle tools have been built by Xcode at least once
+
+To use another local notarization profile, set `WHALE_NOTARY_PROFILE` when running the script.
 
 GitHub release creation only happens when the current branch is `main`.

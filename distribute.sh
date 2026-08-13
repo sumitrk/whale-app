@@ -2,10 +2,11 @@
 # distribute.sh — deterministic packaging pipeline for Whale.
 # The checked-in Whale.xcodeproj is the canonical build/signing source of truth.
 #
-# Default mode is publish for bridge distribution:
+# Default mode is publish for public distribution:
 # - builds the app
 # - verifies bundle integrity
 # - creates a DMG
+# - notarizes and staples the DMG
 #
 # On main, publish mode also creates the GitHub release and pushes release
 # metadata to main. On other branches, publish mode behaves like a branch
@@ -14,8 +15,6 @@
 #
 # Optional local-only dry run:
 #   WHALE_RELEASE_MODE=local ./distribute.sh
-# Public "download and just open" distribution still requires Developer ID +
-# notarization, which this repo does not currently support.
 set -euo pipefail
 
 APP_NAME="Whale"
@@ -26,6 +25,8 @@ DMG_NAME="${APP_NAME}.dmg"
 GITHUB_REPO="sumitrk/whale-app"
 RELEASE_MODE="${WHALE_RELEASE_MODE:-publish}"
 RUN_SMOKE_TEST="${WHALE_SMOKE_TEST:-0}"
+NOTARY_PROFILE="${WHALE_NOTARY_PROFILE:-Whale Notary}"
+SIGNING_IDENTITY="${WHALE_SIGNING_IDENTITY:-Developer ID Application}"
 CURRENT_BRANCH="$(git branch --show-current)"
 
 if [ "$RELEASE_MODE" != "local" ] && [ "$RELEASE_MODE" != "publish" ]; then
@@ -36,7 +37,6 @@ fi
 
 VERSION_PLIST="Whale/Info.plist"
 APP_PATH=""
-SIGNING_IDENTITY=""
 VERSION=""
 BUILD=""
 SPARKLE_BIN=""
@@ -55,8 +55,8 @@ resolve_sparkle_tools() {
 
 sync_version_metadata() {
   local current_version current_build next_build input_version
-  current_version=$(defaults read "$(pwd)/${VERSION_PLIST}" CFBundleShortVersionString)
-  current_build=$(defaults read "$(pwd)/${VERSION_PLIST}" CFBundleVersion)
+  current_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$VERSION_PLIST")
+  current_build=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$VERSION_PLIST")
   next_build=$((current_build + 1))
 
   if [ "$RELEASE_MODE" = "publish" ]; then
@@ -76,7 +76,7 @@ sync_version_metadata() {
 }
 
 build_app() {
-  local ws_state project_dir
+  local ws_state project_dir build_log
 
   ws_state="${DERIVED_DATA}/SourcePackages/workspace-state.json"
   if [ -f "$ws_state" ]; then
@@ -85,13 +85,20 @@ build_app() {
   fi
 
   echo ""
-  echo "▶ Building Xcode project (Release, Xcode-signed)..."
-  xcodebuild \
+  echo "▶ Building Xcode project (Release, Developer ID signed)..."
+  build_log=$(mktemp "${TMPDIR:-/tmp}/whale-xcodebuild.XXXXXX")
+  if ! xcodebuild \
     -project Whale.xcodeproj \
     -scheme "$SCHEME" \
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA" \
-    clean build 2>&1 | grep -E "^(Build|error:)" || true
+    -skipPackagePluginValidation \
+    clean build >"$build_log" 2>&1; then
+    grep -E "(^| )error:" "$build_log" | tail -20 || true
+    echo "❌ Xcode build failed. Full log: $build_log"
+    exit 1
+  fi
+  rm -f "$build_log"
 
   APP_PATH=$(find "$DERIVED_DATA" -name "${APP_NAME}.app" -maxdepth 6 | head -1)
   if [ -z "$APP_PATH" ]; then
@@ -101,6 +108,37 @@ build_app() {
   echo "✅ Built: $APP_PATH"
 }
 
+sign_for_distribution() {
+  local sparkle_framework sparkle_version item
+
+  sparkle_framework="$APP_PATH/Contents/Frameworks/Sparkle.framework"
+  sparkle_version="$sparkle_framework/Versions/Current"
+
+  echo ""
+  echo "▶ Signing embedded code with Developer ID..."
+  for item in \
+    "$sparkle_version/Autoupdate" \
+    "$sparkle_version/Updater.app" \
+    "$sparkle_version/XPCServices/Downloader.xpc" \
+    "$sparkle_version/XPCServices/Installer.xpc" \
+    "$sparkle_framework"; do
+    codesign --force \
+      --options runtime \
+      --timestamp \
+      --preserve-metadata=identifier,entitlements,requirements \
+      --sign "$SIGNING_IDENTITY" \
+      "$item"
+  done
+
+  codesign --force \
+    --options runtime \
+    --timestamp \
+    --entitlements Whale/TranscribeMeeting.entitlements \
+    --sign "$SIGNING_IDENTITY" \
+    "$APP_PATH"
+  echo "✅ Embedded code signed with Developer ID"
+}
+
 verify_app_bundle() {
   local smoke_root smoke_app app_codesign_details app_requirement
 
@@ -108,18 +146,19 @@ verify_app_bundle() {
   echo "▶ Verifying app bundle..."
   codesign --verify --deep --strict --verbose=4 "$APP_PATH"
   app_codesign_details=$(codesign -dvvv "$APP_PATH" 2>&1)
-  printf "%s\n" "$app_codesign_details" | tail -3
+  if ! printf "%s\n" "$app_codesign_details" | grep -q "Authority=Developer ID Application:"; then
+    echo "❌ App is not signed with a Developer ID Application certificate."
+    printf "%s\n" "$app_codesign_details"
+    exit 1
+  fi
+  if ! printf "%s\n" "$app_codesign_details" | grep -q "flags=.*runtime"; then
+    echo "❌ Hardened Runtime is not enabled on the Release app."
+    printf "%s\n" "$app_codesign_details"
+    exit 1
+  fi
+  printf "%s\n" "$app_codesign_details" | grep -E "^(Authority|TeamIdentifier|Timestamp|Runtime Version)="
   app_requirement=$(codesign -dr - "$APP_PATH" 2>&1)
   printf "%s\n" "$app_requirement" | tail -1
-
-  echo ""
-  echo "▶ Gatekeeper check on app bundle (informational for bridge distribution)..."
-  if spctl -a -vvv "$APP_PATH"; then
-    echo "✅ App accepted by spctl"
-  else
-    echo "ℹ️  App not accepted by Gatekeeper. This is expected with Apple Development signing."
-    echo "   Manual install may require right-click Open or quarantine removal on tester Macs."
-  fi
 
   if [ "$RUN_SMOKE_TEST" = "1" ]; then
     echo ""
@@ -152,15 +191,36 @@ create_dmg() {
     -ov -format UDZO \
     "$DMG_NAME" 2>&1 | tail -2
   rm -rf "$DIST_DIR"
-  echo "✅ Created ${DMG_NAME}"
+  codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG_NAME"
+  codesign --verify --verbose=2 "$DMG_NAME"
+  echo "✅ Created and signed ${DMG_NAME}"
+}
+
+notarize_dmg() {
+  local notarization_result notarization_status submission_id
 
   echo ""
-  echo "▶ Gatekeeper check on DMG (informational until Developer ID + notarization)..."
-  if spctl -a -vvv "$DMG_NAME"; then
-    echo "✅ DMG accepted by spctl"
-  else
-    echo "ℹ️  DMG not accepted by Gatekeeper. This is expected for the current bridge distribution path."
+  echo "▶ Notarizing DMG with Apple..."
+  notarization_result=$(xcrun notarytool submit "$DMG_NAME" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --wait \
+    --output-format json)
+  printf "%s\n" "$notarization_result"
+  notarization_status=$(printf "%s" "$notarization_result" | plutil -extract status raw -o - -)
+  submission_id=$(printf "%s" "$notarization_result" | plutil -extract id raw -o - -)
+  if [ "$notarization_status" != "Accepted" ]; then
+    echo "❌ Apple notarization failed (submission: $submission_id, status: $notarization_status)"
+    echo "   Inspect it with: xcrun notarytool log $submission_id --keychain-profile '$NOTARY_PROFILE'"
+    exit 1
   fi
+
+  echo "▶ Stapling notarization ticket..."
+  xcrun stapler staple "$DMG_NAME"
+  xcrun stapler validate "$DMG_NAME"
+
+  echo "▶ Verifying Gatekeeper acceptance..."
+  spctl -a -vvv -t open --context context:primary-signature "$DMG_NAME"
+  echo "✅ DMG is notarized, stapled, and accepted by Gatekeeper"
 }
 
 sign_dmg_for_sparkle() {
@@ -258,8 +318,10 @@ EOF
 
 sync_version_metadata
 build_app
+sign_for_distribution
 verify_app_bundle
 create_dmg
+notarize_dmg
 
 if [ "$RELEASE_MODE" = "publish" ]; then
   publish_release
