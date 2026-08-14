@@ -41,6 +41,7 @@
 		PP0000000000000000000012 /* TranscriptionPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000002 /* TranscriptionPipeline.swift */; };
 		PP0000000000000000000013 /* TranscriptionStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000003 /* TranscriptionStage.swift */; };
 		PP0000000000000000000014 /* TextInsertionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000004 /* TextInsertionManager.swift */; };
+		TAW000000000000000000001 /* TranscriptArtifactWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAW000000000000000000002 /* TranscriptArtifactWriter.swift */; };
 		PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000005 /* TranscriptionPipelineTests.swift */; };
 		PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000006 /* TextInsertionManagerTests.swift */; };
 		PST000000000000000000011 /* PostProcessingTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = PST000000000000000000101 /* PostProcessingTypes.swift */; };
@@ -102,6 +103,7 @@
 		PP0000000000000000000004 /* TextInsertionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManager.swift; sourceTree = "<group>"; };
 		PP0000000000000000000005 /* TranscriptionPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipelineTests.swift; sourceTree = "<group>"; };
 		PP0000000000000000000006 /* TextInsertionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManagerTests.swift; sourceTree = "<group>"; };
+		TAW000000000000000000002 /* TranscriptArtifactWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptArtifactWriter.swift; sourceTree = "<group>"; };
 		PST000000000000000000101 /* PostProcessingTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostProcessingTypes.swift; sourceTree = "<group>"; };
 		PST000000000000000000103 /* PromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptBuilder.swift; sourceTree = "<group>"; };
 		PST000000000000000000104 /* LocalLLMCleanupStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLLMCleanupStage.swift; sourceTree = "<group>"; };
@@ -178,6 +180,7 @@
 				5EB407F215A4729F95EBD5AA /* SettingsView.swift */,
 				4ABD2DA0658FF2189FE2CD1C /* ShortcutsSettingsView.swift */,
 				PP0000000000000000000004 /* TextInsertionManager.swift */,
+				TAW000000000000000000002 /* TranscriptArtifactWriter.swift */,
 				617C5598D1998EE5F01350BC /* TranscribeMeetingApp.swift */,
 			);
 			name = Sources;
@@ -389,6 +392,7 @@
 				F0F812B0EA8E670D04878BDD /* SettingsView.swift in Sources */,
 				94E2FF4554D92D4265DAFE60 /* ShortcutsSettingsView.swift in Sources */,
 				PP0000000000000000000014 /* TextInsertionManager.swift in Sources */,
+				TAW000000000000000000001 /* TranscriptArtifactWriter.swift in Sources */,
 				84740FA4C22131C091BD729B /* TranscribeMeetingApp.swift in Sources */,
 				PP0000000000000000000012 /* TranscriptionPipeline.swift in Sources */,
 				PP0000000000000000000013 /* TranscriptionStage.swift in Sources */,

@@ -90,23 +90,31 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(whisperCalls.connected, [.whisperLocalFolder])
     }
 
-    func testSelectedModelTextComesFromDescriptor() {
+    func testSelectedModelTextComesFromDescriptor() throws {
         let descriptor = BuiltInModelID.whisperLargeV3Turbo.descriptor
+
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Whale-\(#function)-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let url = try TranscriptArtifactWriter().write(
+            .init(
+                startedAt: Date(timeIntervalSince1970: 0),
+                durationMinutes: 3,
+                model: descriptor,
+                transcript: "Hello world",
+                cleanupSummary: "light (Qwen 3 0.6B)"
+            ),
+            to: folder
+        )
+        let markdown = try String(contentsOf: url, encoding: .utf8)
 
         XCTAssertEqual(descriptor.markdownLabel, "Whisper Large V3 Turbo")
         XCTAssertTrue(descriptor.installationPrompt.contains("Whisper Large V3 Turbo"))
-
-        let markdown = TranscriptMarkdownBuilder.build(
-            date: Date(timeIntervalSince1970: 0),
-            duration: 3,
-            model: descriptor,
-            transcript: "Hello world",
-            formattedDate: "Jan 1, 1970 at 12:00 AM",
-            cleanupSummary: "light (Qwen 3 0.6B)"
-        )
-
         XCTAssertTrue(markdown.contains("**Model:** Whisper Large V3 Turbo"))
         XCTAssertTrue(markdown.contains("**Cleanup:** light (Qwen 3 0.6B)"))
+        XCTAssertTrue(markdown.contains("## Transcript\n\nHello world"))
     }
 
     func testWhisperBuiltInDefaultsToEnglish() {

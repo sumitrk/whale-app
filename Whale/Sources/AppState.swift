@@ -45,6 +45,7 @@ class AppState: ObservableObject {
 
     private let settings = SettingsStore.shared
     private let transcriber = LocalTranscriptionService.shared
+    private let transcriptWriter = TranscriptArtifactWriter()
     private let pipelineFactory: @Sendable (TextCleanupSettings) -> TranscriptionPipeline
     private var cancellables = Set<AnyCancellable>()
     private var onboardingWindow: NSWindow?
@@ -413,22 +414,14 @@ class AppState: ObservableObject {
 
             case .markdown:
                 let duration = Int(Date().timeIntervalSince(startedAt) / 60)
-                let saveURL  = settings.transcriptFolder
-                let stamp    = ISO8601DateFormatter().string(from: startedAt)
-                    .replacingOccurrences(of: ":", with: "-")
-                    .replacingOccurrences(of: "T", with: "_")
-                    .replacingOccurrences(of: "Z", with: "")
-                let mdURL = saveURL.appendingPathComponent("transcript-\(stamp).md")
-
-                let md = buildMarkdown(
-                    date: startedAt,
-                    duration: duration,
+                let artifact = TranscriptArtifactWriter.Document(
+                    startedAt: startedAt,
+                    durationMinutes: duration,
                     model: currentModelID.descriptor,
                     transcript: transcript,
                     cleanupSummary: cleanupSummary(for: cleanupSettings, result: result)
                 )
-
-                try md.write(to: mdURL, atomically: true, encoding: .utf8)
+                let mdURL = try transcriptWriter.write(artifact, to: settings.transcriptFolder)
                 print("Saved: \(mdURL.path)")
 
                 lastMeetingPath = mdURL.path
@@ -465,25 +458,6 @@ class AppState: ObservableObject {
         return duration
     }
 
-    // MARK: - Markdown builder
-
-    private func buildMarkdown(
-        date: Date,
-        duration: Int,
-        model: BuiltInModelDescriptor,
-        transcript: String,
-        cleanupSummary: String
-    ) -> String {
-        TranscriptMarkdownBuilder.build(
-            date: date,
-            duration: duration,
-            model: model,
-            transcript: transcript,
-            formattedDate: formattedDate(date),
-            cleanupSummary: cleanupSummary
-        )
-    }
-
     private func cleanupSummary(for settings: TextCleanupSettings, result: PipelineResult) -> String {
         guard settings.enabled else {
             return "off (raw transcript)"
@@ -497,13 +471,6 @@ class AppState: ObservableObject {
         }
 
         return "off (raw transcript fallback)"
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .short
-        return f.string(from: date)
     }
 
     // MARK: - Startup
@@ -522,27 +489,5 @@ class AppState: ObservableObject {
 
         await TranscriptionModelStore.shared.refreshNow()
         status = .ready
-    }
-}
-
-enum TranscriptMarkdownBuilder {
-    static func build(
-        date _: Date,
-        duration: Int,
-        model: BuiltInModelDescriptor,
-        transcript: String,
-        formattedDate: String,
-        cleanupSummary: String
-    ) -> String {
-        let sections: [String] = [
-            "# Meeting — \(formattedDate)",
-            "**Duration:** ~\(max(1, duration)) min  |  **Model:** \(model.markdownLabel)",
-            "**Cleanup:** \(cleanupSummary)",
-            "",
-            "## Transcript",
-            "",
-            transcript,
-        ]
-        return sections.joined(separator: "\n")
     }
 }
