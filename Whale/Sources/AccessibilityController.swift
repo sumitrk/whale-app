@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Foundation
 
 @MainActor
 final class AccessibilityController: ObservableObject {
@@ -9,6 +10,7 @@ final class AccessibilityController: ObservableObject {
     private var pollTimer: Timer?
     private var isMonitoring = false
     private var pollDeadline = Date.distantPast
+    private var recoveryAlertPresented = false
 
     func startMonitoring(promptOnLaunch: Bool) {
         guard !isMonitoring else { return }
@@ -24,7 +26,17 @@ final class AccessibilityController: ObservableObject {
             }
         }
 
-        refresh(prompt: promptOnLaunch)
+        // Do not invoke Apple's automatic prompt during normal relaunches.
+        // For an existing install, a stale TCC record can make that prompt
+        // appear repeatedly even while the old Settings row is enabled. The
+        // explicit recovery dialog below explains the identity migration and
+        // lets the user reset the record before opening Settings.
+        let shouldOfferRecovery = promptOnLaunch && !isTestProcess
+        refresh()
+
+        if shouldOfferRecovery && !isTrusted {
+            presentRecoveryAlertIfNeeded()
+        }
     }
 
     func refresh(prompt: Bool = false) {
@@ -45,6 +57,61 @@ final class AccessibilityController: ObservableObject {
 
     func requestPrompt() {
         refresh(prompt: true)
+    }
+
+    /// Explain and repair the one-time Accessibility break caused when an
+    /// existing install moves from Apple Development to Developer ID signing.
+    /// TCC intentionally requires the user to grant the new identity; the app
+    /// can only reset its own stale record and open the system pane.
+    private func presentRecoveryAlertIfNeeded() {
+        guard !recoveryAlertPresented, !isTrusted else { return }
+        recoveryAlertPresented = true
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.isTrusted else { return }
+
+            let alert = NSAlert()
+            alert.messageText = "Whale needs a one-time Accessibility refresh"
+            alert.informativeText = "Whale does not currently have Accessibility access. If this is an update, macOS may still show an older Whale entry as enabled while blocking this version. Click Reset & Open Settings, then turn on the current Whale entry in Privacy & Security → Accessibility."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Reset & Open Settings")
+            alert.addButton(withTitle: "Later")
+
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn {
+                _ = self.resetAccessibilityGrant()
+                self.openSystemAccessibilitySettingsAndWatch()
+            }
+        }
+    }
+
+    /// Reset only Whale's Accessibility decision. This cannot grant access;
+    /// it clears a stale signing-identity record before the user re-enables it.
+    @discardableResult
+    private func resetAccessibilityGrant() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = [
+            "reset",
+            "Accessibility",
+            Bundle.main.bundleIdentifier ?? "com.sumitrk.transcribe-meeting"
+        ]
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            DiagnosticLog.log("[Accessibility] Failed to reset stale grant: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private var isTestProcess: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
+            || Bundle.main.bundleIdentifier?.hasSuffix("Tests") == true
     }
 
     func openSystemAccessibilitySettingsAndWatch() {

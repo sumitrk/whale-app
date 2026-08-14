@@ -132,7 +132,8 @@ final class TextInsertionManagerTests: XCTestCase {
         XCTAssertEqual(
             TextInsertionManager.insertionStrategy(
                 for: nil,
-                isAccessibilityTrusted: false
+                isAccessibilityTrusted: false,
+                canPostEvents: false
             ),
             .copyOnly(.accessibilityMissing)
         )

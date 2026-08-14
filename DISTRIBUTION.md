@@ -94,6 +94,10 @@ spctl -a -vvv -t open --context context:primary-signature Whale.dmg
 
 The published DMG should open normally on a clean Mac. Users still need to grant Microphone and Accessibility permissions because those are runtime privacy permissions, not code-signing workarounds.
 
+## Accessibility Identity Migration
+
+The first Developer ID release changed Whale's macOS code identity from the old Apple Development certificate. macOS intentionally does not transfer an Accessibility grant between those identities. When the current signed app is untrusted, Whale offers a one-click reset of its stale Accessibility record, then opens the correct System Settings pane for the user to re-enable the current Whale entry. It cannot grant the permission silently.
+
 ## Update Expectations
 
 Stable Accessibility behavior across updates depends on:
