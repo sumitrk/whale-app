@@ -63,6 +63,10 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     private var micCaptureInput: AVCaptureDeviceInput?
     private var micCaptureOutput: AVCaptureAudioDataOutput?
     private let micCaptureQueue = DispatchQueue(label: "Whale.AudioRecorder.MicCapture")
+    private let micSessionQueue = DispatchQueue(
+        label: "Whale.AudioRecorder.MicSession",
+        qos: .userInitiated
+    )
     private var inputDeviceChangeListener: AudioObjectPropertyListenerBlock?
     private var captureDeviceDisconnectObserver: (any NSObjectProtocol)?
     /// macOS can briefly report an invalid input hardware format while the CATap
@@ -126,7 +130,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             if captureSystemAudio {
                 try startSystemAudioCapture()
             }
-            try startMicCapture()
+            try await startMicCapture()
             startMicLevelDecay()
             isRecording = true
             let modeLabel = captureSystemAudio ? "mic + system audio" : "mic only"
@@ -137,6 +141,19 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             stopMicLevelDecay()
             isRecording = false
             throw error
+        }
+    }
+
+    @MainActor
+    func prepareMicrophoneCapture() {
+        guard micCaptureSession == nil else { return }
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
+
+        do {
+            try configureMicCapture(for: currentDefaultInputDevice())
+            print("AudioRecorder: microphone capture preconfigured")
+        } catch {
+            print("AudioRecorder: microphone preconfiguration deferred: \(error)")
         }
     }
 
@@ -388,11 +405,38 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
 
     // MARK: - Microphone (AVCaptureSession)
 
-    private func startMicCapture() throws {
+    private func startMicCapture() async throws {
         lastMicStartDate = Date()
         let inputDevice = try currentDefaultInputDevice()
         let capturePolicy: MicCapturePolicy =
             !currentCaptureIncludesSystemAudio && inputDevice.isBluetooth ? .bluetooth : .standard
+
+        if micCaptureSession == nil || currentInputDeviceUniqueID != inputDevice.uniqueID {
+            teardownMicCapture()
+            try configureMicCapture(for: inputDevice)
+        }
+
+        micCapturePolicy = capturePolicy
+        beginMicReadyState(for: capturePolicy, preserveRestartCount: isRestartingMicCapture)
+        micCaptureOutput?.setSampleBufferDelegate(self, queue: micCaptureQueue)
+
+        guard let session = micCaptureSession else {
+            throw RecorderError.captureSessionSetupFailed("Microphone capture session was not configured")
+        }
+
+        await startCaptureSession(session)
+        if capturePolicy == .bluetooth {
+            scheduleBluetoothStartupValidation(after: bluetoothFallbackRestartDelay)
+        }
+        print(
+            "AudioRecorder: microphone capture started (device=\(inputDevice.name), " +
+            "transport=\(inputDevice.transportLabel), bluetooth=\(inputDevice.isBluetooth), " +
+            "policy=\(capturePolicyLabel(capturePolicy)), " +
+            "sr=\(Int(targetSampleRate))Hz, ch=1)"
+        )
+    }
+
+    private func configureMicCapture(for inputDevice: RecordingInputDevice) throws {
         guard let captureDevice = captureDevice(for: inputDevice.uniqueID) else {
             throw RecorderError.inputDeviceUnavailable("Selected microphone is no longer available")
         }
@@ -429,39 +473,38 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
 
         currentInputDevice = inputDevice
         currentInputDeviceUniqueID = inputDevice.uniqueID
-        micCapturePolicy = capturePolicy
-        beginMicReadyState(for: capturePolicy, preserveRestartCount: isRestartingMicCapture)
 
         micCaptureSession = session
         micCaptureInput = input
         micCaptureOutput = output
         installInputDeviceListener()
         installCaptureDeviceDisconnectObserver()
-        session.startRunning()
-        if capturePolicy == .bluetooth {
-            scheduleBluetoothStartupValidation(after: bluetoothFallbackRestartDelay)
+    }
+
+    private func startCaptureSession(_ session: AVCaptureSession) async {
+        await withCheckedContinuation { continuation in
+            micSessionQueue.async {
+                session.startRunning()
+                continuation.resume()
+            }
         }
-        print(
-            "AudioRecorder: microphone capture started (device=\(inputDevice.name), " +
-            "transport=\(inputDevice.transportLabel), bluetooth=\(inputDevice.isBluetooth), " +
-            "policy=\(capturePolicyLabel(capturePolicy)), " +
-            "sr=\(Int(targetSampleRate))Hz, ch=1)"
-        )
     }
 
     private func scheduleMicCaptureRestart(after delay: TimeInterval) {
         micRestartWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
-            self?.restartMicCapture()
+            Task { @MainActor [weak self] in
+                self?.restartMicCapture()
+            }
         }
         micRestartWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
+    @MainActor
     private func restartMicCapture() {
         guard isRecording, !isRestartingMicCapture else { return }
         isRestartingMicCapture = true
-        defer { isRestartingMicCapture = false }
         if micCapturePolicy == .bluetooth {
             micReadyLock.lock()
             bluetoothRestartCount += 1
@@ -474,10 +517,14 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
 
         teardownMicCapture()
 
-        do {
-            try startMicCapture()
-        } catch {
-            print("AudioRecorder: mic restart failed after config change: \(error)")
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.isRestartingMicCapture = false }
+            do {
+                try await self.startMicCapture()
+            } catch {
+                print("AudioRecorder: mic restart failed after config change: \(error)")
+            }
         }
     }
 
@@ -487,8 +534,21 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         bluetoothStartupValidationWorkItem?.cancel()
         bluetoothStartupValidationWorkItem = nil
         isRestartingMicCapture = false
-        teardownMicCapture()
+        micCaptureOutput?.setSampleBufferDelegate(nil, queue: nil)
+        if let session = micCaptureSession {
+            await stopCaptureSession(session)
+        }
+        clearMicReadyState()
         await drainPendingMicCaptureCallbacks()
+    }
+
+    private func stopCaptureSession(_ session: AVCaptureSession) async {
+        await withCheckedContinuation { continuation in
+            micSessionQueue.async {
+                session.stopRunning()
+                continuation.resume()
+            }
+        }
     }
 
     private func teardownMicCapture() {

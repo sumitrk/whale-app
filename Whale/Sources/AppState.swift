@@ -307,6 +307,9 @@ class AppState: ObservableObject {
             currentModelID = modelID
             currentMode = mode
             DiagnosticLog.log("[Recording] Starting \(mode == .paste ? "paste" : "markdown") capture with model \(modelID.rawValue).")
+            if mode == .paste {
+                RecordingIndicatorWindow.shared.show(recorder: recorder)
+            }
             try await recorder.startRecording(captureSystemAudio: mode == .markdown)
             if mode == .markdown {
                 isRecording = true
@@ -314,7 +317,6 @@ class AppState: ObservableObject {
                 recordingStartedAt = Date()
                 playSound("Blow")
             } else {
-                RecordingIndicatorWindow.shared.show(recorder: recorder)
                 if stopPTTAfterStart {
                     stopPTTAfterStart = false
                     await stopRecording()
@@ -326,6 +328,7 @@ class AppState: ObservableObject {
                 isPTTArming = false
                 stopPTTAfterStart = false
             }
+            RecordingIndicatorWindow.shared.hide()
             status = .error(error.localizedDescription)
         }
     }
@@ -506,6 +509,7 @@ class AppState: ObservableObject {
         defer { RecordingIndicatorWindow.shared.hide() }
 
         AppRuntimeInfo.migrateSandboxDataIfNeeded()
+        recorder.prepareMicrophoneCapture()
 
         if AppRuntimeInfo.current.shouldResetParakeetCacheOnLaunch {
             do {
