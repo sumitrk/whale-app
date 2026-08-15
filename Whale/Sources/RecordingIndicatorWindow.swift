@@ -67,7 +67,7 @@ final class RecordingIndicatorWindow: NSPanel {
         guard contentView != nil else { return }
 
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.4
+            context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             self.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
@@ -116,7 +116,7 @@ final class RecordingIndicatorWindow: NSPanel {
         alphaValue = 0
         orderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.4
+            context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             self.animator().alphaValue = 1
         }
