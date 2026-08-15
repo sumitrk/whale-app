@@ -49,7 +49,7 @@ final class RecordingIndicatorWindow: NSPanel {
         setContentSize(host.frame.size)
 
         positionNearCursor()
-        orderFront(nil)
+        fadeIn()
     }
 
     func showProcessing() {
@@ -60,13 +60,23 @@ final class RecordingIndicatorWindow: NSPanel {
         setContentSize(host.frame.size)
 
         positionNearMouse()
-        orderFront(nil)
+        fadeIn()
     }
 
     func hide() {
-        orderOut(nil)
-        // Clear the hosting view to stop the timer when hidden.
-        contentView = nil
+        guard contentView != nil else { return }
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.4
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            self.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            guard let self else { return }
+            self.orderOut(nil)
+            // Clear the hosting view to stop the timer when hidden.
+            self.contentView = nil
+            self.alphaValue = 1
+        })
     }
 
     /// Show a brief paste/accessibility nudge near the cursor.
@@ -100,6 +110,16 @@ final class RecordingIndicatorWindow: NSPanel {
     private func positionNearMouse() {
         let mouse = NSEvent.mouseLocation
         clampAndSet(mouse)
+    }
+
+    private func fadeIn() {
+        alphaValue = 0
+        orderFront(nil)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.4
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            self.animator().alphaValue = 1
+        }
     }
 
     /// Lightweight AX query for the focused text element's frame.
@@ -186,16 +206,12 @@ private struct RecordingIndicatorView: View {
     @ObservedObject var recorder: AudioRecorder
 
     private let barCount = 5
-    private let centerBar = 2
     private let minH: CGFloat = 3
     private let maxH: CGFloat = 20
 
     @State private var heights: [CGFloat] = Array(repeating: 3, count: 5)
-    @State private var appeared = false
 
     private let timer = Timer.publish(every: 0.07, on: .main, in: .common).autoconnect()
-
-    private var micActive: Bool { recorder.isMicActive }
 
     var body: some View {
         HStack(alignment: .center, spacing: 3) {
@@ -203,20 +219,14 @@ private struct RecordingIndicatorView: View {
                 Capsule()
                     .fill(Color.white.opacity(0.9))
                     .frame(width: 3, height: heights[i])
-                    .opacity(micActive || i == centerBar ? 1 : 0)
                     .animation(.easeOut(duration: 0.12), value: heights[i])
-                    .animation(.easeOut(duration: 0.25), value: micActive)
             }
         }
-        .frame(width: micActive ? 36 : 3, height: 18)
+        .frame(width: 36, height: 18)
         .clipped()
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.72)))
-        .animation(.easeOut(duration: 0.25), value: micActive)
-        .scaleEffect(appeared ? 1 : 0.8)
-        .animation(.easeIn(duration: 0.1), value: appeared)
-        .onAppear { appeared = true }
         .onReceive(timer) { _ in
             let level = recorder.micLevel
             guard level > 0.02 else {
