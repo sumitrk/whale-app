@@ -224,7 +224,7 @@ private struct ModelStep: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task { await syncModelState() }
+        .task { syncModelState() }
         .onChange(of: modelStore.installStates) { _, _ in
             hasModel = modelStore.isReady(for: settings.selectedBuiltInModelID)
         }
@@ -233,8 +233,7 @@ private struct ModelStep: View {
         }
     }
 
-    private func syncModelState() async {
-        await modelStore.refreshNow()
+    private func syncModelState() {
         hasModel = modelStore.isReady(for: settings.selectedBuiltInModelID)
     }
 }

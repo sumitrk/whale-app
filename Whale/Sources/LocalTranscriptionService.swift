@@ -419,6 +419,7 @@ final class TranscriptionModelStore: ObservableObject {
 
 protocol BuiltInTranscriptionBackend: Sendable {
     func isInstalled(modelID: BuiltInModelID) async throws -> Bool
+    func prepare(modelID: BuiltInModelID) async throws
     func install(
         modelID: BuiltInModelID,
         progressHandler: ModelInstallProgressHandler?
@@ -437,6 +438,10 @@ protocol BuiltInTranscriptionBackend: Sendable {
 }
 
 extension BuiltInTranscriptionBackend {
+    func prepare(modelID: BuiltInModelID) async throws {
+        throw LocalTranscriptionError.unsupportedModel(modelID)
+    }
+
     func connectLocalModel(
         modelID: BuiltInModelID,
         folderURL _: URL,
@@ -464,6 +469,10 @@ actor LocalTranscriptionService {
 
     func isModelInstalled(_ modelID: BuiltInModelID) async throws -> Bool {
         try await backend(for: modelID).isInstalled(modelID: modelID)
+    }
+
+    func prepareModel(_ modelID: BuiltInModelID) async throws {
+        try await backend(for: modelID).prepare(modelID: modelID)
     }
 
     func installModel(
@@ -619,18 +628,12 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
             return false
         }
 
-        do {
-            try await runtime.validateModels(at: context.modelDirectory)
-            Self.log("Validated model files at \(context.modelDirectory.path)")
-            return true
-        } catch {
-            Self.log("Validation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
-            throw Self.wrapError(
-                error,
-                step: .validatingFiles,
-                modelDirectory: context.modelDirectory.path
-            )
-        }
+        Self.log("Found model files at \(context.modelDirectory.path)")
+        return true
+    }
+
+    func prepare(modelID: BuiltInModelID) async throws {
+        try await ensureReady(modelID: modelID)
     }
 
     func install(
@@ -782,17 +785,6 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         }
 
         do {
-            try await runtime.validateModels(at: context.modelDirectory)
-        } catch {
-            Self.log("Validation failed while preparing runtime at \(context.modelDirectory.path): \(error.localizedDescription)")
-            throw Self.wrapError(
-                error,
-                step: .validatingFiles,
-                modelDirectory: context.modelDirectory.path
-            )
-        }
-
-        do {
             manager = try await runtime.prepareManager(at: context.modelDirectory)
             loadedModelDirectory = context.modelDirectory
         } catch {
@@ -876,6 +868,10 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
             modelURL: modelURL
         )
         return true
+    }
+
+    func prepare(modelID: BuiltInModelID) async throws {
+        _ = try await ensureReady(modelID: modelID)
     }
 
     func install(

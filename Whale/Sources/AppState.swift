@@ -56,6 +56,7 @@ class AppState: ObservableObject {
     private var currentModelID: BuiltInModelID = .parakeetEnglishV2
     private var isPTTArming = false
     private var stopPTTAfterStart = false
+    private var isStartingRecording = false
     private var processingTask: Task<PipelineResult, Error>?
 
     init(
@@ -163,6 +164,19 @@ class AppState: ObservableObject {
 
     var isReady: Bool { status == .ready }
 
+    private var isBusy: Bool {
+        if isRecording || isPTTArming || isStartingRecording || processingTask != nil {
+            return true
+        }
+
+        switch status {
+        case .starting, .recording, .transcribing, .processing:
+            return true
+        case .ready, .error:
+            return false
+        }
+    }
+
     var statusLabel: String {
         switch status {
         case .starting:      return "Preparing transcription…"
@@ -190,7 +204,7 @@ class AppState: ObservableObject {
                 self?.toggleMarkdown()
             }
             pttPressAction = { [weak self] in
-                guard let self, !self.isRecording, !self.isPTTArming else { return }
+                guard let self, !self.isBusy else { return }
                 Task { await self.startRecording(mode: .paste) }
             }
         } else {
@@ -198,7 +212,7 @@ class AppState: ObservableObject {
                 self?.toggleMarkdown()
             }
             pttPressAction = { [weak self] in
-                guard let self, !self.isRecording, !self.isPTTArming else { return }
+                guard let self, !self.isBusy else { return }
                 self.accessibility.refresh()
                 Task { await self.startRecording(mode: .paste) }
             }
@@ -242,7 +256,7 @@ class AppState: ObservableObject {
     }
 
     func startClipboardOnlyDictation() {
-        guard !isRecording, !isPTTArming else { return }
+        guard !isBusy else { return }
         accessibility.refresh()
         Task { await startRecording(mode: .paste) }
     }
@@ -252,7 +266,7 @@ class AppState: ObservableObject {
     func toggleMarkdown() {
         if isRecording && currentMode == .markdown {
             Task { await stopRecording() }
-        } else if !isRecording {
+        } else if !isBusy {
             Task { await startRecording(mode: .markdown) }
         }
         // ignore ⌘⇧T while in PTT mode
@@ -261,6 +275,11 @@ class AppState: ObservableObject {
     // MARK: - Recording core
 
     fileprivate func startRecording(mode: RecordingMode) async {
+        guard !isBusy else { return }
+
+        isStartingRecording = true
+        defer { isStartingRecording = false }
+
         let isDictation = mode == .paste
         if isDictation {
             isPTTArming = true
@@ -268,8 +287,6 @@ class AppState: ObservableObject {
             recordingStartedAt = nil
         }
 
-        processingTask?.cancel()
-        processingTask = nil
         lastProcessingWarnings = []
         if status != .starting {
             status = .ready
@@ -348,7 +365,7 @@ class AppState: ObservableObject {
             if mode == .markdown {
                 status = cleanupSettings.enabled ? .processing("Processing…") : .transcribing
             } else {
-                status = .ready
+                status = .transcribing
             }
 
             let task = Task.detached(priority: .userInitiated) {
@@ -409,10 +426,16 @@ class AppState: ObservableObject {
 
             case .paste:
                 status = .ready
+                RecordingIndicatorWindow.shared.hide()
+                guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    DiagnosticLog.log("[Recording] Empty transcript; skipped clipboard insertion.")
+                    return
+                }
                 TextInsertionManager.insertOrCopy(transcript)
                 playSound("Bottle")
 
             case .markdown:
+                RecordingIndicatorWindow.shared.hide()
                 let duration = Int(Date().timeIntervalSince(startedAt) / 60)
                 let artifact = TranscriptArtifactWriter.Document(
                     startedAt: startedAt,
@@ -433,14 +456,17 @@ class AppState: ObservableObject {
 
         } catch is CancellationError {
             processingTask = nil
+            RecordingIndicatorWindow.shared.hide()
             status = .ready
             print("Processing cancelled")
             DiagnosticLog.log("[Recording] Processing cancelled.")
         } catch RecorderError.noAudioCaptured where mode == .paste {
+            RecordingIndicatorWindow.shared.hide()
             status = .ready
             DiagnosticLog.log("[Recording] No audio was captured in paste mode.")
         } catch {
             processingTask = nil
+            RecordingIndicatorWindow.shared.hide()
             isRecording = false
             status = .error(error.localizedDescription)
             print("Recording error: \(error.localizedDescription)")
@@ -476,6 +502,9 @@ class AppState: ObservableObject {
     // MARK: - Startup
 
     private func prepareApp() async {
+        RecordingIndicatorWindow.shared.showProcessing()
+        defer { RecordingIndicatorWindow.shared.hide() }
+
         AppRuntimeInfo.migrateSandboxDataIfNeeded()
 
         if AppRuntimeInfo.current.shouldResetParakeetCacheOnLaunch {
@@ -487,7 +516,20 @@ class AppState: ObservableObject {
             }
         }
 
-        await TranscriptionModelStore.shared.refreshNow()
+        let modelStore = TranscriptionModelStore.shared
+        await modelStore.refreshNow()
+
+        let modelID = settings.selectedBuiltInModelID
+        if modelStore.isReady(for: modelID) {
+            do {
+                try await transcriber.prepareModel(modelID)
+            } catch {
+                DiagnosticLog.log("[Startup] Failed to prepare \(modelID.rawValue): \(error.localizedDescription)")
+                status = .error(error.localizedDescription)
+                return
+            }
+        }
+
         status = .ready
     }
 }

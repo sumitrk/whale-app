@@ -52,15 +52,14 @@ final class RecordingIndicatorWindow: NSPanel {
         orderFront(nil)
     }
 
-    func showProcessing(message: String) {
-        let view = ProcessingIndicatorView(message: message)
+    func showProcessing() {
+        let view = ProcessingIndicatorView()
         let host = NSHostingView(rootView: view)
-        let size = host.fittingSize
-        host.frame = NSRect(origin: .zero, size: size)
+        host.frame = NSRect(x: 0, y: 0, width: 48, height: 36)
         contentView = host
-        setContentSize(size)
+        setContentSize(host.frame.size)
 
-        positionNearCursor()
+        positionNearMouse()
         orderFront(nil)
     }
 
@@ -94,7 +93,11 @@ final class RecordingIndicatorWindow: NSPanel {
             clampAndSet(NSPoint(x: inputRect.minX, y: inputRect.maxY + 6))
             return
         }
-        // 2. Fall back to just above the cursor.
+        // 2. Fall back to just above the mouse pointer.
+        positionNearMouse()
+    }
+
+    private func positionNearMouse() {
         let mouse = NSEvent.mouseLocation
         clampAndSet(NSPoint(x: mouse.x - frame.width / 2, y: mouse.y + 18))
     }
@@ -153,21 +156,26 @@ final class RecordingIndicatorWindow: NSPanel {
 }
 
 private struct ProcessingIndicatorView: View {
-    let message: String
+    @State private var activeDot = 0
+    private let timer = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.small)
-                .tint(.white)
-            Text(message)
-                .foregroundStyle(.white)
-                .lineLimit(1)
+        HStack(alignment: .center, spacing: 3) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 3, height: 3)
+                    .opacity(index == activeDot ? 1 : 0.5)
+            }
         }
-        .font(.system(size: 12, weight: .medium))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .frame(width: 36, height: 18)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.72)))
+        .animation(.easeInOut(duration: 0.15), value: activeDot)
+        .onReceive(timer) { _ in
+            activeDot = (activeDot + 1) % 3
+        }
     }
 }
 
