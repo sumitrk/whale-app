@@ -99,7 +99,7 @@ final class RecordingIndicatorWindow: NSPanel {
 
     private func positionNearMouse() {
         let mouse = NSEvent.mouseLocation
-        clampAndSet(NSPoint(x: mouse.x - frame.width / 2, y: mouse.y + 18))
+        clampAndSet(mouse)
     }
 
     /// Lightweight AX query for the focused text element's frame.
@@ -164,7 +164,7 @@ private struct ProcessingIndicatorView: View {
             ForEach(0..<3, id: \.self) { index in
                 Circle()
                     .fill(Color.white)
-                    .frame(width: 3, height: 3)
+                    .frame(width: 6, height: 6)
                     .opacity(index == activeDot ? 1 : 0.5)
             }
         }
