@@ -16,7 +16,7 @@ enum LocalLLMError: LocalizedError {
         case .insufficientMemory:
             return "Not enough memory available for local AI cleanup."
         case .modelNotInstalled(let title):
-            return "\(title) is not installed yet. Install it in Settings > Post-Processing before using AI cleanup."
+            return "\(title) is not installed yet. Install it in Settings > AI Cleanup before using AI cleanup."
         case .emptyResponse:
             return "The local cleanup model returned an empty response."
         case .timedOut:

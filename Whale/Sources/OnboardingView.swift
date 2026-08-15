@@ -199,32 +199,39 @@ private struct ModelStep: View {
     @ObservedObject private var settings = SettingsStore.shared
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Choose and install a model")
-                        .font(.title2.bold())
-                    Text("Models are stored on your Mac. Install the one you want to use, then continue.")
-                        .foregroundStyle(.secondary)
-                        .font(.callout)
-                }
-                .padding(.horizontal, 28)
-                .padding(.top, 28)
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Choose and install a model")
+                    .font(.title2.bold())
+                Text("Models are stored on your Mac. Install the one you want to use, then continue.")
+                    .foregroundStyle(.secondary)
+                    .font(.callout)
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 28)
+            .padding(.bottom, 8)
 
-                TranscriptionModelGroupsView(horizontalPadding: 28, contentPadding: 16)
+            Form {
+                TranscriptionActiveModelSection()
+                TranscriptionModelManagementSections()
 
                 if modelStore.isReady(for: settings.selectedBuiltInModelID) {
-                    Text("Selected model installed. Continue to configure your shortcut and test dictation.")
-                        .font(.callout)
+                    Section {
+                        Label(
+                            "Selected model installed. Continue to configure your shortcut and test dictation.",
+                            systemImage: "checkmark.circle.fill"
+                        )
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 28)
+                    }
                 }
             }
-            .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .formStyle(.grouped)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task { syncModelState() }
+        .task {
+            await modelStore.refreshNow()
+            syncModelState()
+        }
         .onChange(of: modelStore.installStates) { _, _ in
             hasModel = modelStore.isReady(for: settings.selectedBuiltInModelID)
         }
@@ -309,11 +316,11 @@ private struct TryItStep: View {
                     }
                 }
 
-                // ── Toggle Record ─────────────────────────────────────────
+                // ── Transcript Mode ───────────────────────────────────────
                 OnboardingCard {
                     VStack(alignment: .leading, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Toggle Recording")
+                            Text("Transcript Mode")
                                 .fontWeight(.semibold)
                             Text("Press once to start, press again to stop and save as markdown.")
                                 .font(.caption).foregroundStyle(.secondary)
@@ -364,7 +371,7 @@ private struct TryItStep: View {
                             Text("Where to install it")
                                 .foregroundStyle(.secondary)
                                 .font(.callout)
-                            Text("Settings → Post-Processing → Local AI Model")
+                            Text("Settings > AI Cleanup")
                                 .font(.callout)
                         }
                     }

@@ -15,15 +15,16 @@ struct PermissionsSettingsView: View {
                             .font(.callout)
                     } else {
                         HStack(spacing: 12) {
+                            Text("Not Granted")
+                                .foregroundStyle(.secondary)
+
                             Button("Open in System Settings") {
                                 accessibility.openSystemAccessibilitySettingsAndWatch()
                             }
-                            .buttonStyle(.borderless)
 
                             Button("Re-check") {
                                 accessibility.refresh()
                             }
-                            .buttonStyle(.borderless)
                         }
                     }
                 } label: {
@@ -99,9 +100,11 @@ private struct PermissionRow: View {
                     .foregroundStyle(.green)
                     .font(.callout)
             } else {
-                Button("Grant Access →", action: action)
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.blue)
+                HStack(spacing: 12) {
+                    Text("Not Granted")
+                        .foregroundStyle(.secondary)
+                    Button("Grant Access", action: action)
+                }
             }
         } label: {
             Label {

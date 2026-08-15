@@ -52,10 +52,11 @@ struct TranscribeMeetingApp: App {
         .menuBarExtraStyle(.menu)
 
         Settings {
-            SettingsView()
+            SettingsView(updater: updaterController?.updater)
                 .environmentObject(appState)
                 .environmentObject(accessibilityController)
                 .environmentObject(settingsCoordinator)
         }
+        .windowResizability(.contentSize)
     }
 }

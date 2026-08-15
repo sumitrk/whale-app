@@ -61,6 +61,51 @@ final class TranscriptionModelTests: XCTestCase {
         )
     }
 
+    func testModelRowModelCoversEveryInstallState() {
+        let model = BuiltInModelID.parakeetEnglishV2.descriptor
+
+        let checking = TranscriptionModelRowModel(
+            model: model,
+            installState: .checking,
+            isSelected: false
+        )
+        XCTAssertTrue(checking.showsProgress)
+        XCTAssertFalse(checking.isReady)
+
+        let notInstalled = TranscriptionModelRowModel(
+            model: model,
+            installState: .notInstalled,
+            isSelected: false
+        )
+        XCTAssertEqual(notInstalled.primaryActionTitle, "Install")
+        XCTAssertFalse(notInstalled.showsProgress)
+
+        let downloading = TranscriptionModelRowModel(
+            model: model,
+            installState: .downloading(progress: 0.42, phase: "Downloading"),
+            isSelected: false
+        )
+        XCTAssertEqual(downloading.progress, 0.42)
+        XCTAssertEqual(downloading.statusText, "Downloading")
+
+        let ready = TranscriptionModelRowModel(
+            model: model,
+            installState: .ready,
+            isSelected: true
+        )
+        XCTAssertTrue(ready.isReady)
+        XCTAssertTrue(ready.statusText.contains("Active and ready"))
+        XCTAssertEqual(ready.resetActionTitle, "Reset Cache")
+
+        let failed = TranscriptionModelRowModel(
+            model: model,
+            installState: .failed("Download failed"),
+            isSelected: false
+        )
+        XCTAssertEqual(failed.primaryActionTitle, "Retry")
+        XCTAssertEqual(failed.errorText, "Download failed")
+    }
+
     func testCoordinatorRoutesByModelGroup() async throws {
         let parakeet = RecordingBackend()
         let whisper = RecordingBackend()

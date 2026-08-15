@@ -47,9 +47,9 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
     var installationPrompt: String {
         switch provisioning {
         case .download:
-            return "\(title) is not installed. Open Settings > Model and install it."
+            return "\(title) is not installed. Open Settings > Transcription and install it."
         case .localFolder:
-            return "\(title) is not configured yet. Open Settings > Model, choose a WhisperKit/Core ML folder, and try again."
+            return "\(title) is not configured yet. Open Settings > Transcription, choose a WhisperKit/Core ML folder, and try again."
         }
     }
 
@@ -127,6 +127,78 @@ enum BuiltInModelCatalog {
 
     static func models(in group: BuiltInModelGroup) -> [BuiltInModelDescriptor] {
         allModels.filter { $0.group == group }
+    }
+}
+
+struct TranscriptionModelRowModel: Equatable {
+    let statusText: String
+    let primaryActionTitle: String?
+    let progress: Double?
+    let showsProgress: Bool
+    let errorText: String?
+    let resetActionTitle: String?
+    let isReady: Bool
+
+    init(
+        model: BuiltInModelDescriptor,
+        installState: NativeModelInstallState,
+        isSelected: Bool
+    ) {
+        switch installState {
+        case .checking:
+            statusText = "Checking the local model cache…"
+            primaryActionTitle = nil
+            progress = nil
+            showsProgress = true
+            errorText = nil
+            resetActionTitle = nil
+            isReady = false
+
+        case .notInstalled:
+            statusText = "Install or validate this model before selecting it for transcription."
+            primaryActionTitle = model.actionTitle
+            progress = nil
+            showsProgress = false
+            errorText = nil
+            resetActionTitle = nil
+            isReady = false
+
+        case .downloading(let progress, let phase):
+            statusText = phase
+            primaryActionTitle = nil
+            self.progress = progress
+            showsProgress = true
+            errorText = nil
+            resetActionTitle = nil
+            isReady = false
+
+        case .ready:
+            switch model.provisioning {
+            case .download:
+                statusText = isSelected
+                    ? "Active and ready. New recordings will use this model."
+                    : "Installed and ready."
+            case .localFolder:
+                statusText = isSelected
+                    ? "Active and ready. New recordings will use this local Whisper model."
+                    : "Validated and ready."
+            }
+            primaryActionTitle = model.changeActionTitle
+            progress = nil
+            showsProgress = false
+            errorText = nil
+            resetActionTitle = model.resetActionTitle
+            isReady = true
+
+        case .failed(let message):
+            statusText = "This model needs attention."
+            primaryActionTitle = model.retryActionTitle
+            progress = nil
+            showsProgress = false
+            errorText = message
+            resetActionTitle = model.resetActionTitle
+            isReady = false
+        }
     }
 }
 
@@ -1152,7 +1224,7 @@ enum LocalTranscriptionError: LocalizedError {
             Reason:
             \(reason)
 
-            Use Reset Cache in Settings > Model, then install Parakeet again.
+            Use Reset Cache in Settings > Transcription, then install Parakeet again.
             """
         case .invalidWhisperModelFolder(let descriptor, let folderPath, let issues):
             let bulletList = issues.map { "• \($0)" }.joined(separator: "\n")

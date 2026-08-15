@@ -21,7 +21,7 @@ class SettingsStore: ObservableObject {
     }
     var pttKeyLabel: String { keyLabel(keyCode: pttKeyCode, modifiers: pttModifiers) }
 
-    // MARK: - Shortcuts: Toggle Record
+    // MARK: - Shortcuts: Transcript Mode
 
     /// Toggle key code (default: 17 = T).
     @Published var toggleKeyCode: Int {
@@ -33,7 +33,7 @@ class SettingsStore: ObservableObject {
     }
     var toggleKeyLabel: String { keyLabel(keyCode: toggleKeyCode, modifiers: toggleModifiers) }
 
-    // MARK: - Toggle Record
+    // MARK: - Transcript Mode
 
     /// Folder where toggle-record transcripts (.md) are saved.
     @Published var transcriptFolderPath: String {
@@ -87,7 +87,7 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(builtInModelLocalBookmarks, forKey: Keys.builtInModelLocalBookmarks) }
     }
 
-    // MARK: - Post-Processing
+    // MARK: - AI Cleanup
 
     @Published var postProcessingEnabled: Bool {
         didSet { ud.set(postProcessingEnabled, forKey: Keys.postProcessingEnabled) }

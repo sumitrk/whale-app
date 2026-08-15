@@ -44,23 +44,19 @@ struct ShortcutsSettingsView: View {
         Form {
             // MARK: Push-to-Talk
             Section {
-                LabeledContent("Key") {
-                    Picker("", selection: $pttPreset) {
-                        ForEach(PTTPreset.allCases) { preset in
-                            Text(preset.rawValue).tag(preset)
-                        }
+                Picker("Key", selection: $pttPreset) {
+                    ForEach(PTTPreset.allCases) { preset in
+                        Text(preset.rawValue).tag(preset)
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .fixedSize()
-                    .onChange(of: pttPreset) { _, preset in
-                        if let kc = preset.keyCode {
-                            store.pttKeyCode = kc
-                            store.pttModifiers = 0
-                        } else {
-                            // Custom selected — auto-start the recorder
-                            pttRecorderAutoStart = true
-                        }
+                }
+                .pickerStyle(.menu)
+                .onChange(of: pttPreset) { _, preset in
+                    if let kc = preset.keyCode {
+                        store.pttKeyCode = kc
+                        store.pttModifiers = 0
+                    } else {
+                        // Custom selected — auto-start the recorder
+                        pttRecorderAutoStart = true
                     }
                 }
 
@@ -80,7 +76,7 @@ struct ShortcutsSettingsView: View {
                 Text("Hold \(store.pttKeyLabel) to record. Release to transcribe and paste.")
             }
 
-            // MARK: Toggle Record
+            // MARK: Transcript Mode
             Section {
                 LabeledContent("Key") {
                     KeyRecorderView(
@@ -99,12 +95,13 @@ struct ShortcutsSettingsView: View {
                             Image(systemName: "folder")
                         }
                         .buttonStyle(.borderless)
+                        .accessibilityLabel("Choose transcript folder")
                     }
                 }
             } header: {
-                Text("Toggle Record  (saves transcript as markdown)")
+                Text("Transcript Mode")
             } footer: {
-                Text("Press \(store.toggleKeyLabel) to start, press again to stop and save.")
+                Text("Press \(store.toggleKeyLabel) to start, press again to stop and save the transcript as Markdown.")
             }
         }
         .formStyle(.grouped)
@@ -137,12 +134,12 @@ struct KeyBadge: View {
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(Color(NSColor.controlBackgroundColor))
+                    .fill(.quaternary)
                     .shadow(color: .black.opacity(0.18), radius: 0, x: 0, y: 1)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 5)
-                    .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
             )
     }
 }

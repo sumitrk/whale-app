@@ -21,36 +21,27 @@ struct PostProcessingSettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Post-processing")
-                        .font(.title3.bold())
-                    Text("Clean up transcriptions before Whale inserts or saves them.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
+        Form {
+            settingsSection
 
-                settingsSection
-
-                if LocalLLMService.isSupported {
-                    localModelSection
-                } else {
-                    unsupportedSection
-                }
-
-                previewSection
+            if LocalLLMService.isSupported {
+                localModelSection
+            } else {
+                unsupportedSection
             }
-            .padding(18)
+
+            previewSection
         }
+        .formStyle(.grouped)
         .onAppear {
             modelStore.refresh()
         }
     }
 
     private var settingsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Section("AI Cleanup") {
             Toggle("Clean up transcriptions", isOn: $store.postProcessingEnabled)
+                .toggleStyle(.switch)
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -75,43 +66,31 @@ struct PostProcessingSettingsView: View {
             }
             .disabled(!store.postProcessingEnabled)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(NSColor.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder
     private var localModelSection: some View {
         if store.postProcessingEnabled {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Local AI Model")
-                    .font(.headline)
-
+            Section("Cleanup Model") {
                 ForEach(LocalLLMModelCatalog.allModels) { model in
-                    LocalLLMModelCard(model: model)
+                    LocalLLMModelRow(model: model)
                 }
             }
         }
     }
 
     private var unsupportedSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Section("Cleanup Model") {
             Text("Local AI cleanup requires Apple Silicon.")
                 .font(.callout.weight(.medium))
-            Text("On Intel Macs, Whale will skip post-processing and keep the raw transcript.")
+            Text("On Intel Macs, Whale will skip AI Cleanup and keep the raw transcript.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(NSColor.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var previewSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent transcription previews")
-                .font(.headline)
-
+        Section("Recent Transcription Previews") {
             if appState.recentTranscriptionPreviews.isEmpty {
                 Text("No transcriptions yet.")
                     .font(.callout)
@@ -124,9 +103,6 @@ struct PostProcessingSettingsView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(NSColor.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func previewEntry(_ entry: TranscriptionPreviewEntry, index: Int) -> some View {
@@ -152,8 +128,7 @@ struct PostProcessingSettingsView: View {
                     .textSelection(.enabled)
             }
         }
-        .padding(12)
-        .background(Color(NSColor.windowBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 6)
     }
 
     private func previewColumn(title: String, text: String) -> some View {
@@ -173,7 +148,7 @@ struct PostProcessingSettingsView: View {
     }
 }
 
-private struct LocalLLMModelCard: View {
+private struct LocalLLMModelRow: View {
     @ObservedObject private var modelStore = LocalLLMModelStore.shared
     @ObservedObject private var settings = SettingsStore.shared
 
@@ -194,28 +169,14 @@ private struct LocalLLMModelCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
-                Button {
-                    guard canSelect else { return }
-                    settings.selectedLocalLLMModelID = model.id
-                } label: {
-                    Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                        .font(.title3)
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .disabled(!canSelect)
-
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Text(model.title)
                             .font(.headline)
-                        if model.recommended {
-                            Text("Recommended")
+                        if isSelected && canSelect {
+                            Label("Active", systemImage: "checkmark.circle.fill")
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(Color.accentColor)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                                .foregroundStyle(.secondary)
                         }
                     }
 
@@ -231,8 +192,7 @@ private struct LocalLLMModelCard: View {
 
             statusView
         }
-        .padding(16)
-        .background(Color(NSColor.windowBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, 6)
     }
 
     @ViewBuilder
