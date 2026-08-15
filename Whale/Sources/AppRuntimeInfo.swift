@@ -70,7 +70,7 @@ struct AppRuntimeInfo: Equatable, Sendable {
     /// only acts when the container exists and the destination is empty/missing.
     static func migrateSandboxDataIfNeeded() {
         let fm = FileManager.default
-        let bundleID = "com.sumitrk.transcribe-meeting"
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.sumitrk.transcribe-meeting"
         let containerWhale = fm.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Containers/\(bundleID)/Data/Library/Application Support/Whale", isDirectory: true)
 

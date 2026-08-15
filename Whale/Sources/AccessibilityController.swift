@@ -115,6 +115,9 @@ final class AccessibilityController: ObservableObject {
     }
 
     func openSystemAccessibilitySettingsAndWatch() {
+        // Re-register the current signed app after a TCC reset so macOS adds
+        // it back to the Accessibility list before opening System Settings.
+        requestPrompt()
         NSWorkspace.shared.open(
             URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         )

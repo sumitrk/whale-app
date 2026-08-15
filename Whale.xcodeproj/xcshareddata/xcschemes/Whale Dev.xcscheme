@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "2600"
+   LastUpgradeVersion = "2650"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "92FC86E1A1F73D62CBA0B22D"
-               BuildableName = "Whale.app"
+               BuildableName = "Whale Dev.app"
                BlueprintName = "Whale"
                ReferencedContainer = "container:Whale.xcodeproj">
             </BuildableReference>
@@ -72,7 +72,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "92FC86E1A1F73D62CBA0B22D"
-            BuildableName = "Whale.app"
+            BuildableName = "Whale Dev.app"
             BlueprintName = "Whale"
             ReferencedContainer = "container:Whale.xcodeproj">
          </BuildableReference>
@@ -89,7 +89,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "92FC86E1A1F73D62CBA0B22D"
-            BuildableName = "Whale.app"
+            BuildableName = "Whale Dev.app"
             BlueprintName = "Whale"
             ReferencedContainer = "container:Whale.xcodeproj">
          </BuildableReference>
