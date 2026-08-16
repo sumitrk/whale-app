@@ -101,3 +101,13 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Residual risks / skipped work:** The settings UI still does not expose a cancel button; cancellation is centralized for callers and future UI use. Live FluidAudio/Whisper downloads and hardware/runtime behavior were not changed.
 - **Result:** R-TRN-01 is verified.
 - **Next slice:** R-CAP-01.
+
+## 2026-08-16T16:43:23Z — R-CAP-01 verified
+
+- **Branch:** `step-13-r-cap-01`
+- **What changed:** Consolidated toggle, PTT, and AI Action monitor tokens in one `HotkeyManager` collection. `HotkeyRegistrationMode` now owns the full/local/stopped global-vs-local policy, and each installer receives that mode instead of duplicated boolean flags. Fn/Globe `flagsChanged` handling and regular keyDown/keyUp PTT handling remain intact; rebuilding still stops the previous set first.
+- **How to test:** Focused `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' -only-testing:WhaleTests/HotkeyManagerTests CODE_SIGNING_ALLOWED=NO` — passed. Full `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO` — passed. `git diff --check` — passed. Optional manual smoke test: run Whale Dev, rebuild settings repeatedly, verify toggle, Fn/Globe PTT, regular-key PTT, and AI Action still press/release/cancel once each. A signing-enabled focused run compiled and linked but failed at final app signing because the test bundle was left unsigned in the local environment.
+- **Impact:** Hotkey ownership and cleanup now have one storage path, preventing stale monitor categories from being missed during rebuilds or stop. Full mode still registers global and local monitors; recovery mode remains local-only; stopped mode clears all monitors. User-facing shortcut behavior is unchanged.
+- **Residual risks / skipped work:** Tests cover the registration policy matrix but do not synthesize live AppKit keyboard events or exercise Accessibility/TCC hardware paths. No CGEventTap replacement or broader shortcut architecture was added.
+- **Result:** R-CAP-01 is verified.
+- **Next slice:** R-APP-01.
