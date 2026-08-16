@@ -205,6 +205,71 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(SettingsStore.shared.selectedBuiltInModelID, .whisperLargeV3Turbo)
     }
 
+    func testModelStoreSharesOperationLifecycleAcrossInstallResetAndConnect() async {
+        let backend = ModelOperationBackend()
+        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(service: service)
+
+        store.install(.parakeetEnglishV2)
+        await backend.waitUntilStarted(.install)
+        XCTAssertEqual(
+            store.installState(for: .parakeetEnglishV2),
+            .downloading(progress: 0.25, phase: "Downloading")
+        )
+        await backend.release(.install)
+        await waitForState(store, .parakeetEnglishV2, equals: .ready)
+
+        store.reset(.parakeetEnglishV2)
+        await backend.waitUntilStarted(.reset)
+        XCTAssertEqual(store.installState(for: .parakeetEnglishV2), .checking)
+        await backend.release(.reset)
+        await waitForState(store, .parakeetEnglishV2, equals: .notInstalled)
+
+        store.connectLocalModel(
+            .whisperLocalFolder,
+            folderURL: URL(fileURLWithPath: "/tmp/local-whisper-model", isDirectory: true)
+        )
+        await backend.waitUntilStarted(.connect)
+        XCTAssertEqual(
+            store.installState(for: .whisperLocalFolder),
+            .downloading(progress: 0.25, phase: "Downloading")
+        )
+        await backend.release(.connect)
+        await waitForState(store, .whisperLocalFolder, equals: .ready)
+    }
+
+    func testModelStoreCancellationIgnoresLateProgressAndCompletion() async {
+        let backend = ModelOperationBackend()
+        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(service: service)
+
+        store.install(.parakeetEnglishV2)
+        await backend.waitUntilStarted(.install)
+        store.cancel(.parakeetEnglishV2)
+        XCTAssertEqual(store.installState(for: .parakeetEnglishV2), .notInstalled)
+
+        await backend.emitProgress(.install)
+        await backend.release(.install)
+        await Task.yield()
+        await Task.yield()
+
+        XCTAssertEqual(store.installState(for: .parakeetEnglishV2), .notInstalled)
+    }
+
+    private func waitForState(
+        _ store: TranscriptionModelStore,
+        _ modelID: BuiltInModelID,
+        equals expected: NativeModelInstallState
+    ) async {
+        for _ in 0..<100 {
+            if store.installState(for: modelID) == expected {
+                return
+            }
+            await Task.yield()
+        }
+        XCTFail("Timed out waiting for \(modelID) to reach \(expected)")
+    }
+
     func testLocalWhisperPromptMentionsChoosingFolder() {
         let descriptor = BuiltInModelID.whisperLocalFolder.descriptor
 
@@ -447,6 +512,86 @@ final class TranscriptionModelTests: XCTestCase {
         if includeTokenizer {
             let tokenizer = folder.appendingPathComponent("tokenizer.json")
             try Data("{}".utf8).write(to: tokenizer)
+        }
+    }
+}
+
+actor ModelOperationBackend: BuiltInTranscriptionBackend {
+    enum Operation: Hashable {
+        case install
+        case reset
+        case connect
+    }
+
+    private var started: Set<Operation> = []
+    private var released: Set<Operation> = []
+    private var progressHandlers: [Operation: ModelInstallProgressHandler] = [:]
+
+    func waitUntilStarted(_ operation: Operation) async {
+        while !started.contains(operation) {
+            await Task.yield()
+        }
+    }
+
+    func release(_ operation: Operation) {
+        released.insert(operation)
+    }
+
+    func emitProgress(_ operation: Operation) {
+        progressHandlers[operation]?(ModelInstallProgress(fractionCompleted: 0.75, phase: "Late progress"))
+    }
+
+    func isInstalled(modelID _: BuiltInModelID) async throws -> Bool {
+        true
+    }
+
+    func prepare(modelID _: BuiltInModelID) async throws { }
+
+    func install(
+        modelID _: BuiltInModelID,
+        progressHandler: ModelInstallProgressHandler?
+    ) async throws {
+        try await waitForRelease(
+            .install,
+            progressHandler: progressHandler
+        )
+    }
+
+    func connectLocalModel(
+        modelID _: BuiltInModelID,
+        folderURL _: URL,
+        progressHandler: ModelInstallProgressHandler?
+    ) async throws {
+        try await waitForRelease(
+            .connect,
+            progressHandler: progressHandler
+        )
+    }
+
+    func transcribe(
+        modelID _: BuiltInModelID,
+        wavURL _: URL,
+        source _: AudioSource
+    ) async throws -> String {
+        "ok"
+    }
+
+    func resetModel(modelID _: BuiltInModelID) async throws {
+        try await waitForRelease(.reset, progressHandler: nil)
+    }
+
+    private func waitForRelease(
+        _ operation: Operation,
+        progressHandler: ModelInstallProgressHandler?
+    ) async throws {
+        started.insert(operation)
+        if let progressHandler {
+            progressHandlers[operation] = progressHandler
+            progressHandler(ModelInstallProgress(fractionCompleted: 0.25, phase: "Downloading"))
+        }
+
+        while !released.contains(operation) {
+            try await Task.sleep(nanoseconds: 1_000_000)
         }
     }
 }

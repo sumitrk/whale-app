@@ -269,6 +269,17 @@ enum ParakeetInstallStep: String, Sendable {
     }
 }
 
+private final class ModelOperationContext {
+    let id: UUID
+    let previousState: NativeModelInstallState
+    var task: Task<Void, Never>?
+
+    init(id: UUID, previousState: NativeModelInstallState) {
+        self.id = id
+        self.previousState = previousState
+    }
+}
+
 @MainActor
 final class TranscriptionModelStore: ObservableObject {
     static let shared = TranscriptionModelStore(service: .shared)
@@ -276,7 +287,9 @@ final class TranscriptionModelStore: ObservableObject {
     @Published private(set) var installStates: [BuiltInModelID: NativeModelInstallState]
 
     private let service: LocalTranscriptionService
-    private var installTasks: [BuiltInModelID: Task<Void, Never>] = [:]
+    private var activeOperations: [BuiltInModelID: ModelOperationContext] = [:]
+
+    private typealias ModelOperation = @Sendable (ModelInstallProgressHandler?) async throws -> Void
 
     init(service: LocalTranscriptionService) {
         self.service = service
@@ -309,7 +322,7 @@ final class TranscriptionModelStore: ObservableObject {
     }
 
     func refresh() {
-        guard installTasks.isEmpty else { return }
+        guard activeOperations.isEmpty else { return }
         Task { await refreshNow() }
     }
 
@@ -320,7 +333,7 @@ final class TranscriptionModelStore: ObservableObject {
     }
 
     func refresh(_ modelID: BuiltInModelID) async {
-        guard !isDownloading(modelID) else { return }
+        guard activeOperations[modelID] == nil else { return }
 
         setInstallState(.checking, for: modelID)
 
@@ -335,98 +348,77 @@ final class TranscriptionModelStore: ObservableObject {
     func install(_ modelID: BuiltInModelID) {
         guard !isDownloading(modelID) else { return }
 
-        installTasks[modelID]?.cancel()
-        setInstallState(.downloading(progress: nil, phase: "Preparing model download…"), for: modelID)
-
-        installTasks[modelID] = Task { [weak self] in
-            guard let self else { return }
-
-            defer {
-                Task { @MainActor [weak self] in
-                    self?.installTasks[modelID] = nil
-                }
-            }
-
-            do {
-                try await service.installModel(modelID) { progress in
-                    Task { @MainActor [weak self] in
-                        self?.setInstallState(
-                            .downloading(
-                                progress: progress.fractionCompleted,
-                                phase: progress.phase
-                            ),
-                            for: modelID
-                        )
-                    }
-                }
-
-                if !Task.isCancelled {
-                    await MainActor.run {
-                        self.setInstallState(.ready, for: modelID)
-                    }
-                }
-            } catch {
-                if !Task.isCancelled {
-                    await MainActor.run {
-                        self.setInstallState(.failed(error.localizedDescription), for: modelID)
-                    }
-                }
-            }
+        startModelOperation(
+            modelID,
+            initialState: .downloading(progress: nil, phase: "Preparing model download…"),
+            successState: .ready
+        ) { [service] progressHandler in
+            try await service.installModel(modelID, progressHandler: progressHandler)
         }
     }
 
     func reset(_ modelID: BuiltInModelID) {
         guard !isDownloading(modelID) else { return }
 
-        installTasks[modelID]?.cancel()
-        setInstallState(.checking, for: modelID)
-
-        installTasks[modelID] = Task { [weak self] in
-            guard let self else { return }
-
-            defer {
-                Task { @MainActor [weak self] in
-                    self?.installTasks[modelID] = nil
-                }
-            }
-
-            do {
-                try await service.resetModel(modelID)
-
-                if !Task.isCancelled {
-                    await MainActor.run {
-                        self.setInstallState(.notInstalled, for: modelID)
-                    }
-                }
-            } catch {
-                if !Task.isCancelled {
-                    await MainActor.run {
-                        self.setInstallState(.failed(error.localizedDescription), for: modelID)
-                    }
-                }
-            }
+        startModelOperation(
+            modelID,
+            initialState: .checking,
+            successState: .notInstalled
+        ) { [service] _ in
+            try await service.resetModel(modelID)
         }
     }
 
     func connectLocalModel(_ modelID: BuiltInModelID, folderURL: URL) {
         guard !isDownloading(modelID) else { return }
 
-        installTasks[modelID]?.cancel()
-        setInstallState(.downloading(progress: nil, phase: "Validating local model folder…"), for: modelID)
+        startModelOperation(
+            modelID,
+            initialState: .downloading(progress: nil, phase: "Validating local model folder…"),
+            successState: .ready
+        ) { [service] progressHandler in
+            try await service.connectLocalModel(
+                modelID,
+                folderURL: folderURL,
+                progressHandler: progressHandler
+            )
+        }
+    }
 
-        installTasks[modelID] = Task { [weak self] in
-            guard let self else { return }
+    func cancel(_ modelID: BuiltInModelID) {
+        cancelModelOperation(modelID)
+    }
 
+    private func startModelOperation(
+        _ modelID: BuiltInModelID,
+        initialState: NativeModelInstallState,
+        successState: NativeModelInstallState,
+        operation: @escaping ModelOperation
+    ) {
+        cancelModelOperation(modelID)
+
+        let context = ModelOperationContext(
+            id: UUID(),
+            previousState: installState(for: modelID)
+        )
+        activeOperations[modelID] = context
+        setInstallState(initialState, for: modelID)
+
+        let operationID = context.id
+        context.task = Task { [weak self] in
             defer {
                 Task { @MainActor [weak self] in
-                    self?.installTasks[modelID] = nil
+                    self?.finishModelOperation(modelID, operationID: operationID)
                 }
             }
 
             do {
-                try await service.connectLocalModel(modelID, folderURL: folderURL) { progress in
+                try await operation { [weak self] progress in
                     Task { @MainActor [weak self] in
-                        self?.setInstallState(
+                        guard let self, self.isCurrentModelOperation(modelID, operationID: operationID) else {
+                            return
+                        }
+                        self.setInstallState(
                             .downloading(
                                 progress: progress.fractionCompleted,
                                 phase: progress.phase
@@ -436,19 +428,57 @@ final class TranscriptionModelStore: ObservableObject {
                     }
                 }
 
-                if !Task.isCancelled {
-                    await MainActor.run {
-                        self.setInstallState(.ready, for: modelID)
-                    }
+                guard !Task.isCancelled else { return }
+                await MainActor.run { [weak self] in
+                    self?.completeModelOperation(
+                        modelID,
+                        operationID: operationID,
+                        state: successState
+                    )
                 }
             } catch {
-                if !Task.isCancelled {
-                    await MainActor.run {
-                        self.setInstallState(.failed(error.localizedDescription), for: modelID)
-                    }
+                guard !Task.isCancelled else { return }
+                await MainActor.run { [weak self] in
+                    self?.completeModelOperation(
+                        modelID,
+                        operationID: operationID,
+                        state: .failed(error.localizedDescription)
+                    )
                 }
             }
         }
+    }
+
+    private func cancelModelOperation(_ modelID: BuiltInModelID) {
+        guard let context = activeOperations.removeValue(forKey: modelID) else { return }
+        context.task?.cancel()
+        setInstallState(cancellationState(for: context.previousState), for: modelID)
+    }
+
+    private func cancellationState(for state: NativeModelInstallState) -> NativeModelInstallState {
+        if case .checking = state {
+            return .notInstalled
+        }
+        return state
+    }
+
+    private func isCurrentModelOperation(_ modelID: BuiltInModelID, operationID: UUID) -> Bool {
+        activeOperations[modelID]?.id == operationID
+    }
+
+    private func completeModelOperation(
+        _ modelID: BuiltInModelID,
+        operationID: UUID,
+        state: NativeModelInstallState
+    ) {
+        guard isCurrentModelOperation(modelID, operationID: operationID) else { return }
+        setInstallState(state, for: modelID)
+        finishModelOperation(modelID, operationID: operationID)
+    }
+
+    private func finishModelOperation(_ modelID: BuiltInModelID, operationID: UUID) {
+        guard isCurrentModelOperation(modelID, operationID: operationID) else { return }
+        activeOperations[modelID] = nil
     }
 
     private func isDownloading(_ modelID: BuiltInModelID) -> Bool {
