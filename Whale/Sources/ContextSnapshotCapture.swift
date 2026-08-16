@@ -47,9 +47,12 @@ enum ContextSnapshotCapture {
         }
 
         let knownSelection = focused.flatMap(FocusedElementInspector.selectedTextRange(in:))?.length ?? 0 > 0
-        guard CGPreflightPostEventAccess() else {
-            if knownSelection { throw ContextCaptureError.eventPostingUnavailable }
+        guard knownSelection else {
             return ContextSnapshot(capturedAt: Date(), sourceAppName: sourceAppName, inputs: clipboardInputs)
+        }
+
+        guard CGPreflightPostEventAccess() else {
+            throw ContextCaptureError.eventPostingUnavailable
         }
 
         let originalChangeCount = pasteboard.changeCount

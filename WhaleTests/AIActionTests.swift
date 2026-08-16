@@ -35,6 +35,19 @@ final class AIActionTests: XCTestCase {
         XCTAssertTrue(request.images.isEmpty)
     }
 
+    @MainActor
+    func testPromptSupportsInstructionWithoutContext() throws {
+        let request = try AIActionPromptBuilder.build(
+            instruction: "Draft a concise reply",
+            snapshot: ContextSnapshot(capturedAt: Date(), sourceAppName: "Mail", inputs: []),
+            masterPrompt: "Be helpful"
+        )
+
+        XCTAssertTrue(request.prompt.contains("<spoken_instruction>\nDraft a concise reply\n</spoken_instruction>"))
+        XCTAssertFalse(request.prompt.contains("<context_input"))
+        XCTAssertTrue(request.images.isEmpty)
+    }
+
     func testJSONLFramerHandlesFragmentsMultipleLinesAndCRLF() {
         var framer = JSONLFramer()
         XCTAssertTrue(framer.append(Data("{\"type\":\"a\"".utf8)).isEmpty)
