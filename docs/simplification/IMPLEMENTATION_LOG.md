@@ -53,3 +53,9 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Residual:** Historical `Spec/`, `v2/`, and `HOPPER_INVESTIGATION.md` references remain intentionally for R-REPO-02 archival cleanup.
 - **Result:** R-REPO-01 is verified. The checked-in Xcode project and Swift runtime are now the only current ownership path.
 - **Next:** R-CAP-02.
+
+## 2026-08-16T14:48:01Z — Handoff format updated
+
+- **Change:** Added a required post-implementation handoff to the tracker and future slice logs.
+- **Required content:** What changed, exact test commands/manual steps, user and technical impact, residual risks/skipped work, and the next slice.
+- **Applies:** R-CAP-02 onward; future final responses must repeat the same handoff in plain language.
