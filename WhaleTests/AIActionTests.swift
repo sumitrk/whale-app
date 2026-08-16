@@ -141,14 +141,35 @@ final class AIActionTests: XCTestCase {
             instructionText: "Rewrite the selected paragraph",
             resultText: "Finished result"
         )
+        let cancelledActionID = try await store.createEntry(kind: .aiAction)
+        try await store.finalize(
+            cancelledActionID,
+            outcome: .cancelled,
+            instructionText: "Cancelled AI action",
+            errorText: "Cancelled"
+        )
+        let cancelledDictationID = try await store.createEntry(kind: .dictation)
+        try await store.finalize(
+            cancelledDictationID,
+            outcome: .cancelled,
+            resultText: "Cancelled dictation",
+            errorText: "Cancelled"
+        )
         try await store.checkpoint()
 
         let imageCount = try await store.imageCount()
         let matchingIDs = try await store.entries(search: "orchestration").map(\.id)
+        let visibleIDs = try await store.entries().map(\.id)
+        let cancelledSearchIDs = try await store.entries(search: "Cancelled AI action").map(\.id)
         let storedInputCount = try await store.entry(id: id)?.contextInputs.count
+        let storedCancelledAction = try await store.entry(id: cancelledActionID)
         XCTAssertEqual(imageCount, 1)
         XCTAssertEqual(matchingIDs, [id])
+        XCTAssertFalse(visibleIDs.contains(cancelledActionID))
+        XCTAssertTrue(visibleIDs.contains(cancelledDictationID))
+        XCTAssertTrue(cancelledSearchIDs.isEmpty)
         XCTAssertEqual(storedInputCount, 3)
+        XCTAssertEqual(storedCancelledAction?.outcome, .cancelled)
         XCTAssertFalse(String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("orchestration target"))
 
         let reopened = try await HistoryStore.open(url: url, key: key)

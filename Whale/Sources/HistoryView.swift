@@ -84,8 +84,14 @@ struct HistoryView: View {
             let store = try await controller.requireStore()
             entries = try await store.entries(search: query)
             storageBytes = await store.storageBytes()
-            if selectedID == nil { selectedID = entries.first?.id }
-            if let selectedID { await loadDetail(selectedID) }
+            if selectedID == nil || !entries.contains(where: { $0.id == selectedID }) {
+                selectedID = entries.first?.id
+            }
+            if let selectedID {
+                await loadDetail(selectedID)
+            } else {
+                selectedEntry = nil
+            }
         } catch { }
     }
 

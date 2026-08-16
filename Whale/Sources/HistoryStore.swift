@@ -187,14 +187,17 @@ actor HistoryStore {
             sql = """
                 SELECT id, kind, created_at, completed_at, outcome, source_app_name,
                        instruction_text, result_text, error_text
-                FROM history_entries ORDER BY created_at DESC LIMIT ?
+                FROM history_entries
+                WHERE NOT (kind = 'ai_action' AND outcome = 'cancelled')
+                ORDER BY created_at DESC LIMIT ?
                 """
         } else {
             sql = """
                 SELECT e.id, e.kind, e.created_at, e.completed_at, e.outcome, e.source_app_name,
                        e.instruction_text, e.result_text, e.error_text
                 FROM history_fts f JOIN history_entries e ON e.id = f.entry_id
-                WHERE history_fts MATCH ? ORDER BY bm25(history_fts), e.created_at DESC LIMIT ?
+                WHERE NOT (e.kind = 'ai_action' AND e.outcome = 'cancelled')
+                  AND history_fts MATCH ? ORDER BY bm25(history_fts), e.created_at DESC LIMIT ?
                 """
         }
 
