@@ -2,6 +2,22 @@ import XCTest
 @testable import Whale
 
 final class AIActionTests: XCTestCase {
+    func testActiveRunKeepsActionStateTogether() {
+        let run = ActiveRun(id: UUID(), modelID: .whisperLargeV3Turbo)
+        let entryID = UUID()
+        let snapshot = ContextSnapshot(capturedAt: Date(), sourceAppName: "Notes", inputs: [])
+
+        run.historyEntryID = entryID
+        run.snapshot = snapshot
+        run.releaseRequested = true
+
+        XCTAssertEqual(run.modelID, .whisperLargeV3Turbo)
+        XCTAssertEqual(run.historyEntryID, entryID)
+        XCTAssertEqual(run.snapshot, snapshot)
+        XCTAssertTrue(run.releaseRequested)
+        XCTAssertFalse(run.historyFinalized)
+    }
+
     @MainActor
     func testActionSetupKeepsTheStartupOpenRouterModel() {
         let commandTypes = PiRuntime.actionSetupCommands.compactMap { $0["type"] as? String }

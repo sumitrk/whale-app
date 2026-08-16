@@ -79,3 +79,14 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Residual risks / skipped work:** The ignored local `Spec/post-processing-local-llm/` draft was not moved or modified because it is untracked local content. Archived code snippets intentionally retain historical implementation examples.
 - **Result:** R-REPO-02 is verified.
 - **Next slice:** R-AI-01.
+
+## 2026-08-16T21:32:00Z — R-AI-01 verified
+
+- **Branch:** `step-11-r-ai-01`
+- **What changed:** Replaced the coordinator's separate active run ID, history entry, context snapshot, model, and release flag with one `ActiveRun` object. Centralized history finalization so early release, cancellation, supersession, timeout/failure, and success all use the run's history entry; stale setup work now finalizes entries created after cancellation. Timeout tasks are cancelled on every processing exit.
+- **Files:** `Whale/Sources/AIActionCoordinator.swift`, `WhaleTests/AIActionTests.swift`, `docs/simplification/IMPLEMENTATION_TRACKER.md`.
+- **How to test:** Focused `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' -only-testing:WhaleTests/AIActionTests` — passed. Full `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` — passed. `git diff --check` — passed. Optional manual smoke test: hold/release the AI Action key, cancel during setup/recording/processing, and verify history outcomes remain terminal.
+- **Impact:** Run-scoped state cannot drift across asynchronous callbacks or superseded actions. Existing AI Action output, cancellation UI, timeout behavior, and history semantics remain unchanged, while abandoned setup entries are no longer left running.
+- **Residual risks / skipped work:** Unit coverage verifies `ActiveRun` state grouping; live coordinator paths still depend on microphone, accessibility, model, runtime, and history services, so the manual smoke test remains optional. No dependency injection or broader AI runtime refactor was added.
+- **Result:** R-AI-01 is verified.
+- **Next slice:** R-TRN-01.
