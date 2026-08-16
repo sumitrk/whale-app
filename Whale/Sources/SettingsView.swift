@@ -72,7 +72,8 @@ struct SettingsView: View {
                     .tag(section)
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 175, ideal: 200, max: 230)
+            .frame(minWidth: 200)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 250)
         } detail: {
             Group {
                 switch settingsCoordinator.selection {
@@ -87,6 +88,7 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle(settingsCoordinator.selection.rawValue)
         }
+        .navigationSplitViewStyle(.balanced)
         .frame(
             minWidth: SettingsWindowMetrics.minWidth,
             idealWidth: SettingsWindowMetrics.idealWidth,

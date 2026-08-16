@@ -23,6 +23,8 @@ struct HistoryView: View {
             } else {
                 HSplitView {
                     VStack(spacing: 0) {
+                        HistorySearchField(query: $query)
+
                         List(entries, selection: $selectedID) { entry in
                             HistoryEntryRow(entry: entry)
                                 .tag(entry.id)
@@ -30,7 +32,6 @@ struct HistoryView: View {
                                     Button("Delete", role: .destructive) { Task { await delete(entry.id) } }
                                 }
                         }
-                        .searchable(text: $query, prompt: "Search History")
 
                         HStack {
                             Text(ByteCountFormatter.string(fromByteCount: storageBytes, countStyle: .file))
@@ -42,7 +43,7 @@ struct HistoryView: View {
                         .font(.caption)
                         .padding(10)
                     }
-                    .frame(minWidth: 290, idealWidth: 330)
+                    .frame(minWidth: 290, idealWidth: 330, maxWidth: 420)
 
                     HistoryEntryDetail(entry: selectedEntry) {
                         if let selectedID { Task { await delete(selectedID) } }
@@ -95,6 +96,34 @@ struct HistoryView: View {
 
     private func resetHistory() async {
         try? await controller.reset()
+    }
+}
+
+private struct HistorySearchField: View {
+    @Binding var query: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Search History", text: $query)
+                .textFieldStyle(.plain)
+
+            if !query.isEmpty {
+                Button("Clear search", systemImage: "xmark.circle.fill") {
+                    query = ""
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 }
 
