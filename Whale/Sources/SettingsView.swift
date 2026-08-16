@@ -53,6 +53,7 @@ private final class TrafficLightPositioner {
         guard let window else { return }
 
         window.titleVisibility = .hidden
+        window.styleMask.insert(.resizable)
 
         if self.window !== window {
             self.window = window
