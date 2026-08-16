@@ -52,6 +52,8 @@ private final class TrafficLightPositioner {
     func style(_ window: NSWindow?) {
         guard let window else { return }
 
+        window.titleVisibility = .hidden
+
         if self.window !== window {
             self.window = window
             baseOrigins.removeAll()
@@ -181,7 +183,6 @@ struct SettingsView: View {
             } detail: {
                 selectedSettingsView
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .navigationTitle(settingsCoordinator.selection.rawValue)
             }
             .navigationSplitViewStyle(.balanced)
             .toolbar(removing: .sidebarToggle)
