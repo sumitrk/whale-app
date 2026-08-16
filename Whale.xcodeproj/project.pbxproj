@@ -41,6 +41,7 @@
 		AA0000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000072 /* WhisperKit */; };
 		AA0000000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000011 /* XCTest.framework */; };
 		AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000013 /* TranscriptionModelTests.swift */; };
+		C0A000000000000000000001 /* AudioRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A000000000000000000002 /* AudioRecorderTests.swift */; };
 		AA0000000000000000000004 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C91A4D72C0C4A0B9F20A111 /* FluidAudio */; };
 		B7A1C001D44E4C7287B43001 /* AppRuntimeInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1C001D44E4C7287B43002 /* AppRuntimeInfo.swift */; };
 		C6A3D56B2F7023BB00A16DA0 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C6A3D56A2F7023BB00A16DA0 /* Sparkle */; };
@@ -88,6 +89,7 @@
 		AA0000000000000000000011 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		AA0000000000000000000012 /* WhaleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhaleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000013 /* TranscriptionModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionModelTests.swift; sourceTree = "<group>"; };
+		C0A000000000000000000002 /* AudioRecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorderTests.swift; sourceTree = "<group>"; };
 		AIA000000000000000000101 /* AIActionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionCoordinator.swift; sourceTree = "<group>"; };
 		AIA000000000000000000102 /* AIActionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionModels.swift; sourceTree = "<group>"; };
 		AIA000000000000000000103 /* AIActionPromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionPromptBuilder.swift; sourceTree = "<group>"; };
@@ -215,6 +217,7 @@
 			isa = PBXGroup;
 			children = (
 				AIA000000000000000000110 /* AIActionTests.swift */,
+				C0A000000000000000000002 /* AudioRecorderTests.swift */,
 				PP0000000000000000000006 /* TextInsertionManagerTests.swift */,
 				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
 				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
@@ -388,6 +391,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AIA000000000000000000010 /* AIActionTests.swift in Sources */,
+				C0A000000000000000000001 /* AudioRecorderTests.swift in Sources */,
 				PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */,
 				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
 				PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */,
