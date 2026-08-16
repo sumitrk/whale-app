@@ -23,14 +23,6 @@ _Avoid_: Toggle Record, Toggle Recording
 A speech-recognition model that produces a transcription.
 _Avoid_: Model
 
-**AI Cleanup**:
-Optional refinement of a transcription's wording and formatting without changing its intended meaning.
-_Avoid_: Post-Processing
-
-**Cleanup model**:
-A language model that performs AI Cleanup.
-_Avoid_: Model, local AI model
-
 **Dictation**:
 A user intent in which speech becomes text without reasoning over external user content.
 _Avoid_: Basic mode, transcription operation
@@ -55,9 +47,13 @@ _Avoid_: Backend request, operation
 A constrained capability that may be invoked during an Agent Run.
 _Avoid_: Function, integration
 
-**Action History**:
-A persistent local log of completed and failed AI Actions, including their Context Snapshots and any Action Results, retained until the user deletes them but never included automatically in a later Agent Run.
-_Avoid_: Memory, conversation
+**History**:
+The persistent local log of Dictations and AI Actions, including their inputs, outcomes, and any Action Results, retained until the user deletes them but never included automatically in a later Agent Run.
+_Avoid_: Action History, memory, conversation
+
+**History Entry**:
+A retained Dictation or AI Action within History.
+_Avoid_: Preview, message
 
 **Action Result**:
 The final user-facing text produced by an AI Action and made available for insertion, copying, and later review.

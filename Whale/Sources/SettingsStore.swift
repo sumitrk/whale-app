@@ -21,6 +21,17 @@ class SettingsStore: ObservableObject {
     }
     var pttKeyLabel: String { keyLabel(keyCode: pttKeyCode, modifiers: pttModifiers) }
 
+    // MARK: - Shortcuts: AI Action
+
+    /// AI Action key code (default: 59 = Left Control).
+    @Published var aiActionKeyCode: Int {
+        didSet { ud.set(aiActionKeyCode, forKey: Keys.aiActionKeyCode) }
+    }
+    @Published var aiActionModifiers: Int {
+        didSet { ud.set(aiActionModifiers, forKey: Keys.aiActionModifiers) }
+    }
+    var aiActionKeyLabel: String { keyLabel(keyCode: aiActionKeyCode, modifiers: aiActionModifiers) }
+
     // MARK: - Shortcuts: Transcript Mode
 
     /// Toggle key code (default: 17 = T).
@@ -87,22 +98,16 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(builtInModelLocalBookmarks, forKey: Keys.builtInModelLocalBookmarks) }
     }
 
-    // MARK: - AI Cleanup
+    // MARK: - AI Actions
 
-    @Published var postProcessingEnabled: Bool {
-        didSet { ud.set(postProcessingEnabled, forKey: Keys.postProcessingEnabled) }
+    static let defaultAIActionMasterPrompt = "Follow the spoken instruction using the supplied context. Preserve the user's intended tone, language, and useful formatting."
+
+    @Published var aiActionMasterPrompt: String {
+        didSet { ud.set(aiActionMasterPrompt, forKey: Keys.aiActionMasterPrompt) }
     }
 
-    @Published var cleanupLevel: CleanupLevel {
-        didSet { ud.set(cleanupLevel.rawValue, forKey: Keys.cleanupLevel) }
-    }
-
-    @Published var selectedLocalLLMModelID: LocalLLMModelID? {
-        didSet { ud.set(selectedLocalLLMModelID?.rawValue, forKey: Keys.selectedLocalLLMModelID) }
-    }
-
-    @Published var cleanupPromptOverride: String {
-        didSet { ud.set(cleanupPromptOverride, forKey: Keys.cleanupPromptOverride) }
+    @Published var openRouterKeyRejected: Bool {
+        didSet { ud.set(openRouterKeyRejected, forKey: Keys.openRouterKeyRejected) }
     }
 
     // MARK: - Init
@@ -123,17 +128,15 @@ class SettingsStore: ObservableObject {
         toggleModifiers          = (ud.object(forKey: Keys.toggleModifiers) as? Int) ?? SettingsStore.defaultModifiers
         pttKeyCode               = (ud.object(forKey: Keys.pttKeyCode) as? Int) ?? 63
         pttModifiers             = (ud.object(forKey: Keys.pttModifiers) as? Int) ?? 0
+        aiActionKeyCode          = (ud.object(forKey: Keys.aiActionKeyCode) as? Int) ?? 59
+        aiActionModifiers        = (ud.object(forKey: Keys.aiActionModifiers) as? Int) ?? 0
         selectedBuiltInModelID   = BuiltInModelID(
             rawValue: ud.string(forKey: Keys.selectedBuiltInModelID) ?? ""
         ) ?? .parakeetEnglishV2
         builtInModelLocalPaths   = ud.dictionary(forKey: Keys.builtInModelLocalPaths) as? [String: String] ?? [:]
         builtInModelLocalBookmarks = ud.dictionary(forKey: Keys.builtInModelLocalBookmarks) as? [String: String] ?? [:]
-        postProcessingEnabled    = ud.object(forKey: Keys.postProcessingEnabled) as? Bool ?? true
-        cleanupLevel             = .medium
-        selectedLocalLLMModelID  = LocalLLMModelID(
-            rawValue: ud.string(forKey: Keys.selectedLocalLLMModelID) ?? ""
-        ) ?? .qwen3_0_6b_4bit
-        cleanupPromptOverride    = ud.string(forKey: Keys.cleanupPromptOverride) ?? ""
+        aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
+        openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
     }
 
     func setTranscriptFolderURL(_ url: URL?) {
@@ -285,12 +288,12 @@ class SettingsStore: ObservableObject {
         static let toggleModifiers       = "toggleModifiers"
         static let pttKeyCode            = "pttKeyCode"
         static let pttModifiers          = "pttModifiers"
+        static let aiActionKeyCode       = "aiActionKeyCode"
+        static let aiActionModifiers     = "aiActionModifiers"
         static let selectedBuiltInModelID = "selectedBuiltInModelID"
         static let builtInModelLocalPaths = "builtInModelLocalPaths"
         static let builtInModelLocalBookmarks = "builtInModelLocalBookmarks"
-        static let postProcessingEnabled = "postProcessingEnabled"
-        static let cleanupLevel = "cleanupLevel"
-        static let selectedLocalLLMModelID = "selectedLocalLLMModelID"
-        static let cleanupPromptOverride = "cleanupPromptOverride"
+        static let aiActionMasterPrompt = "aiActionMasterPrompt"
+        static let openRouterKeyRejected = "openRouterKeyRejected"
     }
 }

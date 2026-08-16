@@ -22,3 +22,6 @@ Whale.dmg
 whale-local-models/
 whale-local-models-debug/
 Spec/post-processing-local-llm/
+
+# Downloaded and verified by scripts/prepare_pi_runtime.sh before Xcode copies resources.
+Whale/Resources/Pi/pi/

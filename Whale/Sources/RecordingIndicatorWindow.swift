@@ -97,6 +97,21 @@ final class RecordingIndicatorWindow: NSPanel {
         }
     }
 
+    func showMessage(_ message: String, isError: Bool, duration: TimeInterval) {
+        let view = StatusMessageView(message: message, isError: isError)
+        let host = NSHostingView(rootView: view)
+        let size = host.fittingSize
+        host.frame = NSRect(origin: .zero, size: size)
+        contentView = host
+        setContentSize(size)
+        positionNearCursor()
+        orderFront(nil)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            self?.hide()
+        }
+    }
+
     private func positionNearCursor() {
         // 1. Try to place at the top-left corner of the focused input box.
         if let inputRect = focusedInputFrame() {
@@ -282,5 +297,25 @@ private struct PasteHintView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.72)))
+    }
+}
+
+private struct StatusMessageView: View {
+    let message: String
+    let isError: Bool
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: isError ? "exclamationmark.triangle.fill" : "xmark.circle.fill")
+                .foregroundStyle(isError ? .red : .secondary)
+            Text(message)
+                .foregroundStyle(.white)
+                .lineLimit(2)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: 360)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.78)))
     }
 }

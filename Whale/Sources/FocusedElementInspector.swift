@@ -27,6 +27,10 @@ struct FocusedElementSnapshot {
     /// AX attributes found on the focused element (for diagnostics).
     let attributeNames: [String]
 
+    var isSecureTextField: Bool {
+        subrole == "AXSecureTextField" || role == "AXSecureTextField"
+    }
+
     private static let knownTextRoles: Set<String> = [
         "AXTextField",
         "AXTextArea",
@@ -76,6 +80,7 @@ struct FocusedElementSnapshot {
     }
 
     var isWritableTextTarget: Bool {
+        if isSecureTextField { return false }
         // 1. Classic native text roles
         if let role, Self.knownTextRoles.contains(role) {
             return true
@@ -199,6 +204,14 @@ enum FocusedElementInspector {
         )
     }
 
+    static func selectedText(in context: FocusedElementContext) -> String? {
+        stringAttribute(kAXSelectedTextAttribute as CFString, of: context.element)
+    }
+
+    static func selectedTextRange(in context: FocusedElementContext) -> CFRange? {
+        selectedTextRangeAttribute(of: context.element)
+    }
+
     private static func resolveFocusedElement(
         system: AXUIElement,
         frontmostPID: pid_t?,
@@ -267,7 +280,11 @@ enum FocusedElementInspector {
             attempts.append("\(label)=\(error.rawValue)")
             return nil
         }
-        return focusedRef as! AXUIElement
+        guard CFGetTypeID(focusedRef) == AXUIElementGetTypeID() else {
+            attempts.append("\(label)=unexpected-type")
+            return nil
+        }
+        return unsafeBitCast(focusedRef, to: AXUIElement.self)
     }
 
     @discardableResult

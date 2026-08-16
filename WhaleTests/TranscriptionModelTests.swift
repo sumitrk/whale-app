@@ -148,8 +148,7 @@ final class TranscriptionModelTests: XCTestCase {
                 startedAt: Date(timeIntervalSince1970: 0),
                 durationMinutes: 3,
                 model: descriptor,
-                transcript: "Hello world",
-                cleanupSummary: "light (Qwen 3 0.6B)"
+                transcript: "Hello world"
             ),
             to: folder
         )
@@ -158,7 +157,7 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(descriptor.markdownLabel, "Whisper Large V3 Turbo")
         XCTAssertTrue(descriptor.installationPrompt.contains("Whisper Large V3 Turbo"))
         XCTAssertTrue(markdown.contains("**Model:** Whisper Large V3 Turbo"))
-        XCTAssertTrue(markdown.contains("**Cleanup:** light (Qwen 3 0.6B)"))
+        XCTAssertFalse(markdown.contains("Cleanup"))
         XCTAssertTrue(markdown.contains("## Transcript\n\nHello world"))
     }
 

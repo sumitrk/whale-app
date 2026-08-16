@@ -32,7 +32,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general       = "General"
     case shortcuts     = "Shortcuts"
     case transcription = "Transcription"
-    case aiCleanup     = "AI Cleanup"
+    case aiActions     = "AI Actions"
+    case history       = "History"
     case permissions   = "Permissions"
 
     var id: String { rawValue }
@@ -42,7 +43,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general:       return "gearshape"
         case .shortcuts:     return "keyboard"
         case .transcription: return "waveform"
-        case .aiCleanup:     return "sparkles"
+        case .aiActions:     return "sparkles"
+        case .history:       return "clock.arrow.circlepath"
         case .permissions:   return "lock.shield"
         }
     }
@@ -77,7 +79,8 @@ struct SettingsView: View {
                 case .general:       GeneralSettingsView(updater: updater)
                 case .shortcuts:     ShortcutsSettingsView()
                 case .transcription: TranscriptionSettingsView()
-                case .aiCleanup:     PostProcessingSettingsView()
+                case .aiActions:     AIActionSettingsView()
+                case .history:       HistoryView()
                 case .permissions:   PermissionsSettingsView()
                 }
             }

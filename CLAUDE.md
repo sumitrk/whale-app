@@ -1,7 +1,8 @@
 # Project Rules for Claude
 
 ## Runtime
-- The app is fully native Swift and no longer depends on a bundled Python server.
+- The app no longer depends on a bundled Python server.
+- The app targets Apple Silicon Macs only.
 - Transcription runs through the `FluidAudio` Swift package and Core ML.
 - Build and package the app with Xcode and the checked-in `Whale.xcodeproj`.
 

@@ -5,6 +5,7 @@ import SwiftUI
 
 enum PTTPreset: String, CaseIterable, Identifiable {
     case globe    = "Globe / Fn"
+    case leftControl = "⌃ (Left)"
     case rightCmd = "⌘ (Right)"
     case rightOpt = "⌥ (Right)"
     case rightShift = "⇧ (Right)"
@@ -16,6 +17,7 @@ enum PTTPreset: String, CaseIterable, Identifiable {
     var keyCode: Int? {
         switch self {
         case .globe:      return 63
+        case .leftControl: return 59
         case .rightCmd:   return 54
         case .rightOpt:   return 61
         case .rightShift: return 60
@@ -34,10 +36,17 @@ struct ShortcutsSettingsView: View {
     @State private var pttPreset: PTTPreset = .globe
     /// True only right after the user picks Custom — auto-starts the recorder.
     @State private var pttRecorderAutoStart = false
+    @State private var actionPreset: PTTPreset = .leftControl
+    @State private var actionRecorderAutoStart = false
 
     private func derivedPreset() -> PTTPreset {
         guard store.pttModifiers == 0 else { return .custom }
         return PTTPreset.allCases.first { $0.keyCode == store.pttKeyCode } ?? .custom
+    }
+
+    private func derivedActionPreset() -> PTTPreset {
+        guard store.aiActionModifiers == 0 else { return .custom }
+        return PTTPreset.allCases.first { $0.keyCode == store.aiActionKeyCode } ?? .custom
     }
 
     var body: some View {
@@ -76,6 +85,37 @@ struct ShortcutsSettingsView: View {
                 Text("Hold \(store.pttKeyLabel) to record. Release to transcribe and paste.")
             }
 
+            Section {
+                Picker("Key", selection: $actionPreset) {
+                    ForEach(PTTPreset.allCases) { preset in
+                        Text(preset.rawValue).tag(preset)
+                    }
+                }
+                .pickerStyle(.menu)
+                .onChange(of: actionPreset) { _, preset in
+                    if let keyCode = preset.keyCode {
+                        store.aiActionKeyCode = keyCode
+                        store.aiActionModifiers = 0
+                    } else {
+                        actionRecorderAutoStart = true
+                    }
+                }
+                if actionPreset == .custom {
+                    LabeledContent("Custom key") {
+                        PTTRecorderView(
+                            keyCode: $store.aiActionKeyCode,
+                            modifiers: $store.aiActionModifiers,
+                            startImmediately: actionRecorderAutoStart
+                        )
+                        .onAppear { actionRecorderAutoStart = false }
+                    }
+                }
+            } header: {
+                Text("AI Action")
+            } footer: {
+                Text("Hold \(store.aiActionKeyLabel) to speak an instruction. Press another key or mouse button while holding a modifier-only shortcut to cancel it.")
+            }
+
             // MARK: Transcript Mode
             Section {
                 LabeledContent("Key") {
@@ -105,7 +145,10 @@ struct ShortcutsSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { pttPreset = derivedPreset() }
+        .onAppear {
+            pttPreset = derivedPreset()
+            actionPreset = derivedActionPreset()
+        }
     }
 
     private func pickFolder() {

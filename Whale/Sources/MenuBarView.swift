@@ -49,6 +49,10 @@ struct MenuBarView: View {
         }
         .keyboardShortcut(",", modifiers: .command)
 
+        Button("History…") {
+            openSettingsWindow(section: .history)
+        }
+
         Button("View Log") {
             DiagnosticLog.openInFinder()
         }

@@ -360,18 +360,18 @@ private struct TryItStep: View {
                 OnboardingCard {
                     VStack(alignment: .leading, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Optional AI cleanup")
+                            Text("AI Actions")
                                 .fontWeight(.semibold)
-                            Text("AI cleanup needs the Qwen local AI model installed from Settings.")
+                            Text("Add an OpenRouter API key in Settings to use spoken instructions with selected or copied context.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Where to install it")
+                            Text("Where to configure it")
                                 .foregroundStyle(.secondary)
                                 .font(.callout)
-                            Text("Settings > AI Cleanup")
+                            Text("Settings > AI Actions")
                                 .font(.callout)
                         }
                     }

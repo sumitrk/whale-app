@@ -158,6 +158,27 @@ final class TextInsertionManagerTests: XCTestCase {
         )
     }
 
+    func testSecureFieldAlwaysUsesCopyOnly() {
+        let snapshot = makeSnapshot(
+            appName: "Safari",
+            bundleIdentifier: "com.apple.Safari",
+            role: "AXTextField",
+            subrole: "AXSecureTextField",
+            isEditable: true,
+            supportsSelectedTextRange: true,
+            supportsAXValue: true,
+            canReadAXValueAsString: true,
+            isAXValueSettable: true,
+            canReadSelectedTextRange: true,
+            isSelectedTextRangeSettable: true
+        )
+
+        XCTAssertEqual(
+            TextInsertionManager.insertionStrategy(for: snapshot, isAccessibilityTrusted: true),
+            .copyOnly(.manualPasteOnly)
+        )
+    }
+
     // MARK: - Replacement logic
 
     func testInsertAtCaret() {
@@ -262,6 +283,7 @@ final class TextInsertionManagerTests: XCTestCase {
         appName: String,
         bundleIdentifier: String,
         role: String?,
+        subrole: String? = nil,
         isEditable: Bool,
         supportsSelectedTextRange: Bool,
         supportsAXValue: Bool,
@@ -275,7 +297,7 @@ final class TextInsertionManagerTests: XCTestCase {
             appName: appName,
             bundleIdentifier: bundleIdentifier,
             role: role,
-            subrole: nil,
+            subrole: subrole,
             roleDescription: role == "AXButton" ? "button" : nil,
             placeholderValue: nil,
             numberOfCharacters: nil,

@@ -370,10 +370,7 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: inputURL,
             modelID: dummyModel,
-            audioSource: .microphone,
-            outputMode: .paste,
-            postProcessingSettings: .stub(),
-            focusedAppContext: nil
+            audioSource: .microphone
         )
 
         XCTAssertEqual(result.stagesExecuted, ["VAD", "Capture"])
@@ -406,10 +403,7 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: inputURL,
             modelID: dummyModel,
-            audioSource: .system,
-            outputMode: .markdown,
-            postProcessingSettings: .stub(),
-            focusedAppContext: nil
+            audioSource: .system
         )
 
         let capturedURL = await wavCapture.capturedWavURL
@@ -431,10 +425,7 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: badURL,
             modelID: dummyModel,
-            audioSource: .microphone,
-            outputMode: .paste,
-            postProcessingSettings: .stub(),
-            focusedAppContext: nil
+            audioSource: .microphone
         )
 
         let capturedURL = await wavCapture.capturedWavURL
@@ -446,20 +437,17 @@ final class VADPipelineIntegrationTests: XCTestCase {
     func testPipelineRawAndProcessedTranscriptsBothPopulated() async throws {
         let pipeline = TranscriptionPipeline(stages: [
             MockTranscriptionStage(name: "Transcription", output: "hello world"),
-            AppendingStage(name: "Cleanup", suffix: " [clean]"),
+            AppendingStage(name: "Format", suffix: " [formatted]"),
         ])
 
         let result = try await pipeline.process(
             wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
             modelID: dummyModel,
-            audioSource: .microphone,
-            outputMode: .paste,
-            postProcessingSettings: .stub(),
-            focusedAppContext: nil
+            audioSource: .microphone
         )
 
         XCTAssertEqual(result.rawTranscript, "hello world")
-        XCTAssertEqual(result.processedTranscript, "hello world [clean]")
+        XCTAssertEqual(result.processedTranscript, "hello world [formatted]")
     }
 
     func testPipelineTranscriptionStagePopulatesRawTranscript() async throws {
@@ -477,10 +465,7 @@ final class VADPipelineIntegrationTests: XCTestCase {
         let result = try await pipeline.process(
             wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
             modelID: .parakeetEnglishV2,
-            audioSource: .microphone,
-            outputMode: .paste,
-            postProcessingSettings: .stub(),
-            focusedAppContext: nil
+            audioSource: .microphone
         )
 
         XCTAssertEqual(result.rawTranscript, "ok")
@@ -497,16 +482,5 @@ private actor WAVCapturingStage: PipelineStage {
     func process(_ context: PipelineContext) async throws -> PipelineContext {
         capturedWavURL = context.wavURL
         return context
-    }
-}
-
-private extension TextCleanupSettings {
-    static func stub() -> TextCleanupSettings {
-        TextCleanupSettings(
-            enabled: true,
-            cleanupLevel: .light,
-            localLLMModelID: .qwen3_0_6b_4bit,
-            cleanupPromptOverride: ""
-        )
     }
 }

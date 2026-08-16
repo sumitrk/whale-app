@@ -1,5 +1,5 @@
 {
-  "originHash" : "fcdaabcfb202877d872bd75c0fa0533dde475ccd959b0321d95d0f5d83e35130",
+  "originHash" : "b48c6bf6033688760d43b50b45227ea5924c25914a2176a68b5419fe2f2357b7",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -20,30 +20,21 @@
       }
     },
     {
-      "identity" : "mlx-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift",
-      "state" : {
-        "revision" : "0bb916c67f4b9e5c682cbe02a42c701c93ab5021",
-        "version" : "0.31.6"
-      }
-    },
-    {
-      "identity" : "mlx-swift-lm",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift-lm.git",
-      "state" : {
-        "revision" : "25b00d4e22e61ec9c41efda47990cd2084ec87ff",
-        "version" : "2.31.3"
-      }
-    },
-    {
       "identity" : "sparkle",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sparkle-project/Sparkle",
       "state" : {
         "revision" : "21d8df80440b1ca3b65fa82e40782f1e5a9e6ba2",
         "version" : "2.9.0"
+      }
+    },
+    {
+      "identity" : "sqlcipher.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sqlcipher/SQLCipher.swift.git",
+      "state" : {
+        "revision" : "46e687b829dce3f9262e16e9f941a9e159136085",
+        "version" : "4.10.0"
       }
     },
     {
@@ -116,15 +107,6 @@
       "state" : {
         "revision" : "0b18836bd8b0162e7e17a995a3fbee20ed8f3b2b",
         "version" : "2.101.3"
-      }
-    },
-    {
-      "identity" : "swift-numerics",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
-      "state" : {
-        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
-        "version" : "1.1.1"
       }
     },
     {

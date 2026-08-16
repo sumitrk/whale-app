@@ -11,7 +11,6 @@ struct TranscriptArtifactWriter {
         let durationMinutes: Int
         let model: BuiltInModelDescriptor
         let transcript: String
-        let cleanupSummary: String
     }
 
     func write(_ document: Document, to folder: URL) throws -> URL {
@@ -37,7 +36,6 @@ struct TranscriptArtifactWriter {
         let sections: [String] = [
             "# Meeting — \(formattedDate)",
             "**Duration:** ~\(max(1, document.durationMinutes)) min  |  **Model:** \(document.model.markdownLabel)",
-            "**Cleanup:** \(document.cleanupSummary)",
             "",
             "## Transcript",
             "",

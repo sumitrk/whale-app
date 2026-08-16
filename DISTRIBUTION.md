@@ -16,6 +16,7 @@ The checked-in [Whale.xcodeproj](/Users/sumitkumar/Downloads/Projects/whale-app/
 - entitlements
 - signing behavior
 - embedded frameworks
+- the pinned arm64 Pi 0.72.1 download, verification, embedding, and AI Actions third-party notices
 
 [project.yml](/Users/sumitkumar/Downloads/Projects/whale-app/project.yml) is kept only as legacy reference and should not be treated as authoritative for release behavior.
 
@@ -40,6 +41,8 @@ The Release app intentionally remains unsandboxed. A paid Apple Developer member
 
 ## Build Pipeline
 
+Pi is not installed independently on the user's Mac and its 73 MB executable is not stored in Git. The first local Xcode build downloads the official pinned Apple Silicon archive, verifies both archive and executable SHA-256 checksums, and caches it under `Whale/Resources/Pi/pi/`. Later builds work offline from that ignored cache. Xcode embeds the verified runtime in `Whale.app`, so end users receive it as part of the signed application and do not need Pi, Node.js, npm, or Bun installed.
+
 Default publish flow:
 
 1. Build, verify, package, notarize, staple, sign for Sparkle, update `appcast.xml`, and publish.
@@ -50,7 +53,11 @@ Default publish flow:
 This default flow:
 - prompts for the new marketing version
 - increments the build number
+- prepares the verified, pinned Pi runtime when it is not already cached
 - builds and verifies the app bundle
+- verifies that Whale and bundled Pi are arm64-only and that Pi matches the pinned version and SHA-256
+- signs the nested Pi executable and SQLCipher framework before signing the app bundle
+- gives the Bun-based Pi child only its dedicated JIT/executable-memory signing entitlements; Whale keeps its separate app entitlements
 - creates the DMG
 - notarizes the DMG with Apple and staples the ticket
 - verifies Gatekeeper acceptance
@@ -83,6 +90,8 @@ These commands should pass on the packaged app:
 ```bash
 codesign --verify --deep --strict --verbose=4 /Applications/Whale.app
 codesign -dr - /Applications/Whale.app
+codesign --verify --strict --verbose=4 /Applications/Whale.app/Contents/Resources/Pi/pi/pi
+/Applications/Whale.app/Contents/Resources/Pi/pi/pi --version
 ```
 
 These commands must also pass for the packaged DMG:
