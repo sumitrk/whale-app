@@ -52,8 +52,8 @@ transcribe-meetings/
 ├── .env                     # User config (gitignored)
 ├── .env.example             # Template committed to repo
 ├── requirements.txt
-└── Spec/
-    └── macos-meeting-transcriber/
+└── docs/archive/specifications/
+    └── v0-macos-meeting-transcriber/
         └── spec.md
 ```
 
@@ -403,4 +403,4 @@ Bob: Agreed. We also need to talk about engineering capacity for April...
 
 ---
 
-**Ready for implementation!** Run `/guide Spec/macos-meeting-transcriber/spec.md` to generate a step-by-step tutorial.
+**Ready for implementation!** Run `/guide docs/archive/specifications/v0-macos-meeting-transcriber/spec.md` to generate a step-by-step tutorial.

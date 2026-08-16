@@ -79,7 +79,7 @@ transcribe-meeting/
 │   └── requirements.txt
 ├── scripts/
 │   └── build.sh                 ← build + notarize script
-└── Spec/v1-standalone-macos-app/
+└── docs/archive/specifications/v1-standalone-macos-app/
     ├── spec.md
     ├── plans/
     └── log/

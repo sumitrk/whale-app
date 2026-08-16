@@ -2,7 +2,7 @@
 
 Open-source Granola AI alternative. Local transcription on Apple Silicon, Claude for cleanup/summary, markdown output to Obsidian vault.
 
-Spec: `Spec/macos-meeting-transcriber/spec.md`
+Spec: `../spec.md`
 
 ---
 
@@ -103,8 +103,8 @@ transcribe-meetings/
 │   ├── step-04-llm-cleanup.md
 │   ├── step-05-output.md
 │   └── step-06-hotkey-integration.md
-└── Spec/
-    └── macos-meeting-transcriber/
+└── docs/archive/specifications/
+    └── v0-macos-meeting-transcriber/
         └── spec.md
 ```
 
@@ -128,7 +128,7 @@ transcribe-meetings/
 
 ## After V0
 
-See `Spec/macos-meeting-transcriber/spec.md` → Future Enhancements section:
+See `../spec.md` → Future Enhancements section:
 - Speaker diarization
 - ScreenCaptureKit (no BlackHole required)
 - Menu bar app (SwiftUI wrapper)
