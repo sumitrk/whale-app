@@ -9,3 +9,6 @@
 ## Git Workflow
 - Direct commits to `main` are allowed.
 - Use a branch only when isolated review or experimentation is useful.
+
+## Simplification implementation
+- Before working on the codebase simplification plan, read `docs/simplification/IMPLEMENTATION_TRACKER.md` and append handoff results to `docs/simplification/IMPLEMENTATION_LOG.md`.

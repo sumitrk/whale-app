@@ -374,7 +374,7 @@ final class TextInsertionManagerTests: XCTestCase {
             selectedRange: CFRange(location: 11, length: 0),
             placeholderValue: nil,
             numberOfCharacters: nil,
-            characterProbe: .realContent("H")
+            characterProbe: .content
         )
 
         XCTAssertEqual(normalized.currentValue, "Hello world")
