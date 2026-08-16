@@ -111,3 +111,14 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Residual risks / skipped work:** Tests cover the registration policy matrix but do not synthesize live AppKit keyboard events or exercise Accessibility/TCC hardware paths. No CGEventTap replacement or broader shortcut architecture was added.
 - **Result:** R-CAP-01 is verified.
 - **Next slice:** R-APP-01.
+
+## 2026-08-16T22:33:00Z — R-APP-01 verified
+
+- **Branch:** `step-14-r-app-01`
+- **What changed:** Replaced AppState's independent recording flags and immediately-awaited processing task with one `RecordingActivity` phase: idle, starting, recording, processing, or error. The phase owns PTT early-release state, recording mode/start time, busy/recording projections, and processing ownership. AI Action state remains separate and only projects its status text.
+- **Files:** `Whale/Sources/AppState.swift`, `WhaleTests/AppStateTests.swift`, `Whale.xcodeproj/project.pbxproj`, `docs/simplification/IMPLEMENTATION_TRACKER.md`.
+- **How to test:** Focused `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' -only-testing:WhaleTests/AppStateActivityTests CODE_SIGNING_ALLOWED=NO` — passed. Full `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO` — passed. `git diff --check` — passed. Optional manual smoke test: hold/release Fn before recorder readiness, try an unavailable model, trigger a recorder failure, complete both markdown and paste recordings, and run an AI Action during idle; confirm no stuck busy/recording projection.
+- **Impact:** AppState cannot report recording and non-recording lifecycle flags simultaneously; early Fn release survives model/startup/readiness awaits; start failures and processing exits leave one terminal phase. Existing menu bar consumers still read `isRecording`; AI Action uses its own recorder and no longer mutates AppState's recording phase.
+- **Residual risks / skipped work:** Tests cover the phase model and transition projections but do not inject live AudioRecorder failures or exercise hardware/TCC timing. The public `status` projection remains shared with AI Action and startup, while recording ownership is phase-based. No broader AppState dependency-injection refactor was added.
+- **Result:** R-APP-01 is verified. All listed simplification slices are now verified.
+- **Next slice:** None.
