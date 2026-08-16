@@ -2,6 +2,12 @@
 
 Whale turns captured speech into text and uses spoken instructions to produce text for the user's current workflow.
 
+## Settings UI direction
+
+The Settings window keeps the native macOS Liquid Glass treatment. Use standard SwiftUI `NavigationSplitView`, sidebar `List`, grouped `Form`, and native controls so macOS 26 can provide Liquid Glass automatically; do not replace the shell with opaque custom panels or apply decorative glass to content groups.
+
+The Settings sidebar is always visible and must not expose a collapse control. Its native divider remains resizable, with percentage-based minimum, midpoint, and maximum widths defined in `Whale/Sources/SettingsView.swift`. The History page uses percentage-based columns inside the detail pane so adding History does not push the Settings sidebar outside the window.
+
 ## Language
 
 **Transcription**:

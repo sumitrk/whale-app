@@ -24,7 +24,7 @@ enum InsertionStrategy: Equatable {
 /// app's accessibility implementation (common in Electron/Chromium).
 enum CharacterProbeResult: Equatable {
     /// The probe returned at least one character — the field has real content.
-    case realContent(String)
+    case content
     /// The attribute is supported but returned no content — the field is
     /// actually empty and `AXValue` contains a phantom placeholder.
     case empty
@@ -292,7 +292,7 @@ enum TextInsertionManager {
         switch error {
         case .success:
             if let str = result as? String, !str.isEmpty {
-                return .realContent(str)
+                return .content
             }
             return .empty
         case .parameterizedAttributeUnsupported, .attributeUnsupported, .notImplemented:

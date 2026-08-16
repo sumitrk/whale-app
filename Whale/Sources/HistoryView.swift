@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+private enum HistoryLayoutMetrics {
+    // This is the History list's share of the detail container. Change it to resize the list.
+    static let listFraction: CGFloat = 0.38
+}
+
 struct HistoryView: View {
     @ObservedObject private var controller = HistoryController.shared
     @State private var query = ""
@@ -21,33 +26,21 @@ struct HistoryView: View {
                     Button("Reset History", role: .destructive) { Task { await resetHistory() } }
                 }
             } else {
-                HSplitView {
-                    VStack(spacing: 0) {
-                        List(entries, selection: $selectedID) { entry in
-                            HistoryEntryRow(entry: entry)
-                                .tag(entry.id)
-                                .contextMenu {
-                                    Button("Delete", role: .destructive) { Task { await delete(entry.id) } }
-                                }
-                        }
-                        .searchable(text: $query, prompt: "Search History")
+                GeometryReader { geometry in
+                    let listWidth = geometry.size.width * HistoryLayoutMetrics.listFraction
+                    let detailWidth = max(0, geometry.size.width - listWidth - 1)
 
-                        HStack {
-                            Text(ByteCountFormatter.string(fromByteCount: storageBytes, countStyle: .file))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button("Clear History…", role: .destructive) { showingClearConfirmation = true }
-                                .disabled(entries.isEmpty)
-                        }
-                        .font(.caption)
-                        .padding(10)
-                    }
-                    .frame(minWidth: 290, idealWidth: 330)
+                    HStack(spacing: 0) {
+                        historyList
+                            .frame(width: listWidth, height: geometry.size.height)
 
-                    HistoryEntryDetail(entry: selectedEntry) {
-                        if let selectedID { Task { await delete(selectedID) } }
+                        Divider()
+
+                        HistoryEntryDetail(entry: selectedEntry) {
+                            if let selectedID { Task { await delete(selectedID) } }
+                        }
+                        .frame(width: detailWidth, height: geometry.size.height)
                     }
-                    .frame(minWidth: 360)
                 }
             }
         }
@@ -57,6 +50,30 @@ struct HistoryView: View {
             Button("Clear History", role: .destructive) { Task { await clear() } }
         } message: {
             Text("This permanently removes every Dictation, AI Action, and stored context image.")
+        }
+    }
+
+    private var historyList: some View {
+        VStack(spacing: 0) {
+            HistorySearchField(query: $query)
+
+            List(entries, selection: $selectedID) { entry in
+                HistoryEntryRow(entry: entry)
+                    .tag(entry.id)
+                    .contextMenu {
+                        Button("Delete", role: .destructive) { Task { await delete(entry.id) } }
+                    }
+            }
+
+            HStack {
+                Text(ByteCountFormatter.string(fromByteCount: storageBytes, countStyle: .file))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Clear History…", role: .destructive) { showingClearConfirmation = true }
+                    .disabled(entries.isEmpty)
+            }
+            .font(.caption)
+            .padding(10)
         }
     }
 
@@ -95,6 +112,34 @@ struct HistoryView: View {
 
     private func resetHistory() async {
         try? await controller.reset()
+    }
+}
+
+private struct HistorySearchField: View {
+    @Binding var query: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Search History", text: $query)
+                .textFieldStyle(.plain)
+
+            if !query.isEmpty {
+                Button("Clear search", systemImage: "xmark.circle.fill") {
+                    query = ""
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 }
 
@@ -176,7 +221,9 @@ private struct HistoryEntryDetail: View {
     private func detailSection(_ title: String, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.headline)
-            Text(text).textSelection(.enabled)
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
         }
     }
 }
