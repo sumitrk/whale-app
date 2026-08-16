@@ -14,6 +14,7 @@ struct HistoryView: View {
     @State private var selectedEntry: HistoryEntry?
     @State private var storageBytes: Int64 = 0
     @State private var showingClearConfirmation = false
+    @State private var relativeTimeReference = Date()
 
     var body: some View {
         Group {
@@ -45,6 +46,7 @@ struct HistoryView: View {
             }
         }
         .task(id: "\(query)|\(controller.revision)") { await load() }
+        .onAppear { relativeTimeReference = Date() }
         .onChange(of: selectedID) { _, id in Task { await loadDetail(id) } }
         .confirmationDialog("Clear all History?", isPresented: $showingClearConfirmation) {
             Button("Clear History", role: .destructive) { Task { await clear() } }
@@ -58,7 +60,7 @@ struct HistoryView: View {
             HistorySearchField(query: $query)
 
             List(entries, selection: $selectedID) { entry in
-                HistoryEntryRow(entry: entry)
+                HistoryEntryRow(entry: entry, relativeTo: relativeTimeReference)
                     .tag(entry.id)
                     .contextMenu {
                         Button("Delete", role: .destructive) { Task { await delete(entry.id) } }
@@ -145,6 +147,7 @@ private struct HistorySearchField: View {
 
 private struct HistoryEntryRow: View {
     let entry: HistoryEntry
+    let relativeTo: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -152,7 +155,8 @@ private struct HistoryEntryRow: View {
                 Label(entry.kind == .dictation ? "Dictation" : "AI Action", systemImage: entry.kind == .dictation ? "mic" : "sparkles")
                     .font(.headline)
                 Spacer()
-                Text(entry.createdAt, style: .relative).foregroundStyle(.secondary)
+                Text(relativeTime)
+                    .foregroundStyle(.secondary)
             }
             Text(entry.resultText ?? entry.instructionText ?? entry.errorText ?? entry.outcome.rawValue.capitalized)
                 .lineLimit(2)
@@ -165,6 +169,12 @@ private struct HistoryEntryRow: View {
             .foregroundStyle(outcomeColor)
         }
         .padding(.vertical, 4)
+    }
+
+    private var relativeTime: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: entry.createdAt, relativeTo: relativeTo)
     }
 
     private var outcomeColor: Color {
