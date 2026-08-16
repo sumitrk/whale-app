@@ -48,6 +48,40 @@ final class AIActionTests: XCTestCase {
         XCTAssertTrue(request.images.isEmpty)
     }
 
+    @MainActor
+    func testPromptSupportsSelectionOnlyContext() throws {
+        let request = try AIActionPromptBuilder.build(
+            instruction: "Rewrite this",
+            snapshot: ContextSnapshot(
+                capturedAt: Date(),
+                sourceAppName: "Notes",
+                inputs: [ContextInput(source: .selection, ordinal: 0, content: .text("selected text"))]
+            ),
+            masterPrompt: "Be concise"
+        )
+
+        XCTAssertTrue(request.prompt.contains("selected text"))
+        XCTAssertTrue(request.prompt.contains("source=\"Selection\""))
+        XCTAssertFalse(request.prompt.contains("source=\"Clipboard\""))
+    }
+
+    @MainActor
+    func testPromptSupportsClipboardOnlyContext() throws {
+        let request = try AIActionPromptBuilder.build(
+            instruction: "Rewrite this",
+            snapshot: ContextSnapshot(
+                capturedAt: Date(),
+                sourceAppName: "Notes",
+                inputs: [ContextInput(source: .clipboard, ordinal: 0, content: .text("clipboard text"))]
+            ),
+            masterPrompt: "Be concise"
+        )
+
+        XCTAssertTrue(request.prompt.contains("clipboard text"))
+        XCTAssertTrue(request.prompt.contains("source=\"Clipboard\""))
+        XCTAssertFalse(request.prompt.contains("source=\"Selection\""))
+    }
+
     func testJSONLFramerHandlesFragmentsMultipleLinesAndCRLF() {
         var framer = JSONLFramer()
         XCTAssertTrue(framer.append(Data("{\"type\":\"a\"".utf8)).isEmpty)

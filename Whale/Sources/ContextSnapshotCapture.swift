@@ -18,7 +18,7 @@ enum ContextCaptureError: LocalizedError {
         case .eventPostingUnavailable:
             return "Accessibility permission is required to capture this selection"
         case .contextTooLarge:
-            return "The selected and copied context is too large for one AI Action"
+            return "The selected or clipboard context is too large for one AI Action"
         }
     }
 }
@@ -32,8 +32,6 @@ enum ContextSnapshotCapture {
         }
 
         let pasteboard = NSPasteboard.general
-        let original = TextInsertionManager.PasteboardSnapshot.capture(from: pasteboard)
-        let clipboardInputs = inputs(from: pasteboard, source: .clipboard)
         let sourceAppName = focused?.snapshot.appName ?? NSWorkspace.shared.frontmostApplication?.localizedName
 
         if let focused,
@@ -42,19 +40,24 @@ enum ContextSnapshotCapture {
             return ContextSnapshot(
                 capturedAt: Date(),
                 sourceAppName: sourceAppName,
-                inputs: [ContextInput(source: .selection, ordinal: 0, content: .text(selectedText))] + clipboardInputs
+                inputs: [ContextInput(source: .selection, ordinal: 0, content: .text(selectedText))]
             )
         }
 
         let knownSelection = focused.flatMap(FocusedElementInspector.selectedTextRange(in:))?.length ?? 0 > 0
         guard knownSelection else {
-            return ContextSnapshot(capturedAt: Date(), sourceAppName: sourceAppName, inputs: clipboardInputs)
+            return ContextSnapshot(
+                capturedAt: Date(),
+                sourceAppName: sourceAppName,
+                inputs: inputs(from: pasteboard, source: .clipboard)
+            )
         }
 
         guard CGPreflightPostEventAccess() else {
             throw ContextCaptureError.eventPostingUnavailable
         }
 
+        let original = TextInsertionManager.PasteboardSnapshot.capture(from: pasteboard)
         let originalChangeCount = pasteboard.changeCount
         simulateCopy()
         defer { original.restore(to: pasteboard) }
@@ -68,7 +71,7 @@ enum ContextSnapshotCapture {
         return ContextSnapshot(
             capturedAt: Date(),
             sourceAppName: sourceAppName,
-            inputs: selectionInputs + clipboardInputs
+            inputs: selectionInputs
         )
     }
 

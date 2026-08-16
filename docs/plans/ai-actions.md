@@ -92,16 +92,14 @@ Dictation and Transcript Mode must not call an LLM. Removing AI Cleanup means th
 
 Freeze context at AI Action start, before recording. Later selection or clipboard changes must not change what is sent to the model.
 
-Capture all supported inputs rather than trying to infer whether the instruction needs the clipboard:
+Use one context source per AI Action:
 
-- Selected text, when non-empty.
-- Selected images, when the source application exposes them through Accessibility or Copy.
-- Clipboard text.
-- Clipboard images.
-- Image files copied from Finder when their type is PNG, JPEG, HEIC, or WebP.
-- The source application's display name, but not its bundle identifier.
+- Selected text or images, when available, take precedence and are the only external context sent.
+- When no content is selected, use supported clipboard text and images.
+- Image files copied from Finder are supported when their type is PNG, JPEG, HEIC, or WebP.
+- The source application's display name is captured, but not its bundle identifier.
 
-Selection and the original clipboard are separate, labeled Context Inputs. Send both when both are present, even if they contain similar content. Do not make a preliminary LLM call to route or choose context.
+Selection and clipboard inputs remain separately labeled Context Inputs, but they are never sent together. Do not make a preliminary LLM call to route or choose context.
 
 Capture selection in this order:
 
@@ -109,7 +107,7 @@ Capture selection in this order:
 2. Otherwise preserve the original pasteboard, simulate Command-C, read supported copied content as selection, and restore the original pasteboard.
 3. If Whale knows there is a non-empty selection but cannot capture it, fail explicitly. Do not silently substitute unrelated clipboard content.
 
-For a simulated Copy, restore every readable original pasteboard item/representation, not just its plain-text value. The original clipboard captured before Command-C is also the clipboard Context Input.
+For a simulated Copy, restore every readable original pasteboard item/representation, not just its plain-text value. The original clipboard is not used as context when a selection is captured.
 
 Additional rules:
 
@@ -126,7 +124,7 @@ One final model request contains:
 - Protected internal runtime instructions.
 - The editable user master prompt.
 - The local transcript of the spoken instruction.
-- Every available Context Input, clearly labeled by source and media type.
+- The selected or clipboard Context Inputs, clearly labeled by source and media type.
 - The source application name when available.
 - Request-optimized image attachments mapped unambiguously to their labels.
 
