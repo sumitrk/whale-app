@@ -15,16 +15,61 @@ enum AppStatus: Equatable {
 }
 
 /// Tracks how the current recording was triggered.
-fileprivate enum RecordingMode: Sendable {
+enum RecordingMode: Sendable, Equatable {
     case markdown   // ⌘⇧T: Transcribe → .md file → Finder
     case paste      // Fn:   Transcribe only → clipboard + auto-paste
-    case aiAction   // Left Control: spoken instruction + frozen context → AI result
+}
+
+enum RecordingActivity: Equatable {
+    case idle
+    case starting(mode: RecordingMode, stopRequested: Bool)
+    case recording(mode: RecordingMode, startedAt: Date)
+    case processing(mode: RecordingMode)
+    case error(String)
+
+    var isRecording: Bool {
+        if case .recording = self { return true }
+        return false
+    }
+
+    var isBusy: Bool {
+        switch self {
+        case .starting, .recording, .processing:
+            return true
+        case .idle, .error:
+            return false
+        }
+    }
+
+    var mode: RecordingMode? {
+        switch self {
+        case .idle, .error:
+            return nil
+        case .starting(let mode, _), .recording(let mode, _), .processing(let mode):
+            return mode
+        }
+    }
+
+    var startedAt: Date? {
+        guard case .recording(_, let startedAt) = self else { return nil }
+        return startedAt
+    }
+
+    var stopRequested: Bool {
+        guard case .starting(_, let stopRequested) = self else { return false }
+        return stopRequested
+    }
+
+    mutating func requestStop() {
+        guard case .starting(let mode, false) = self else { return }
+        self = .starting(mode: mode, stopRequested: true)
+    }
 }
 
 @MainActor
 class AppState: ObservableObject {
     @Published var status: AppStatus = .starting
-    @Published var isRecording = false
+    @Published private var activity: RecordingActivity = .idle
     @Published var lastMeetingPath: String? = nil
     /// Set after every transcription — observed by the onboarding test screen.
     @Published var lastTranscript: String = ""
@@ -44,13 +89,7 @@ class AppState: ObservableObject {
     private var onboardingWindow: NSWindow?
     private var onboardingWindowCloseObserver: NSObjectProtocol?
 
-    private var recordingStartedAt: Date?
-    private var currentMode: RecordingMode = .markdown
     private var currentModelID: BuiltInModelID = .parakeetEnglishV2
-    private var isPTTArming = false
-    private var stopPTTAfterStart = false
-    private var isStartingRecording = false
-    private var processingTask: Task<PipelineResult, Error>?
     private var currentHistoryEntryID: UUID?
 
     init(
@@ -172,17 +211,10 @@ class AppState: ObservableObject {
 
     var isReady: Bool { status == .ready }
 
-    private var isBusy: Bool {
-        if isRecording || isPTTArming || isStartingRecording || processingTask != nil || aiActionCoordinator.state.isActive {
-            return true
-        }
+    var isRecording: Bool { activity.isRecording }
 
-        switch status {
-        case .starting, .recording, .transcribing, .processing:
-            return true
-        case .ready, .error:
-            return false
-        }
+    private var isBusy: Bool {
+        activity.isBusy || status == .starting || aiActionCoordinator.state.isActive
     }
 
     var statusLabel: String {
@@ -190,11 +222,9 @@ class AppState: ObservableObject {
         case .starting:      return "Preparing transcription…"
         case .ready:         return "Ready  (⌘⇧T to record | hold Fn to dictate)"
         case .recording:
-            switch currentMode {
-            case .paste: return "Dictating…  (release Fn to stop)"
-            case .aiAction: return "Listening for an AI Action…"
-            case .markdown: return "Recording…  (⌘⇧T to stop)"
-            }
+            if activity.mode == .paste { return "Dictating…  (release Fn to stop)" }
+            if activity.mode == .markdown { return "Recording…  (⌘⇧T to stop)" }
+            return "Listening for an AI Action…"
         case .transcribing:  return "Transcribing…"
         case .processing(let message): return message
         case .error(let m):  return "Error: \(m)"
@@ -241,14 +271,14 @@ class AppState: ObservableObject {
             onPTTPress: pttPressAction,
             onPTTRelease: { [weak self] in
                 guard let self else { return }
-                if self.isPTTArming {
-                    self.stopPTTAfterStart = true
+                if case .starting(let mode, _) = self.activity, mode == .paste {
+                    self.activity.requestStop()
                     if self.recorder.isRecording {
                         Task { await self.stopRecording() }
                     }
                     return
                 }
-                guard self.isRecording else { return }
+                guard self.activity.isRecording else { return }
                 Task { await self.stopRecording() }
             },
             onActionPress: { [weak self] in
@@ -267,16 +297,13 @@ class AppState: ObservableObject {
     }
 
     private func handleRecorderReady() {
-        guard currentMode == .paste, isPTTArming else { return }
-        if stopPTTAfterStart {
-            stopPTTAfterStart = false
+        guard case .starting(let mode, let stopRequested) = activity, mode == .paste else { return }
+        if stopRequested {
             Task { await self.stopRecording() }
             return
         }
-        isPTTArming = false
-        isRecording = true
+        activity = .recording(mode: .paste, startedAt: Date())
         status = .recording
-        recordingStartedAt = Date()
         playSound("Blow")
     }
 
@@ -289,7 +316,7 @@ class AppState: ObservableObject {
     // MARK: - Toggle (⌘⇧T)
 
     func toggleMarkdown() {
-        if isRecording && currentMode == .markdown {
+        if case .recording(let mode, _) = activity, mode == .markdown {
             Task { await stopRecording() }
         } else if !isBusy {
             Task { await startRecording(mode: .markdown) }
@@ -302,34 +329,20 @@ class AppState: ObservableObject {
     fileprivate func startRecording(mode: RecordingMode) async {
         guard !isBusy else { return }
 
-        isStartingRecording = true
-        defer { isStartingRecording = false }
-
-        let isDictation = mode == .paste
-        if isDictation {
-            isPTTArming = true
-            stopPTTAfterStart = false
-            recordingStartedAt = nil
-        }
-
-        if status != .starting {
-            status = .ready
-        }
+        activity = .starting(mode: mode, stopRequested: false)
+        status = .starting
 
         do {
             let modelID = settings.selectedBuiltInModelID
             guard try await transcriber.isModelInstalled(modelID) else {
-                if isDictation {
-                    isPTTArming = false
-                    stopPTTAfterStart = false
-                }
+                let message = modelID.descriptor.installationPrompt
                 DiagnosticLog.log("[Recording] Selected model \(modelID.rawValue) is not installed.")
-                status = .error(modelID.descriptor.installationPrompt)
+                activity = .error(message)
+                status = .error(message)
                 return
             }
 
             currentModelID = modelID
-            currentMode = mode
             if mode == .paste {
                 let store = try await history.requireStore()
                 currentHistoryEntryID = try await store.createEntry(
@@ -344,34 +357,36 @@ class AppState: ObservableObject {
             }
             try await recorder.startRecording(captureSystemAudio: mode == .markdown)
             if mode == .markdown {
-                isRecording = true
+                activity = .recording(mode: .markdown, startedAt: Date())
                 status = .recording
-                recordingStartedAt = Date()
                 playSound("Blow")
-            } else {
-                if stopPTTAfterStart {
-                    stopPTTAfterStart = false
-                    await stopRecording()
-                    return
-                }
+            } else if activity.stopRequested {
+                await stopRecording()
             }
         } catch {
-            if isDictation {
-                isPTTArming = false
-                stopPTTAfterStart = false
-            }
             RecordingIndicatorWindow.shared.hide()
             await finalizeCurrentDictation(outcome: .failed, errorText: error.localizedDescription)
+            activity = .error(error.localizedDescription)
             status = .error(error.localizedDescription)
         }
     }
 
     func stopRecording() async {
-        let startedAt = recordingStartedAt ?? Date()
-        let mode = currentMode
-        isPTTArming = false
-        stopPTTAfterStart = false
-        isRecording = false
+        let mode: RecordingMode
+        let startedAt: Date
+        switch activity {
+        case .starting(let activeMode, _):
+            mode = activeMode
+            startedAt = Date()
+        case .recording(let activeMode, let recordingStartedAt):
+            mode = activeMode
+            startedAt = recordingStartedAt
+        case .idle, .processing, .error:
+            return
+        }
+
+        activity = .processing(mode: mode)
+        status = .transcribing
         RecordingIndicatorWindow.shared.hide()
 
         do {
@@ -392,19 +407,13 @@ class AppState: ObservableObject {
             let audioSource: AudioSource = mode == .paste ? .microphone : .system
             let pipeline = pipelineFactory()
             let activeModelID = currentModelID
-
-            status = .transcribing
-
-            let task = Task.detached(priority: .userInitiated) {
+            let result = try await Task.detached(priority: .userInitiated) {
                 try await pipeline.process(
                     wavURL: wavURL,
                     modelID: activeModelID,
                     audioSource: audioSource
                 )
-            }
-            processingTask = task
-            let result = try await task.value
-            processingTask = nil
+            }.value
             let transcript = result.processedTranscript
             DiagnosticLog.log(
                 "[Recording] Transcript ready (\(transcript.count) chars, stages: \(result.stagesExecuted.joined(separator: " -> ")))."
@@ -425,6 +434,7 @@ class AppState: ObservableObject {
             switch mode {
 
             case .paste:
+                activity = .idle
                 status = .ready
                 RecordingIndicatorWindow.shared.hide()
                 guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -453,31 +463,30 @@ class AppState: ObservableObject {
                 print("Saved: \(mdURL.path)")
 
                 lastMeetingPath = mdURL.path
+                activity = .idle
                 status = .ready
                 playSound("Bottle")
 
                 NSWorkspace.shared.selectFile(mdURL.path, inFileViewerRootedAtPath: "")
 
-            case .aiAction:
-                break
             }
 
         } catch is CancellationError {
-            processingTask = nil
+            activity = .idle
             RecordingIndicatorWindow.shared.hide()
             status = .ready
             print("Processing cancelled")
             DiagnosticLog.log("[Recording] Processing cancelled.")
             await finalizeCurrentDictation(outcome: .cancelled, errorText: "Cancelled")
         } catch RecorderError.noAudioCaptured where mode == .paste {
+            activity = .idle
             RecordingIndicatorWindow.shared.hide()
             status = .ready
             DiagnosticLog.log("[Recording] No audio was captured in paste mode.")
             await finalizeCurrentDictation(outcome: .failed, errorText: "No audio was captured")
         } catch {
-            processingTask = nil
+            activity = .error(error.localizedDescription)
             RecordingIndicatorWindow.shared.hide()
-            isRecording = false
             status = .error(error.localizedDescription)
             print("Recording error: \(error.localizedDescription)")
             DiagnosticLog.log("[Recording] Failed: \(error.localizedDescription)")
@@ -498,29 +507,20 @@ class AppState: ObservableObject {
     private func handleAIActionState(_ actionState: AIActionState) {
         switch actionState {
         case .idle:
-            isRecording = false
             if status != .starting { status = .ready }
         case .capturingContext:
-            currentMode = .aiAction
-            isRecording = false
             status = .processing("Capturing context…")
         case .listening:
-            currentMode = .aiAction
-            isRecording = true
             status = .recording
         case .transcribing:
-            isRecording = false
             status = .transcribing
         case .processing:
-            isRecording = false
             status = .processing("Running AI Action…")
         case .delivering:
             status = .processing("Delivering…")
         case .succeeded, .cancelled:
-            isRecording = false
             status = .ready
         case .failed(let message):
-            isRecording = false
             status = .error(message)
         }
     }

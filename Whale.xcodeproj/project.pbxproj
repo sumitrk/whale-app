@@ -34,6 +34,7 @@
 		AIA000000000000000000008 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000108 /* KeychainStore.swift */; };
 		AIA000000000000000000009 /* PiRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000109 /* PiRuntime.swift */; };
 		AIA000000000000000000010 /* AIActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000110 /* AIActionTests.swift */; };
+		AAPP00000000000000000001 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAPP00000000000000000002 /* AppStateTests.swift */; };
 		AIA000000000000000000011 /* Pi in Resources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000111 /* Pi */; };
 		AIA000000000000000000012 /* SQLCipher in Frameworks */ = {isa = PBXBuildFile; productRef = AIA000000000000000000302 /* SQLCipher */; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */; };
@@ -102,6 +103,7 @@
 		AIA000000000000000000108 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		AIA000000000000000000109 /* PiRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiRuntime.swift; sourceTree = "<group>"; };
 		AIA000000000000000000110 /* AIActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionTests.swift; sourceTree = "<group>"; };
+		AAPP00000000000000000002 /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		AIA000000000000000000111 /* Pi */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Pi; sourceTree = "<group>"; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
@@ -219,6 +221,7 @@
 			isa = PBXGroup;
 			children = (
 				AIA000000000000000000110 /* AIActionTests.swift */,
+				AAPP00000000000000000002 /* AppStateTests.swift */,
 				C0A000000000000000000002 /* AudioRecorderTests.swift */,
 				C1A000000000000000000002 /* HotkeyManagerTests.swift */,
 				PP0000000000000000000006 /* TextInsertionManagerTests.swift */,
@@ -394,6 +397,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AIA000000000000000000010 /* AIActionTests.swift in Sources */,
+				AAPP00000000000000000001 /* AppStateTests.swift in Sources */,
 				C0A000000000000000000001 /* AudioRecorderTests.swift in Sources */,
 				C1A000000000000000000001 /* HotkeyManagerTests.swift in Sources */,
 				PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */,
