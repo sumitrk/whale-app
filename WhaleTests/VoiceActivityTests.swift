@@ -21,6 +21,20 @@ private func noisyTone(seconds: Double, amplitude: Float = 0.5) -> [Float] {
     }
 }
 
+// MARK: - VAD Policy Tests
+
+final class VADPolicyTests: XCTestCase {
+
+    func testMinimumOutputDurationBoundaryIsInclusive() {
+        let belowMinimum = Double(VADPolicy.minOutputSamples - 1) / VADPolicy.sampleRate
+        let atMinimum = Double(VADPolicy.minOutputSamples) / VADPolicy.sampleRate
+
+        XCTAssertFalse(VADPolicy.isOutputLongEnough(belowMinimum))
+        XCTAssertTrue(VADPolicy.isOutputLongEnough(atMinimum))
+        XCTAssertEqual(VADPolicy.minOutputDuration, 1.1, accuracy: 0.000_001)
+    }
+}
+
 // MARK: - Speech Span Detection Tests
 
 final class SpeechSpanDetectionTests: XCTestCase {

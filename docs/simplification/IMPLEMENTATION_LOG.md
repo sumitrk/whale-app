@@ -33,3 +33,14 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Diff validation:** `git diff --check` — passed.
 - **Result:** R-SET-01 is verified. Shortcut labels now have one formatter and preserve existing output, including modifier-only keys.
 - **Next:** R-TRN-02.
+
+## 2026-08-16T14:38:50Z — R-TRN-02 verified
+
+- **Checkpoint:** `main`
+- **Change:** Centralized the FluidAudio VAD output floor at 1.1 seconds (17,600 samples), deriving duration from the sample threshold and sharing the boundary predicate between the editor and stage.
+- **Tests:** Added inclusive boundary coverage for output durations just below and exactly at the minimum.
+- **Focused validation:** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' -only-testing:WhaleTests/VoiceActivityTests` — passed after moving the shared predicate into `VADPolicy` following an initial compile failure.
+- **Full validation:** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` — passed.
+- **Diff validation:** `git diff --check` — passed.
+- **Result:** R-TRN-02 is verified. The editor and stage now use one minimum output-duration policy, preserving the existing 1.1-second stage safety floor.
+- **Next:** R-REPO-01.

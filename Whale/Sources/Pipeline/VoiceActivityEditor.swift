@@ -30,10 +30,15 @@ enum VADPolicy {
     static let mergeGapSamples: Int = 2_400 // 150 ms — only stitch threshold chatter
     static let preRollSamples: Int = 1_920   // 120 ms
     static let postRollSamples: Int = 19_200 // 1.2 s keeps trailing dictation from getting clipped
-    static let minOutputSamples: Int = 16_800 // ~1.05 s — FluidAudio requires >= 1 s of 16 kHz audio
+    static let minOutputSamples: Int = 17_600 // 1.1 s — FluidAudio requires >= 1 s of 16 kHz audio
+    static let minOutputDuration: TimeInterval = Double(minOutputSamples) / sampleRate
     static let absoluteFloorDBFS: Float = -48.0
     static let noiseFloorCapDBFS: Float = -48.0 // keep speech-heavy starts from inflating the threshold
     static let noiseMarginDB: Float = 6.0    // margin above noise floor to set speech threshold
+
+    static func isOutputLongEnough(_ duration: TimeInterval) -> Bool {
+        duration >= minOutputDuration
+    }
 }
 
 // MARK: - VoiceActivityEditor
@@ -195,7 +200,8 @@ enum VoiceActivityEditor {
 
         let rebuilt = rebuildWaveform(samples: samples, spans: spans)
 
-        if rebuilt.count < VADPolicy.minOutputSamples {
+        let rebuiltDuration = Double(rebuilt.count) / VADPolicy.sampleRate
+        if !VADPolicy.isOutputLongEnough(rebuiltDuration) {
             return VADStats(
                 originalDuration: originalDuration,
                 retainedDuration: originalDuration,
