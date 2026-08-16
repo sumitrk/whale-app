@@ -175,7 +175,18 @@ sign_for_distribution() {
     codesign --force \
       --options runtime \
       --timestamp \
-      --preserve-metadata=identifier,entitlements,requirements \
+      --preserve-metadata=identifier,entitlements \
+      --sign "$SIGNING_IDENTITY" \
+      "$item"
+  done
+
+  # Xcode may embed Swift compatibility dylibs with an Apple Development
+  # signature; notarization requires every nested binary to use Developer ID.
+  for item in "$APP_PATH/Contents/Frameworks/"*.dylib; do
+    [ -e "$item" ] || continue
+    codesign --force \
+      --options runtime \
+      --timestamp \
       --sign "$SIGNING_IDENTITY" \
       "$item"
   done
