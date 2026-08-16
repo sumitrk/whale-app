@@ -24,7 +24,7 @@ Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 ## Current state
 
 - **Coordinator:** parent session / next available session
-- **Active slice:** none (R-AI-01 verified)
+- **Active slice:** none (R-TRN-01 verified)
 - **Baseline tests:** passed (`xcodebuild test`, all suites)
 - **Baseline build:** passed as part of baseline test run
 - **Worktree at tracker creation:** `M Whale/Sources/TranscribeMeetingApp.swift` — preserve; not part of this plan unless explicitly claimed.
@@ -41,7 +41,7 @@ Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 | 4 | R-REPO-01 | Retire stale Node/Python/XcodeGen ownership artifacts | verified | `project.yml`, `index.js`, env/runtime docs, confirmed ignore rules | Tracked-reference search; Xcode show-build-settings; tests |
 | 5 | R-CAP-02 | Mix audio without temporary padded arrays | verified | `AudioRecorder.swift`, focused tests if practical | System-only, mic-only, unequal, empty, combined audio |
 | 6 | R-AI-01 | Replace correlated AI-action optionals with `ActiveRun` | verified | `AIActionCoordinator.swift`, coordinator tests | Early release, cancellation, supersession, timeout/failure, history finalization |
-| 7 | R-TRN-01 | Centralize model-operation task lifecycle | queued | `LocalTranscriptionService.swift`, model tests | Install/reset/connect, cancellation, progress, stale cleanup |
+| 7 | R-TRN-01 | Centralize model-operation task lifecycle | verified | `LocalTranscriptionService.swift`, model tests | Install/reset/connect, cancellation, progress, stale cleanup |
 | 8 | R-CAP-01 | Unify hotkey monitor ownership and registration policy | queued | `HotkeyManager.swift` | Full/local/stopped modes; Fn/Globe; regular PTT; repeated rebuilds |
 | 9 | R-APP-01 | Represent AppState recording lifecycle as one activity phase | queued | `AppState.swift`, transition tests | Early release, unavailable model, recorder failure, normal flows, AI independence |
 | 10 | R-REPO-02 | Archive historical specifications and exploratory designs | verified | `docs/archive/specifications`, `docs/archive/explorations`, links | Tracked-reference search; Markdown/reference validation |

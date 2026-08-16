@@ -90,3 +90,14 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Residual risks / skipped work:** Unit coverage verifies `ActiveRun` state grouping; live coordinator paths still depend on microphone, accessibility, model, runtime, and history services, so the manual smoke test remains optional. No dependency injection or broader AI runtime refactor was added.
 - **Result:** R-AI-01 is verified.
 - **Next slice:** R-TRN-01.
+
+## 2026-08-16T16:22:21Z — R-TRN-01 verified
+
+- **Branch:** `step-12-r-trn-01`
+- **What changed:** Centralized install, reset, and local-model connection task handling in `TranscriptionModelStore` with one operation context. Progress, success, failure, cancellation, and cleanup now share one lifecycle; operation IDs prevent stale tasks and late progress callbacks from mutating newer state. Refresh now skips models with an active operation.
+- **Files:** `Whale/Sources/LocalTranscriptionService.swift`, `WhaleTests/TranscriptionModelTests.swift`, `docs/simplification/IMPLEMENTATION_TRACKER.md`.
+- **How to test:** Focused `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' -only-testing:WhaleTests/TranscriptionModelTests` — passed. Full `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` — passed. `git diff --check` — passed.
+- **Impact:** Model-management UI keeps the same install/reset/connect states and backend behavior while removing duplicated async lifecycle code. Canceled or superseded work can no longer clear a newer task or apply stale progress; cancellation leaves a stable state.
+- **Residual risks / skipped work:** The settings UI still does not expose a cancel button; cancellation is centralized for callers and future UI use. Live FluidAudio/Whisper downloads and hardware/runtime behavior were not changed.
+- **Result:** R-TRN-01 is verified.
+- **Next slice:** R-CAP-01.
