@@ -315,4 +315,4 @@ At this point, the full V0 is done. Workflow for every meeting going forward:
 5. Open your vault in Obsidian → note is there
 
 ---
-**V0 complete!** See `Spec/macos-meeting-transcriber/spec.md` for future enhancement ideas.
+**V0 complete!** See `../spec.md` for future enhancement ideas.

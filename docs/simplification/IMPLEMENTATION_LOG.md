@@ -69,3 +69,13 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Residual risks / skipped work:** Unit tests do not exercise live CoreAudio/AVCapture hardware timing; manual capture smoke testing remains optional. No broader audio pipeline refactor was attempted.
 - **Result:** R-CAP-02 is verified.
 - **Next slice:** R-AI-01.
+
+## 2026-08-16T15:51:41Z — R-REPO-02 verified
+
+- **Branch:** `step-10-r-repo-02`
+- **What changed:** Moved the historical V0/V1 specifications and logs to `docs/archive/specifications/`, moved V2 ideas and the Hopper investigation to `docs/archive/explorations/`, and added `docs/archive/README.md` explaining their archival status and current sources of truth. Updated the archived command/path references and tracker sequence.
+- **How to test:** Tracked-reference search found no stale `Spec/v0`, `Spec/v1`, `v2/`, or `HOPPER_INVESTIGATION.md` references outside the tracker/log. Markdown reference validation checked 45 tracked Markdown files and found no missing non-code targets. `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` — passed. `git diff --check` — passed.
+- **Impact:** Historical design material remains available without competing with current `docs/plans/`, `docs/adr/`, and `Whale.xcodeproj` ownership. Runtime code and build behavior are unchanged.
+- **Residual risks / skipped work:** The ignored local `Spec/post-processing-local-llm/` draft was not moved or modified because it is untracked local content. Archived code snippets intentionally retain historical implementation examples.
+- **Result:** R-REPO-02 is verified.
+- **Next slice:** R-AI-01.
