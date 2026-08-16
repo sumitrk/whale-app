@@ -44,3 +44,12 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Diff validation:** `git diff --check` — passed.
 - **Result:** R-TRN-02 is verified. The editor and stage now use one minimum output-duration policy, preserving the existing 1.1-second stage safety floor.
 - **Next:** R-REPO-01.
+
+## 2026-08-16T14:45:57Z — R-REPO-01 verified
+
+- **Branch:** `step-04-r-repo-01`
+- **Change:** Removed stale root `index.js`, `project.yml`, `.env.example`, and `.python-version` artifacts. Updated `DISTRIBUTION.md` to state that `Whale.xcodeproj` is the sole Xcode project source of truth, and removed obsolete Python/PyInstaller/XcodeGen ignore rules while preserving current Xcode, distribution, audio, and local model ignores.
+- **Validation:** Current ownership-reference search passed; `xcodebuild -showBuildSettings -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` passed; full `xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` passed; `git diff --check` passed.
+- **Residual:** Historical `Spec/`, `v2/`, and `HOPPER_INVESTIGATION.md` references remain intentionally for R-REPO-02 archival cleanup.
+- **Result:** R-REPO-01 is verified. The checked-in Xcode project and Swift runtime are now the only current ownership path.
+- **Next:** R-CAP-02.

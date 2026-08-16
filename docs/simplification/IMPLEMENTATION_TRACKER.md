@@ -27,7 +27,7 @@ Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 - **Baseline tests:** passed (`xcodebuild test`, all suites)
 - **Baseline build:** passed as part of baseline test run
 - **Worktree at tracker creation:** `M Whale/Sources/TranscribeMeetingApp.swift` — preserve; not part of this plan unless explicitly claimed.
-- **Next slice:** R-REPO-01
+- **Next slice:** R-CAP-02
 
 ## Recommended sequence
 
@@ -37,7 +37,7 @@ Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 | 1 | R-OUT-01 | Replace payload-bearing `CharacterProbeResult.realContent(String)` with payload-free `.content` | verified | `TextInsertionManager.swift`, insertion tests | Focused insertion tests; full Xcode test |
 | 2 | R-SET-01 | Reuse one shortcut-label formatter | verified | `KeyRecorderView.swift`, possibly settings tests | Fn/Globe, Escape, arrows, ordinary keys, modifiers |
 | 3 | R-TRN-02 | Centralize VAD minimum-duration policy | verified | VAD editor/stage/tests | Decide threshold; boundary tests; full Xcode test |
-| 4 | R-REPO-01 | Retire stale Node/Python/XcodeGen ownership artifacts | queued | `project.yml`, `index.js`, env/runtime docs, confirmed ignore rules | Tracked-reference search; Xcode show-build-settings; tests |
+| 4 | R-REPO-01 | Retire stale Node/Python/XcodeGen ownership artifacts | verified | `project.yml`, `index.js`, env/runtime docs, confirmed ignore rules | Tracked-reference search; Xcode show-build-settings; tests |
 | 5 | R-CAP-02 | Mix audio without temporary padded arrays | queued | `AudioRecorder.swift`, focused tests if practical | System-only, mic-only, unequal, empty, combined audio |
 | 6 | R-AI-01 | Replace correlated AI-action optionals with `ActiveRun` | queued | `AIActionCoordinator.swift`, coordinator tests | Early release, cancellation, supersession, timeout/failure, history finalization |
 | 7 | R-TRN-01 | Centralize model-operation task lifecycle | queued | `LocalTranscriptionService.swift`, model tests | Install/reset/connect, cancellation, progress, stale cleanup |

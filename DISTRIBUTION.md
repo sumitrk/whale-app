@@ -18,7 +18,7 @@ The checked-in [Whale.xcodeproj](/Users/sumitkumar/Downloads/Projects/whale-app/
 - embedded frameworks
 - the pinned arm64 Pi 0.72.1 download, verification, embedding, and AI Actions third-party notices
 
-[project.yml](/Users/sumitkumar/Downloads/Projects/whale-app/project.yml) is kept only as legacy reference and should not be treated as authoritative for release behavior.
+No generated Xcode project specification is kept; release behavior changes belong in `Whale.xcodeproj`.
 
 ## First Principles
 
