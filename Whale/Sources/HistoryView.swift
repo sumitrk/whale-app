@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+private enum HistoryLayoutMetrics {
+    // This is the History list's share of the detail container. Change it to resize the list.
+    static let listFraction: CGFloat = 0.38
+}
+
 struct HistoryView: View {
     @ObservedObject private var controller = HistoryController.shared
     @State private var query = ""
@@ -21,34 +26,21 @@ struct HistoryView: View {
                     Button("Reset History", role: .destructive) { Task { await resetHistory() } }
                 }
             } else {
-                HSplitView {
-                    VStack(spacing: 0) {
-                        HistorySearchField(query: $query)
+                GeometryReader { geometry in
+                    let listWidth = geometry.size.width * HistoryLayoutMetrics.listFraction
+                    let detailWidth = max(0, geometry.size.width - listWidth - 1)
 
-                        List(entries, selection: $selectedID) { entry in
-                            HistoryEntryRow(entry: entry)
-                                .tag(entry.id)
-                                .contextMenu {
-                                    Button("Delete", role: .destructive) { Task { await delete(entry.id) } }
-                                }
+                    HStack(spacing: 0) {
+                        historyList
+                            .frame(width: listWidth, height: geometry.size.height)
+
+                        Divider()
+
+                        HistoryEntryDetail(entry: selectedEntry) {
+                            if let selectedID { Task { await delete(selectedID) } }
                         }
-
-                        HStack {
-                            Text(ByteCountFormatter.string(fromByteCount: storageBytes, countStyle: .file))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button("Clear History…", role: .destructive) { showingClearConfirmation = true }
-                                .disabled(entries.isEmpty)
-                        }
-                        .font(.caption)
-                        .padding(10)
+                        .frame(width: detailWidth, height: geometry.size.height)
                     }
-                    .frame(minWidth: 290, idealWidth: 330, maxWidth: 420)
-
-                    HistoryEntryDetail(entry: selectedEntry) {
-                        if let selectedID { Task { await delete(selectedID) } }
-                    }
-                    .frame(minWidth: 360)
                 }
             }
         }
@@ -58,6 +50,30 @@ struct HistoryView: View {
             Button("Clear History", role: .destructive) { Task { await clear() } }
         } message: {
             Text("This permanently removes every Dictation, AI Action, and stored context image.")
+        }
+    }
+
+    private var historyList: some View {
+        VStack(spacing: 0) {
+            HistorySearchField(query: $query)
+
+            List(entries, selection: $selectedID) { entry in
+                HistoryEntryRow(entry: entry)
+                    .tag(entry.id)
+                    .contextMenu {
+                        Button("Delete", role: .destructive) { Task { await delete(entry.id) } }
+                    }
+            }
+
+            HStack {
+                Text(ByteCountFormatter.string(fromByteCount: storageBytes, countStyle: .file))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Clear History…", role: .destructive) { showingClearConfirmation = true }
+                    .disabled(entries.isEmpty)
+            }
+            .font(.caption)
+            .padding(10)
         }
     }
 
@@ -205,7 +221,9 @@ private struct HistoryEntryDetail: View {
     private func detailSection(_ title: String, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.headline)
-            Text(text).textSelection(.enabled)
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
         }
     }
 }
