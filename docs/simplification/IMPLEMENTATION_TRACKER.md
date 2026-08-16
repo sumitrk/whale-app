@@ -9,6 +9,7 @@ This tracker is the coordination source for the recommendations from the simplif
 3. Each recommendation gets its own branch/checkpoint and focused validation. Do not mix unrelated changes.
 4. Update this tracker and append the log before handing work to another session.
 5. Never reset or overwrite pre-existing worktree changes.
+6. Every completed slice must include a user-facing handoff: what changed, exactly how to test it, its user/technical impact, residual risks, and the next slice.
 
 Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 
@@ -27,7 +28,7 @@ Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 - **Baseline tests:** passed (`xcodebuild test`, all suites)
 - **Baseline build:** passed as part of baseline test run
 - **Worktree at tracker creation:** `M Whale/Sources/TranscribeMeetingApp.swift` — preserve; not part of this plan unless explicitly claimed.
-- **Next slice:** R-REPO-01
+- **Next slice:** R-AI-01
 
 ## Recommended sequence
 
@@ -37,8 +38,8 @@ Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 | 1 | R-OUT-01 | Replace payload-bearing `CharacterProbeResult.realContent(String)` with payload-free `.content` | verified | `TextInsertionManager.swift`, insertion tests | Focused insertion tests; full Xcode test |
 | 2 | R-SET-01 | Reuse one shortcut-label formatter | verified | `KeyRecorderView.swift`, possibly settings tests | Fn/Globe, Escape, arrows, ordinary keys, modifiers |
 | 3 | R-TRN-02 | Centralize VAD minimum-duration policy | verified | VAD editor/stage/tests | Decide threshold; boundary tests; full Xcode test |
-| 4 | R-REPO-01 | Retire stale Node/Python/XcodeGen ownership artifacts | queued | `project.yml`, `index.js`, env/runtime docs, confirmed ignore rules | Tracked-reference search; Xcode show-build-settings; tests |
-| 5 | R-CAP-02 | Mix audio without temporary padded arrays | queued | `AudioRecorder.swift`, focused tests if practical | System-only, mic-only, unequal, empty, combined audio |
+| 4 | R-REPO-01 | Retire stale Node/Python/XcodeGen ownership artifacts | verified | `project.yml`, `index.js`, env/runtime docs, confirmed ignore rules | Tracked-reference search; Xcode show-build-settings; tests |
+| 5 | R-CAP-02 | Mix audio without temporary padded arrays | verified | `AudioRecorder.swift`, focused tests if practical | System-only, mic-only, unequal, empty, combined audio |
 | 6 | R-AI-01 | Replace correlated AI-action optionals with `ActiveRun` | queued | `AIActionCoordinator.swift`, coordinator tests | Early release, cancellation, supersession, timeout/failure, history finalization |
 | 7 | R-TRN-01 | Centralize model-operation task lifecycle | queued | `LocalTranscriptionService.swift`, model tests | Install/reset/connect, cancellation, progress, stale cleanup |
 | 8 | R-CAP-01 | Unify hotkey monitor ownership and registration policy | queued | `HotkeyManager.swift` | Full/local/stopped modes; Fn/Globe; regular PTT; repeated rebuilds |
@@ -53,6 +54,16 @@ Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 - **Possible reorder:** R-OUT-01, R-SET-01, R-REPO-01, R-REPO-02, and R-CAP-02 are relatively independent, but the listed order minimizes risk and keeps one clear handoff.
 - **Sub-agent rule:** use sub-agents as read-only reviewers or isolated implementation candidates. The coordinator owns integration, tracker updates, tests, and final acceptance.
 
+## Required post-implementation handoff
+
+Before marking a slice `verified`, append this to `IMPLEMENTATION_LOG.md` and include it in the final response:
+
+- **What changed:** files and behavior changed, in plain language.
+- **How to test:** exact commands plus any manual steps or focused test names.
+- **Impact:** what users/developers gain, and what behavior intentionally stays the same.
+- **Residual risks / skipped work:** known limits and why they are deferred.
+- **Next slice:** the next tracker ID.
+
 ## Per-slice acceptance checklist
 
 - [ ] Confirm the slice and scope in this tracker.
@@ -63,6 +74,8 @@ Statuses: `queued` → `active` → `verified` (or `blocked` / `skipped`).
 - [ ] Run focused validation and the full Xcode test command.
 - [ ] Run `git diff --check` and inspect the diff.
 - [ ] Record commands, results, failures, and residual risks in `IMPLEMENTATION_LOG.md`.
+- [ ] Add the required post-implementation handoff: what changed, how to test, impact, residual risks, and next slice.
+- [ ] Explain the same handoff in the final response.
 - [ ] Mark this row `verified` only after the functional gate passes.
 
 ## Explicitly skipped findings

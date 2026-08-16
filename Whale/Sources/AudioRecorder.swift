@@ -835,6 +835,19 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
 
     // MARK: - Mix + Write WAV
 
+    static func mixSamples(system: [Float], microphone: [Float]) -> [Float] {
+        let sampleCount = max(system.count, microphone.count)
+        guard sampleCount > 0 else { return [] }
+
+        var mixed = [Float](repeating: 0, count: sampleCount)
+        for index in 0..<sampleCount {
+            let systemSample = index < system.count ? system[index] : 0
+            let microphoneSample = index < microphone.count ? microphone[index] : 0
+            mixed[index] = (systemSample + microphoneSample) / 2.0
+        }
+        return mixed
+    }
+
     private func mixAndWriteWAV() throws -> RecordingResult {
         lock.lock()
         let rawSys = systemAudioSamples
@@ -842,16 +855,10 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         lock.unlock()
 
         let sys = resample(rawSys, from: tapSampleRate, to: targetSampleRate)
-        let capturedLength = max(sys.count, mic.count)
-        guard capturedLength > 0 else { throw RecorderError.noAudioCaptured }
+        var mixed = Self.mixSamples(system: sys, microphone: mic)
+        guard !mixed.isEmpty else { throw RecorderError.noAudioCaptured }
 
-        let sysPad = sys + [Float](repeating: 0, count: max(0, capturedLength - sys.count))
-        let micPad = mic + [Float](repeating: 0, count: max(0, capturedLength - mic.count))
-
-        var mixed = [Float](repeating: 0, count: capturedLength)
-        for i in 0..<capturedLength {
-            mixed[i] = (sysPad[i] + micPad[i]) / 2.0
-        }
+        let capturedLength = mixed.count
 
         let shouldPadForASR = !currentCaptureIncludesSystemAudio && mixed.count < minimumASRSamples
         if shouldPadForASR {

@@ -44,3 +44,28 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Diff validation:** `git diff --check` — passed.
 - **Result:** R-TRN-02 is verified. The editor and stage now use one minimum output-duration policy, preserving the existing 1.1-second stage safety floor.
 - **Next:** R-REPO-01.
+
+## 2026-08-16T14:45:57Z — R-REPO-01 verified
+
+- **Branch:** `step-04-r-repo-01`
+- **Change:** Removed stale root `index.js`, `project.yml`, `.env.example`, and `.python-version` artifacts. Updated `DISTRIBUTION.md` to state that `Whale.xcodeproj` is the sole Xcode project source of truth, and removed obsolete Python/PyInstaller/XcodeGen ignore rules while preserving current Xcode, distribution, audio, and local model ignores.
+- **Validation:** Current ownership-reference search passed; `xcodebuild -showBuildSettings -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` passed; full `xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` passed; `git diff --check` passed.
+- **Residual:** Historical `Spec/`, `v2/`, and `HOPPER_INVESTIGATION.md` references remain intentionally for R-REPO-02 archival cleanup.
+- **Result:** R-REPO-01 is verified. The checked-in Xcode project and Swift runtime are now the only current ownership path.
+- **Next:** R-CAP-02.
+
+## 2026-08-16T14:48:01Z — Handoff format updated
+
+- **Change:** Added a required post-implementation handoff to the tracker and future slice logs.
+- **Required content:** What changed, exact test commands/manual steps, user and technical impact, residual risks/skipped work, and the next slice.
+- **Applies:** R-CAP-02 onward; future final responses must repeat the same handoff in plain language.
+
+## 2026-08-16T15:42:27Z — R-CAP-02 verified
+
+- **Branch:** `step-05-r-cap-02`
+- **What changed:** Replaced the temporary `sysPad` and `micPad` arrays in `Whale/Sources/AudioRecorder.swift` with one index-based `AudioRecorder.mixSamples(system:microphone:)` mixer. Added `WhaleTests/AudioRecorderTests.swift` covering empty, system-only, microphone-only, unequal-length, and combined inputs, and registered it in `Whale.xcodeproj`.
+- **How to test:** Focused `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' -only-testing:WhaleTests/AudioRecorderMixingTests` — passed. Full `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` — passed. `git diff --check` — passed. Optional manual smoke test: run Whale Dev, record once with system audio enabled and once microphone-only, then confirm both WAVs transcribe normally.
+- **Impact:** WAV sample values, averaging, unequal-input zero fill, empty-input failure, and microphone-only ASR padding remain unchanged; mixing now avoids allocating two full-length temporary padded arrays.
+- **Residual risks / skipped work:** Unit tests do not exercise live CoreAudio/AVCapture hardware timing; manual capture smoke testing remains optional. No broader audio pipeline refactor was attempted.
+- **Result:** R-CAP-02 is verified.
+- **Next slice:** R-AI-01.
