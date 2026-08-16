@@ -13,6 +13,18 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(store.selectedBuiltInModelID, .parakeetEnglishV2)
     }
 
+    func testShortcutLabelsCoverModifierOnlyAndRegularKeys() {
+        let store = SettingsStore(userDefaults: UserDefaults(suiteName: #function)!)
+        let commandShift = Int(NSEvent.ModifierFlags([.command, .shift]).rawValue)
+
+        XCTAssertEqual(store.keyLabel(keyCode: 63, modifiers: 0), "Globe / Fn")
+        XCTAssertEqual(store.keyLabel(keyCode: 54, modifiers: 0), "Right ⌘")
+        XCTAssertEqual(store.keyLabel(keyCode: 53, modifiers: 0), "⎋")
+        XCTAssertEqual(store.keyLabel(keyCode: 123, modifiers: 0), "←")
+        XCTAssertEqual(store.keyLabel(keyCode: 0, modifiers: 0), "A")
+        XCTAssertEqual(store.keyLabel(keyCode: 17, modifiers: commandShift), "⇧⌘T")
+    }
+
     func testMissingSelectedModelKeyMigratesToParakeet() {
         let defaults = UserDefaults(suiteName: #function)!
         defaults.removePersistentDomain(forName: #function)
