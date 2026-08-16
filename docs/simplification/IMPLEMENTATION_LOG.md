@@ -22,3 +22,14 @@ Append-only handoff history for the implementation tracker. Record what was atte
 - **Diff validation:** `git diff --check` — passed.
 - **Result:** R-OUT-01 is verified. No production behavior change intended; empty and unsupported probe states remain distinct.
 - **Next:** R-SET-01.
+
+## 2026-08-16T19:40:00Z — R-SET-01 verified
+
+- **Branch:** `step-02-r-set-01`
+- **Change:** Reused `SettingsStore.keyLabel(keyCode:modifiers:)` from `KeyRecorderView` and removed its duplicate key-code map/formatter.
+- **Tests:** Added shortcut-label coverage for Globe/Fn, modifier-only Command, Escape, arrows, ordinary keys, and Command+Shift modifiers.
+- **Focused validation:** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS' -only-testing:WhaleTests/TranscriptionModelTests` — passed.
+- **Full validation:** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Whale.xcodeproj -scheme Whale -destination 'platform=macOS'` — passed.
+- **Diff validation:** `git diff --check` — passed.
+- **Result:** R-SET-01 is verified. Shortcut labels now have one formatter and preserve existing output, including modifier-only keys.
+- **Next:** R-TRN-02.
