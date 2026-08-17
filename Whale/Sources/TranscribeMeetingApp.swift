@@ -40,14 +40,11 @@ struct TranscribeMeetingApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra("Whale", systemImage: menuBarIconName) {
             MenuBarView(updater: updaterController?.updater)
                 .environmentObject(appState)
                 .environmentObject(accessibilityController)
                 .environmentObject(settingsCoordinator)
-        } label: {
-            Image(systemName: menuBarIconName)
-                .symbolRenderingMode(.hierarchical)
         }
         .menuBarExtraStyle(.menu)
 
