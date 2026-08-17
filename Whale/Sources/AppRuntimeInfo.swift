@@ -7,6 +7,7 @@ struct AppRuntimeInfo: Equatable, Sendable {
     let homeDirectoryURL: URL
     let appSupportDirectoryURL: URL
     let environment: [String: String]
+    let bundleIdentifier: String?
 
     var isSandboxed: Bool {
         if environment["APP_SANDBOX_CONTAINER_ID"] != nil {
@@ -18,6 +19,17 @@ struct AppRuntimeInfo: Equatable, Sendable {
 
     var whaleSupportDirectoryURL: URL {
         appSupportDirectoryURL.appendingPathComponent("Whale", isDirectory: true)
+    }
+
+    var historyDirectoryURL: URL {
+        appSupportDirectoryURL.appendingPathComponent(
+            Self.historyDirectoryName(for: bundleIdentifier),
+            isDirectory: true
+        )
+    }
+
+    static func historyDirectoryName(for bundleIdentifier: String?) -> String {
+        bundleIdentifier?.hasSuffix(".dev") == true ? "Whale-Dev" : "Whale"
     }
 
     var modelsDirectoryURL: URL {
@@ -59,7 +71,8 @@ struct AppRuntimeInfo: Equatable, Sendable {
         return AppRuntimeInfo(
             homeDirectoryURL: fileManager.homeDirectoryForCurrentUser,
             appSupportDirectoryURL: appSupportDirectoryURL,
-            environment: ProcessInfo.processInfo.environment
+            environment: ProcessInfo.processInfo.environment,
+            bundleIdentifier: Bundle.main.bundleIdentifier
         )
     }
 

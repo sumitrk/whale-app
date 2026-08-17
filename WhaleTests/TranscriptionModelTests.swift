@@ -335,7 +335,8 @@ final class TranscriptionModelTests: XCTestCase {
         let runtimeInfo = AppRuntimeInfo(
             homeDirectoryURL: URL(fileURLWithPath: "/Users/tester", isDirectory: true),
             appSupportDirectoryURL: URL(fileURLWithPath: "/Users/tester/Library/Application Support", isDirectory: true),
-            environment: [:]
+            environment: [:],
+            bundleIdentifier: "com.sumitrk.transcribe-meeting"
         )
 
         XCTAssertFalse(runtimeInfo.isSandboxed)
@@ -345,6 +346,17 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(
             runtimeInfo.parakeetEnglishV2DirectoryURL.path,
             "/Users/tester/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2-coreml"
+        )
+    }
+
+    func testAppRuntimeInfoSeparatesDevelopmentApplicationSupportPath() {
+        XCTAssertEqual(
+            AppRuntimeInfo.historyDirectoryName(for: "com.sumitrk.transcribe-meeting"),
+            "Whale"
+        )
+        XCTAssertEqual(
+            AppRuntimeInfo.historyDirectoryName(for: "com.sumitrk.transcribe-meeting.dev"),
+            "Whale-Dev"
         )
     }
 
@@ -358,7 +370,8 @@ final class TranscriptionModelTests: XCTestCase {
                 fileURLWithPath: "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data/Library/Application Support",
                 isDirectory: true
             ),
-            environment: ["APP_SANDBOX_CONTAINER_ID": "com.sumitrk.transcribe-meeting"]
+            environment: ["APP_SANDBOX_CONTAINER_ID": "com.sumitrk.transcribe-meeting"],
+            bundleIdentifier: "com.sumitrk.transcribe-meeting"
         )
 
         XCTAssertTrue(runtimeInfo.isSandboxed)
@@ -499,7 +512,8 @@ final class TranscriptionModelTests: XCTestCase {
         return AppRuntimeInfo(
             homeDirectoryURL: root,
             appSupportDirectoryURL: root.appendingPathComponent("Library/Application Support", isDirectory: true),
-            environment: [:]
+            environment: [:],
+            bundleIdentifier: nil
         )
     }
 

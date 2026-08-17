@@ -485,13 +485,7 @@ actor HistoryStore {
     }
 
     private static func historyDirectory() throws -> URL {
-        let base = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let directory = base.appendingPathComponent("Whale", isDirectory: true)
+        let directory = AppRuntimeInfo.current.historyDirectoryURL
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
