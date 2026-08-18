@@ -64,3 +64,15 @@ _Avoid_: Preview, message
 **Action Result**:
 The final user-facing text produced by an AI Action and made available for insertion, copying, and later review.
 _Avoid_: Response, assistant message
+
+**Insertion Target**:
+The focused destination that can receive a Dictation or Action Result, including conventional text fields and compatible editors such as terminal input.
+_Avoid_: HUD anchor, input field
+
+**HUD Anchor**:
+A trustworthy on-screen location associated with an Insertion Target where Whale can place its recording HUD. For terminal input, the caret or prompt location qualifies; the full terminal viewport does not.
+_Avoid_: Insertion Target
+
+**HUD**:
+Whale’s non-interactive floating feedback surface for recording, processing, delivery guidance, and outcomes.
+_Avoid_: Indicator window, overlay
