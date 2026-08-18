@@ -185,6 +185,9 @@ final class RecordingIndicatorWindow: NSPanel {
     private func beginPresentation(feedbackDuration: TimeInterval? = nil) {
         presentationID &+= 1
         stopPresentationObservers()
+        // A new presentation can replace a HUD that is still fading out.
+        // Restore visibility before ordering the replacement to the front.
+        alphaValue = 1
         currentAnchor = FocusedElementInspector.hudAnchor()
         ticksUntilAnchorRefresh = 30
         updatePosition()

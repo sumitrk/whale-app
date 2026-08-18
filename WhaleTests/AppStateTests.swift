@@ -200,4 +200,17 @@ final class HUDDismissalTests: XCTestCase {
         RunLoop.main.run(until: shownAt.addingTimeInterval(2.3))
         XCTAssertNil(hud.contentView)
     }
+
+    @MainActor
+    func testPasteHintReplacesAnInFlightHideAnimation() {
+        let hud = RecordingIndicatorWindow.shared
+        hud.showProcessing()
+        hud.hide()
+        hud.showHint(reason: .manualPasteOnly)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+
+        XCTAssertNotNil(hud.contentView)
+        XCTAssertGreaterThan(hud.alphaValue, 0.9)
+    }
 }
