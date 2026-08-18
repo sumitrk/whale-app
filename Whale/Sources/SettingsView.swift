@@ -16,9 +16,6 @@ private enum SettingsWindowMetrics {
     static let sidebarMaxFraction: CGFloat = 0.30
     static let sidebarIdealFraction: CGFloat =
         sidebarMinFraction + (sidebarMaxFraction - sidebarMinFraction) * 0.5
-
-    // AppKit uses points; converting keeps the requested offset at 8 physical pixels.
-    static let trafficLightOffsetPixels: CGFloat = 8
 }
 
 private struct SettingsWindowAccessor: NSViewRepresentable {
@@ -47,51 +44,25 @@ private struct SettingsWindowAccessor: NSViewRepresentable {
 
 private final class TrafficLightPositioner {
     private weak var window: NSWindow?
-    private var baseOrigins: [ObjectIdentifier: NSPoint] = [:]
 
     func style(_ window: NSWindow?) {
         guard let window else { return }
 
         window.titleVisibility = .hidden
-        window.styleMask.insert(.resizable)
+        window.titlebarAppearsTransparent = true
+        window.styleMask.insert([.resizable, .fullSizeContentView])
+        // Dropping the toolbar entirely (rather than just hiding its sidebar-toggle
+        // item) removes the reserved title-bar strip, so the traffic lights sit
+        // directly over the sidebar and the native full-size-content safe area lines
+        // the sidebar list up right underneath them.
+        window.toolbar = nil
 
         if self.window !== window {
             self.window = window
-            baseOrigins.removeAll()
         }
 
-        removeSidebarToggle(from: window)
         hideSidebarToggle(in: window.contentView)
         preventSidebarCollapse(in: window.contentViewController)
-
-        let offset = SettingsWindowMetrics.trafficLightOffsetPixels / window.backingScaleFactor
-        let buttonTypes: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
-
-        for buttonType in buttonTypes {
-            guard let button = window.standardWindowButton(buttonType) else { continue }
-
-            let key = ObjectIdentifier(button)
-            let baseOrigin = baseOrigins[key] ?? button.frame.origin
-            baseOrigins[key] = baseOrigin
-            button.setFrameOrigin(
-                NSPoint(x: baseOrigin.x - offset, y: baseOrigin.y - offset)
-            )
-        }
-    }
-
-    private func removeSidebarToggle(from window: NSWindow) {
-        guard let toolbar = window.toolbar else { return }
-
-        for index in toolbar.items.indices.reversed() {
-            let item = toolbar.items[index]
-            let identifier = item.itemIdentifier.rawValue.lowercased()
-            let label = item.label.lowercased()
-            let imageName = item.image?.name()?.lowercased() ?? ""
-
-            if identifier.contains("sidebar") || label.contains("sidebar") || imageName.contains("sidebar") {
-                toolbar.removeItem(at: index)
-            }
-        }
     }
 
     private func hideSidebarToggle(in view: NSView?) {
