@@ -30,6 +30,12 @@ enum HotkeyRegistrationMode {
 final class HotkeyManager {
     private var monitors: [Any] = []
 
+    static func shouldCancelModifierOnlyAIAction(
+        sourceUserData: Int64
+    ) -> Bool {
+        sourceUserData != contextCopyEventUserData
+    }
+
     func rebuild(toggleKeyCode: Int,
                  toggleModifiers: NSEvent.ModifierFlags,
                  pttKeyCode: Int,
@@ -116,7 +122,10 @@ final class HotkeyManager {
 
                 if let monitor = NSEvent.addGlobalMonitorForEvents(
                     matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown],
-                    handler: { _ in
+                    handler: { event in
+                        guard Self.shouldCancelModifierOnlyAIAction(
+                            sourceUserData: event.cgEvent?.getIntegerValueField(.eventSourceUserData) ?? 0
+                        ) else { return }
                         guard globalDown, !globalCancelled else { return }
                         globalCancelled = true
                         Task { @MainActor in onCancel() }
@@ -142,6 +151,9 @@ final class HotkeyManager {
                 if let monitor = NSEvent.addLocalMonitorForEvents(
                     matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown],
                     handler: { event in
+                        guard Self.shouldCancelModifierOnlyAIAction(
+                            sourceUserData: event.cgEvent?.getIntegerValueField(.eventSourceUserData) ?? 0
+                        ) else { return event }
                         guard localDown, !localCancelled else { return event }
                         localCancelled = true
                         Task { @MainActor in onCancel() }

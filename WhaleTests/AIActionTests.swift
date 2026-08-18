@@ -25,6 +25,57 @@ final class AIActionTests: XCTestCase {
         XCTAssertFalse(commandTypes.contains("set_model"))
     }
 
+    func testSelectionCaptureUsesCopyWhenAXDoesNotExposeASelectionRange() {
+        XCTAssertEqual(
+            ContextSnapshotCapture.selectionCaptureStrategy(
+                hasDirectSelection: false,
+                canPostEvents: true
+            ),
+            .simulatedCopy
+        )
+    }
+
+    func testSelectionCaptureUsesClipboardWhenThereIsNoSelectionAndEventsAreUnavailable() {
+        XCTAssertEqual(
+            ContextSnapshotCapture.selectionCaptureStrategy(
+                hasDirectSelection: false,
+                canPostEvents: false
+            ),
+            .clipboard
+        )
+    }
+
+    func testFailedSelectionCaptureFallsBackToOriginalClipboardInputs() {
+        let clipboard = [
+            ContextInput(source: .clipboard, ordinal: 0, content: .text("clipboard")),
+        ]
+
+        XCTAssertEqual(
+            ContextSnapshotCapture.preferredInputs(
+                capturedSelection: [],
+                originalClipboard: clipboard
+            ),
+            clipboard
+        )
+    }
+
+    func testCapturedSelectionTakesPrecedenceOverOriginalClipboard() {
+        let selection = [
+            ContextInput(source: .selection, ordinal: 0, content: .text("selection")),
+        ]
+        let clipboard = [
+            ContextInput(source: .clipboard, ordinal: 0, content: .text("clipboard")),
+        ]
+
+        XCTAssertEqual(
+            ContextSnapshotCapture.preferredInputs(
+                capturedSelection: selection,
+                originalClipboard: clipboard
+            ),
+            selection
+        )
+    }
+
     @MainActor
     func testPromptLabelsSelectionClipboardAndProtectsAgainstInjection() throws {
         let snapshot = ContextSnapshot(

@@ -36,7 +36,6 @@ struct FocusedElementSnapshot {
         "AXTextArea",
         "AXComboBox",
         "AXSearchField",
-        "AXWebArea",
     ]
 
     /// Bundle IDs of known Chromium-based browsers / Electron apps.
@@ -53,6 +52,10 @@ struct FocusedElementSnapshot {
     private var isBrowserApp: Bool {
         guard let bundle = bundleIdentifier else { return false }
         return Self.chromiumBundlePrefixes.contains(where: { bundle.hasPrefix($0) })
+    }
+
+    private var isBrowserLike: Bool {
+        isBrowserApp || hasChromiumAccessibilityMarkers
     }
 
     var prefersSimulatedPasteOverDirectAX: Bool {
@@ -81,20 +84,25 @@ struct FocusedElementSnapshot {
 
     var isWritableTextTarget: Bool {
         if isSecureTextField { return false }
+        if isEditable { return true }
+        // A web area or landmark is page content, not an insertion target.
+        if role == "AXWebArea" || subrole?.hasPrefix("AXLandmark") == true {
+            return false
+        }
         // 1. Classic native text roles
         if let role, Self.knownTextRoles.contains(role) {
             return true
         }
-        // 2. Element reports itself as editable or supports text selection
-        if isEditable || supportsSelectedTextRange {
+        // 2. Native custom editors commonly expose a writable selection range.
+        if !isBrowserLike && supportsSelectedTextRange {
             return true
         }
         // 3. Chromium browsers: the focused element is often an AXGroup
         //    inside an AXWebArea. Check for text-input indicators.
-        if isBrowserApp {
-            // If the element has AXValue (holds text) or AXSelectedTextRange
-            // it is almost certainly an editable web field.
-            if supportsAXValue || supportsSelectedTextRange {
+        if isBrowserLike {
+            // Chromium contenteditable nodes are often AXGroup values rather
+            // than conventional text roles.
+            if role == "AXGroup" && subrole == nil && supportsAXValue {
                 return true
             }
             // Chromium may report role=AXGroup, subrole=nil for
@@ -105,10 +113,9 @@ struct FocusedElementSnapshot {
                rd.contains("text") || rd.contains("edit") {
                 return true
             }
-            // Final heuristic: if we're in a browser and the focused
-            // element is an AXGroup (common for contenteditable), allow it.
-            // This matches address bars and web text inputs alike.
-            if role == "AXGroup" {
+            // Chromium contenteditable nodes can be AXGroup with a writable
+            // selected-text range but no conventional text role.
+            if role == "AXGroup" && subrole == nil && supportsSelectedTextRange {
                 return true
             }
         }
@@ -205,7 +212,41 @@ enum FocusedElementInspector {
     }
 
     static func selectedText(in context: FocusedElementContext) -> String? {
-        stringAttribute(kAXSelectedTextAttribute as CFString, of: context.element)
+        let elements = selectionElements(startingAt: context.element)
+        var markerRanges: [CFTypeRef] = []
+
+        for element in elements {
+            if let selectedText = stringAttribute(kAXSelectedTextAttribute as CFString, of: element),
+               !selectedText.isEmpty {
+                return selectedText
+            }
+
+            if let selectedMarkerRange = attributeValue(
+                "AXSelectedTextMarkerRange" as CFString,
+                of: element
+            ) {
+                markerRanges.append(selectedMarkerRange)
+            }
+
+            if let selectedRange = selectedTextRangeAttribute(of: element),
+               selectedRange.length > 0,
+               let selectedText = text(for: selectedRange, in: element),
+               !selectedText.isEmpty {
+                return selectedText
+            }
+        }
+
+        // Browser engines may expose AXSelectedTextMarkerRange on a leaf node
+        // while serving AXStringForTextMarkerRange from a shared parent.
+        for markerRange in markerRanges {
+            for element in elements {
+                if let selectedText = text(for: markerRange, in: element),
+                   !selectedText.isEmpty {
+                    return selectedText
+                }
+            }
+        }
+        return nil
     }
 
     static func selectedTextRange(in context: FocusedElementContext) -> CFRange? {
@@ -322,6 +363,67 @@ enum FocusedElementInspector {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, name, &value) == .success else { return nil }
         return value as? String
+    }
+
+    private static func attributeValue(_ name: CFString, of element: AXUIElement) -> CFTypeRef? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, name, &value) == .success else { return nil }
+        return value
+    }
+
+    private static func selectionElements(startingAt element: AXUIElement) -> [AXUIElement] {
+        var elements: [AXUIElement] = []
+        var current: AXUIElement? = element
+
+        for _ in 0..<8 {
+            guard let currentElement = current else { break }
+            elements.append(currentElement)
+            current = uiElementAttribute(kAXParentAttribute as CFString, of: currentElement)
+        }
+        return elements
+    }
+
+    private static func uiElementAttribute(_ name: CFString, of element: AXUIElement) -> AXUIElement? {
+        guard let value = attributeValue(name, of: element),
+              CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return unsafeBitCast(value, to: AXUIElement.self)
+    }
+
+    private static func text(for markerRange: CFTypeRef, in element: AXUIElement) -> String? {
+        let markerAttributes: [CFString] = [
+            "AXStringForTextMarkerRange" as CFString,
+            "AXAttributedStringForTextMarkerRange" as CFString,
+        ]
+        for attribute in markerAttributes {
+            if let text = parameterizedText(attribute, parameter: markerRange, in: element) {
+                return text
+            }
+        }
+        return nil
+    }
+
+    private static func text(for range: CFRange, in element: AXUIElement) -> String? {
+        var range = range
+        guard let rangeValue = AXValueCreate(.cfRange, &range) else { return nil }
+        return parameterizedText(
+            "AXStringForRange" as CFString,
+            parameter: rangeValue,
+            in: element
+        )
+    }
+
+    private static func parameterizedText(
+        _ attribute: CFString,
+        parameter: CFTypeRef,
+        in element: AXUIElement
+    ) -> String? {
+        var result: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element, attribute, parameter, &result) == .success,
+              let result else { return nil }
+        if let string = result as? String {
+            return string
+        }
+        return (result as? NSAttributedString)?.string
     }
 
     private static func boolAttribute(_ name: CFString, of element: AXUIElement) -> Bool {

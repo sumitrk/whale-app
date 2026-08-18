@@ -105,11 +105,12 @@ final class TextInsertionManagerTests: XCTestCase {
         )
     }
 
-    func testChromiumGroupFallsBackToSimulatedPasteWithoutSafeAXCapability() {
+    func testChromiumContentEditableGroupFallsBackToSimulatedPasteWithoutSafeAXCapability() {
         let snapshot = makeSnapshot(
             appName: "Google Chrome",
             bundleIdentifier: "com.google.Chrome",
             role: "AXGroup",
+            roleDescription: "text editor",
             isEditable: false,
             supportsSelectedTextRange: false,
             supportsAXValue: true,
@@ -117,6 +118,107 @@ final class TextInsertionManagerTests: XCTestCase {
             isAXValueSettable: false,
             canReadSelectedTextRange: false,
             isSelectedTextRangeSettable: false
+        )
+
+        XCTAssertEqual(
+            TextInsertionManager.insertionStrategy(
+                for: snapshot,
+                isAccessibilityTrusted: true
+            ),
+            .simulatedPaste
+        )
+    }
+
+    func testWebAreaIsCopyOnlyEvenWhenItHasBrowserAccessibilityMarkers() {
+        let snapshot = makeSnapshot(
+            appName: "Google Chrome",
+            bundleIdentifier: "com.google.Chrome",
+            role: "AXWebArea",
+            isEditable: false,
+            supportsSelectedTextRange: true,
+            supportsAXValue: false,
+            attributeNames: ["AXSelectedTextMarkerRange"]
+        )
+
+        XCTAssertEqual(
+            TextInsertionManager.insertionStrategy(
+                for: snapshot,
+                isAccessibilityTrusted: true
+            ),
+            .copyOnly(.manualPasteOnly)
+        )
+    }
+
+    func testBrowserLandmarkGroupIsCopyOnly() {
+        let snapshot = makeSnapshot(
+            appName: "Arc",
+            bundleIdentifier: "company.thebrowser.Browser",
+            role: "AXGroup",
+            subrole: "AXLandmarkMain",
+            isEditable: false,
+            supportsSelectedTextRange: false,
+            supportsAXValue: false,
+            attributeNames: ["AXSelectedTextMarkerRange"]
+        )
+
+        XCTAssertEqual(
+            TextInsertionManager.insertionStrategy(
+                for: snapshot,
+                isAccessibilityTrusted: true
+            ),
+            .copyOnly(.manualPasteOnly)
+        )
+    }
+
+    func testBrowserButtonWithAXValueIsCopyOnly() {
+        let snapshot = makeSnapshot(
+            appName: "Google Chrome",
+            bundleIdentifier: "com.google.Chrome",
+            role: "AXButton",
+            isEditable: false,
+            supportsSelectedTextRange: false,
+            supportsAXValue: true
+        )
+
+        XCTAssertEqual(
+            TextInsertionManager.insertionStrategy(
+                for: snapshot,
+                isAccessibilityTrusted: true
+            ),
+            .copyOnly(.manualPasteOnly)
+        )
+    }
+
+    func testEditableWebAreaUsesSimulatedPaste() {
+        let snapshot = makeSnapshot(
+            appName: "Google Chrome",
+            bundleIdentifier: "com.google.Chrome",
+            role: "AXWebArea",
+            isEditable: true,
+            supportsSelectedTextRange: true,
+            supportsAXValue: true,
+            attributeNames: ["AXSelectedTextMarkerRange"]
+        )
+
+        XCTAssertEqual(
+            TextInsertionManager.insertionStrategy(
+                for: snapshot,
+                isAccessibilityTrusted: true
+            ),
+            .simulatedPaste
+        )
+    }
+
+    func testEditableBrowserLandmarkUsesSimulatedPaste() {
+        let snapshot = makeSnapshot(
+            appName: "Arc",
+            bundleIdentifier: "company.thebrowser.Browser",
+            role: "AXGroup",
+            subrole: "AXLandmarkMain",
+            isEditable: true,
+            supportsSelectedTextRange: true,
+            supportsAXValue: true,
+            attributeNames: ["AXSelectedTextMarkerRange"]
         )
 
         XCTAssertEqual(
@@ -284,6 +386,7 @@ final class TextInsertionManagerTests: XCTestCase {
         bundleIdentifier: String,
         role: String?,
         subrole: String? = nil,
+        roleDescription: String? = nil,
         isEditable: Bool,
         supportsSelectedTextRange: Bool,
         supportsAXValue: Bool,
@@ -298,7 +401,7 @@ final class TextInsertionManagerTests: XCTestCase {
             bundleIdentifier: bundleIdentifier,
             role: role,
             subrole: subrole,
-            roleDescription: role == "AXButton" ? "button" : nil,
+            roleDescription: roleDescription ?? (role == "AXButton" ? "button" : nil),
             placeholderValue: nil,
             numberOfCharacters: nil,
             isEditable: isEditable,

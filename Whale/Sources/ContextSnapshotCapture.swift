@@ -5,26 +5,45 @@ import UniformTypeIdentifiers
 
 enum ContextCaptureError: LocalizedError {
     case secureField
-    case selectionUnavailable
-    case eventPostingUnavailable
     case contextTooLarge
 
     var errorDescription: String? {
         switch self {
         case .secureField:
             return "AI Actions are unavailable in secure fields"
-        case .selectionUnavailable:
-            return "The current selection could not be captured"
-        case .eventPostingUnavailable:
-            return "Accessibility permission is required to capture this selection"
         case .contextTooLarge:
             return "The selected or clipboard context is too large for one AI Action"
         }
     }
 }
 
+enum SelectionCaptureStrategy: Equatable {
+    case direct
+    case simulatedCopy
+    case clipboard
+}
+
+let contextCopyEventUserData: Int64 = 0x5748_414C_45 // "WHALE"
+
 @MainActor
 enum ContextSnapshotCapture {
+    nonisolated static func selectionCaptureStrategy(
+        hasDirectSelection: Bool,
+        canPostEvents: Bool
+    ) -> SelectionCaptureStrategy {
+        if hasDirectSelection {
+            return .direct
+        }
+        return canPostEvents ? .simulatedCopy : .clipboard
+    }
+
+    nonisolated static func preferredInputs(
+        capturedSelection: [ContextInput],
+        originalClipboard: [ContextInput]
+    ) -> [ContextInput] {
+        capturedSelection.isEmpty ? originalClipboard : capturedSelection
+    }
+
     static func capture() async throws -> ContextSnapshot {
         let focused = FocusedElementInspector.focusedElementContext()
         if focused?.snapshot.isSecureTextField == true {
@@ -33,10 +52,19 @@ enum ContextSnapshotCapture {
 
         let pasteboard = NSPasteboard.general
         let sourceAppName = focused?.snapshot.appName ?? NSWorkspace.shared.frontmostApplication?.localizedName
+        let selectedText = focused.flatMap(FocusedElementInspector.selectedText(in:))
+        let canPostEvents = CGPreflightPostEventAccess()
+        let strategy = selectionCaptureStrategy(
+            hasDirectSelection: selectedText?.isEmpty == false,
+            canPostEvents: canPostEvents
+        )
+        let appName = sourceAppName ?? "unknown"
+        DiagnosticLog.log(
+            "[Context] strategy=\(strategy.diagnosticName) app=\(appName) " +
+            "canPostEvents=\(canPostEvents)"
+        )
 
-        if let focused,
-           let selectedText = FocusedElementInspector.selectedText(in: focused),
-           !selectedText.isEmpty {
+        if case .direct = strategy, let selectedText {
             return ContextSnapshot(
                 capturedAt: Date(),
                 sourceAppName: sourceAppName,
@@ -44,17 +72,13 @@ enum ContextSnapshotCapture {
             )
         }
 
-        let knownSelection = focused.flatMap(FocusedElementInspector.selectedTextRange(in:))?.length ?? 0 > 0
-        guard knownSelection else {
+        let originalClipboardInputs = inputs(from: pasteboard, source: .clipboard)
+        if case .clipboard = strategy {
             return ContextSnapshot(
                 capturedAt: Date(),
                 sourceAppName: sourceAppName,
-                inputs: inputs(from: pasteboard, source: .clipboard)
+                inputs: originalClipboardInputs
             )
-        }
-
-        guard CGPreflightPostEventAccess() else {
-            throw ContextCaptureError.eventPostingUnavailable
         }
 
         let original = TextInsertionManager.PasteboardSnapshot.capture(from: pasteboard)
@@ -64,14 +88,17 @@ enum ContextSnapshotCapture {
         try await Task.sleep(for: .milliseconds(140))
         let didCopy = pasteboard.changeCount != originalChangeCount
         let selectionInputs = didCopy ? inputs(from: pasteboard, source: .selection) : []
-
-        if knownSelection && selectionInputs.isEmpty {
-            throw ContextCaptureError.selectionUnavailable
+        let resolvedInputs = preferredInputs(
+            capturedSelection: selectionInputs,
+            originalClipboard: originalClipboardInputs
+        )
+        if selectionInputs.isEmpty {
+            DiagnosticLog.log("[Context] Simulated copy produced no supported selection; using original clipboard inputs.")
         }
         return ContextSnapshot(
             capturedAt: Date(),
             sourceAppName: sourceAppName,
-            inputs: selectionInputs
+            inputs: resolvedInputs
         )
     }
 
@@ -166,7 +193,19 @@ enum ContextSnapshotCapture {
         let up = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: false)
         down?.flags = .maskCommand
         up?.flags = .maskCommand
+        down?.setIntegerValueField(.eventSourceUserData, value: contextCopyEventUserData)
+        up?.setIntegerValueField(.eventSourceUserData, value: contextCopyEventUserData)
         down?.post(tap: .cghidEventTap)
         up?.post(tap: .cghidEventTap)
+    }
+}
+
+private extension SelectionCaptureStrategy {
+    var diagnosticName: String {
+        switch self {
+        case .direct: return "direct"
+        case .simulatedCopy: return "simulatedCopy"
+        case .clipboard: return "clipboard"
+        }
     }
 }

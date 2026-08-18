@@ -105,7 +105,7 @@ Capture selection in this order:
 
 1. Read the focused element through Accessibility when it exposes selected content.
 2. Otherwise preserve the original pasteboard, simulate Command-C, read supported copied content as selection, and restore the original pasteboard.
-3. If Whale knows there is a non-empty selection but cannot capture it, fail explicitly. Do not silently substitute unrelated clipboard content.
+3. If simulated Copy does not yield supported selected content, use the original clipboard inputs instead.
 
 For a simulated Copy, restore every readable original pasteboard item/representation, not just its plain-text value. The original clipboard is not used as context when a selection is captured.
 
