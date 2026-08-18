@@ -344,11 +344,11 @@ private struct RecordingIndicatorView: View {
     private let timer = Timer.publish(every: 0.07, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(alignment: .center, spacing: 3.5) {
+        HStack(alignment: .center, spacing: 3) {
             ForEach(0..<barCount, id: \.self) { i in
                 Capsule()
                     .fill(Color.white.opacity(0.9))
-                    .frame(width: 2.5, height: heights[i])
+                    .frame(width: 3, height: heights[i])
                     .animation(.easeOut(duration: 0.12), value: heights[i])
             }
         }
