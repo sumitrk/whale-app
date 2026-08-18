@@ -1,6 +1,62 @@
 import AppKit
-import ApplicationServices
 import SwiftUI
+
+enum HUDAnchor: Equatable {
+    case field(NSRect)
+    case caret(NSRect)
+    case cursor
+}
+
+enum HUDPlacementPolicy {
+    private static let caretAnchoredBundlePrefixes = [
+        "com.apple.Terminal",
+        "com.googlecode.iterm2",
+        "com.mitchellh.ghostty",
+    ]
+
+    static func anchor(
+        bundleIdentifier: String? = nil,
+        role: String?,
+        frame: NSRect?,
+        caretFrame: NSRect? = nil,
+        isWritable: Bool = true
+    ) -> HUDAnchor {
+        guard isWritable, role != "AXWebArea" else { return .cursor }
+
+        let prefersCaret = bundleIdentifier.map { bundle in
+            caretAnchoredBundlePrefixes.contains(where: bundle.hasPrefix)
+        } ?? false
+        if prefersCaret {
+            guard let caretFrame, caretFrame.height > 0 else { return .cursor }
+            return .caret(caretFrame)
+        }
+        if let frame, !frame.isEmpty {
+            return .field(frame)
+        }
+        if let caretFrame, caretFrame.height > 0 {
+            return .caret(caretFrame)
+        }
+        return .cursor
+    }
+
+    static func cursorOrigin(
+        pointer: NSPoint,
+        hudSize: NSSize,
+        visibleFrame: NSRect
+    ) -> NSPoint {
+        let gap: CGFloat = 12
+        let x = pointer.x + gap + hudSize.width <= visibleFrame.maxX - 4
+            ? pointer.x + gap
+            : pointer.x - hudSize.width - gap
+        let y = pointer.y - hudSize.height - gap >= visibleFrame.minY + 4
+            ? pointer.y - hudSize.height - gap
+            : pointer.y + gap
+        return NSPoint(
+            x: max(visibleFrame.minX + 4, min(x, visibleFrame.maxX - hudSize.width - 4)),
+            y: max(visibleFrame.minY + 4, min(y, visibleFrame.maxY - hudSize.height - 4))
+        )
+    }
+}
 
 // MARK: - Floating panel
 
@@ -23,6 +79,14 @@ final class RecordingIndicatorWindow: NSPanel {
     }
 
     static let shared = RecordingIndicatorWindow()
+
+    private var trackingTimer: Timer?
+    private var currentAnchor: HUDAnchor = .cursor
+    private var ticksUntilAnchorRefresh = 0
+    private var globalDismissalMonitor: Any?
+    private var localDismissalMonitor: Any?
+    private var autoHideTask: Task<Void, Never>?
+    private var presentationID = 0
 
     private init() {
         super.init(
@@ -48,7 +112,7 @@ final class RecordingIndicatorWindow: NSPanel {
         contentView = host
         setContentSize(host.frame.size)
 
-        positionNearCursor()
+        beginPresentation()
         fadeIn()
     }
 
@@ -59,28 +123,32 @@ final class RecordingIndicatorWindow: NSPanel {
         contentView = host
         setContentSize(host.frame.size)
 
-        positionNearMouse()
+        beginPresentation()
         fadeIn()
     }
 
     func hide() {
         guard contentView != nil else { return }
+        presentationID &+= 1
+        let hiddenPresentationID = presentationID
+        stopPresentationObservers()
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             self.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            guard let self else { return }
-            self.orderOut(nil)
-            // Clear the hosting view to stop the timer when hidden.
-            self.contentView = nil
-            self.alphaValue = 1
+            Task { @MainActor in
+                guard let self, self.presentationID == hiddenPresentationID else { return }
+                self.orderOut(nil)
+                // Clear the hosting view to stop the timer when hidden.
+                self.contentView = nil
+                self.alphaValue = 1
+            }
         })
     }
 
-    /// Show a brief paste/accessibility nudge near the cursor.
-    /// Dismissed automatically after 3 seconds.
+    /// Show a brief paste/accessibility nudge.
     func showHint(reason: PasteHintReason) {
         let view = PasteHintView(reason: reason)
         let host = NSHostingView(rootView: view)
@@ -89,12 +157,8 @@ final class RecordingIndicatorWindow: NSPanel {
         contentView = host
         setContentSize(size)
 
-        positionNearCursor()
+        beginPresentation(feedbackDuration: 2)
         orderFront(nil)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.hide()
-        }
     }
 
     func showMessage(_ message: String, isError: Bool, duration: TimeInterval) {
@@ -104,27 +168,119 @@ final class RecordingIndicatorWindow: NSPanel {
         host.frame = NSRect(origin: .zero, size: size)
         contentView = host
         setContentSize(size)
-        positionNearCursor()
+        beginPresentation(feedbackDuration: duration)
         orderFront(nil)
+    }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
-            self?.hide()
+    private func beginPresentation(feedbackDuration: TimeInterval? = nil) {
+        presentationID &+= 1
+        stopPresentationObservers()
+        currentAnchor = FocusedElementInspector.hudAnchor()
+        ticksUntilAnchorRefresh = 30
+        updatePosition()
+
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.trackPosition()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        trackingTimer = timer
+
+        if let feedbackDuration {
+            installDismissalMonitors()
+            let id = presentationID
+            autoHideTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(feedbackDuration * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                self?.dismissFeedback(presentationID: id)
+            }
         }
     }
 
-    private func positionNearCursor() {
-        // 1. Try to place at the top-left corner of the focused input box.
-        if let inputRect = focusedInputFrame() {
-            clampAndSet(NSPoint(x: inputRect.minX, y: inputRect.maxY + 6))
-            return
+    private func trackPosition() {
+        ticksUntilAnchorRefresh -= 1
+        if ticksUntilAnchorRefresh <= 0 {
+            currentAnchor = FocusedElementInspector.hudAnchor()
+            ticksUntilAnchorRefresh = 30
         }
-        // 2. Fall back to just above the mouse pointer.
-        positionNearMouse()
+        updatePosition()
     }
 
-    private func positionNearMouse() {
-        let mouse = NSEvent.mouseLocation
-        clampAndSet(mouse)
+    private func updatePosition() {
+        switch currentAnchor {
+        case .field(let inputFrame):
+            setClampedOrigin(
+                NSPoint(x: inputFrame.minX, y: inputFrame.maxY + 6),
+                on: screen(containing: NSPoint(x: inputFrame.midX, y: inputFrame.midY))
+            )
+        case .caret(let caretFrame):
+            positionNearPointer(NSPoint(x: caretFrame.maxX, y: caretFrame.minY))
+        case .cursor:
+            positionNearPointer(NSEvent.mouseLocation)
+        }
+    }
+
+    private func positionNearPointer(_ pointer: NSPoint) {
+        guard let screen = screen(containing: pointer) else { return }
+        setFrameOrigin(
+            HUDPlacementPolicy.cursorOrigin(
+                pointer: pointer,
+                hudSize: frame.size,
+                visibleFrame: screen.visibleFrame
+            )
+        )
+    }
+
+    private func setClampedOrigin(_ origin: NSPoint, on screen: NSScreen?) {
+        guard let screen else { return }
+        let visibleFrame = screen.visibleFrame
+        let size = frame.size
+        let x = max(visibleFrame.minX + 4, min(origin.x, visibleFrame.maxX - size.width - 4))
+        let y = max(visibleFrame.minY + 4, min(origin.y, visibleFrame.maxY - size.height - 4))
+        setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    private func screen(containing point: NSPoint) -> NSScreen? {
+        NSScreen.screens.first(where: { $0.frame.contains(point) }) ?? NSScreen.main
+    }
+
+    private func installDismissalMonitors() {
+        let events: NSEvent.EventTypeMask = [
+            .leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown,
+        ]
+        let id = presentationID
+        globalDismissalMonitor = NSEvent.addGlobalMonitorForEvents(matching: events) { [weak self] _ in
+            Task { @MainActor in
+                self?.dismissFeedback(presentationID: id)
+            }
+        }
+        localDismissalMonitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self] event in
+            Task { @MainActor in
+                self?.dismissFeedback(presentationID: id)
+            }
+            return event
+        }
+    }
+
+    private func dismissFeedback(presentationID id: Int) {
+        guard presentationID == id else { return }
+        hide()
+    }
+
+    private func stopPresentationObservers() {
+        trackingTimer?.invalidate()
+        trackingTimer = nil
+        autoHideTask?.cancel()
+        autoHideTask = nil
+        if let globalDismissalMonitor {
+            NSEvent.removeMonitor(globalDismissalMonitor)
+            self.globalDismissalMonitor = nil
+        }
+        if let localDismissalMonitor {
+            NSEvent.removeMonitor(localDismissalMonitor)
+            self.localDismissalMonitor = nil
+        }
     }
 
     private func fadeIn() {
@@ -135,58 +291,6 @@ final class RecordingIndicatorWindow: NSPanel {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             self.animator().alphaValue = 1
         }
-    }
-
-    /// Lightweight AX query for the focused text element's frame.
-    /// Uses a direct system-wide lookup (the original approach that worked)
-    /// instead of going through FocusedElementInspector's multi-step resolution.
-    private func focusedInputFrame() -> NSRect? {
-        guard AXIsProcessTrusted() else { return nil }
-
-        let system = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            system, kAXFocusedUIElementAttribute as CFString, &focusedRef
-        ) == .success, let focusedRef else { return nil }
-
-        let element = focusedRef as! AXUIElement
-
-        // Only position relative to writable text inputs.
-        var roleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element, kAXRoleAttribute as CFString, &roleRef
-        ) == .success,
-              let role = roleRef as? String,
-              ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField", "AXWebArea"].contains(role)
-        else { return nil }
-
-        var frameRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element, "AXFrame" as CFString, &frameRef
-        ) == .success, let frameRef,
-              CFGetTypeID(frameRef) == AXValueGetTypeID() else { return nil }
-
-        var axRect = CGRect.zero
-        guard AXValueGetValue(frameRef as! AXValue, .cgRect, &axRect) else { return nil }
-
-        // AX coordinates: origin top-left of primary screen, y increases downward.
-        // Cocoa coordinates: origin bottom-left, y increases upward.
-        let screenH = NSScreen.screens.first?.frame.height ?? 0
-        return NSRect(
-            x: axRect.origin.x,
-            y: screenH - axRect.origin.y - axRect.height,
-            width: axRect.width,
-            height: axRect.height
-        )
-    }
-
-    private func clampAndSet(_ origin: NSPoint) {
-        guard let screen = NSScreen.main else { return }
-        let vf = screen.visibleFrame
-        let sz = frame.size
-        let x  = max(vf.minX + 4, min(origin.x, vf.maxX - sz.width  - 4))
-        let y  = max(vf.minY + 4, min(origin.y, vf.maxY - sz.height - 4))
-        setFrameOrigin(NSPoint(x: x, y: y))
     }
 }
 

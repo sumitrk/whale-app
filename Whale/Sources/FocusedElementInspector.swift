@@ -145,9 +145,11 @@ enum FocusedElementInspector {
         focusedElementContext()?.snapshot
     }
 
-    static func focusedElementContext() -> FocusedElementContext? {
+    static func focusedElementContext(logDiagnostics: Bool = true) -> FocusedElementContext? {
         guard AXIsProcessTrusted() else {
-            DiagnosticLog.log("[Focus] AXIsProcessTrusted returned false.")
+            if logDiagnostics {
+                DiagnosticLog.log("[Focus] AXIsProcessTrusted returned false.")
+            }
             return nil
         }
 
@@ -160,7 +162,8 @@ enum FocusedElementInspector {
             system: system,
             frontmostPID: frontmostApp?.processIdentifier,
             appName: appName,
-            bundleIdentifier: bundleIdentifier
+            bundleIdentifier: bundleIdentifier,
+            logDiagnostics: logDiagnostics
         ) else {
             return nil
         }
@@ -211,6 +214,18 @@ enum FocusedElementInspector {
         )
     }
 
+    static func hudAnchor() -> HUDAnchor {
+        guard let context = focusedElementContext(logDiagnostics: false) else { return .cursor }
+        let snapshot = context.snapshot
+        return HUDPlacementPolicy.anchor(
+            bundleIdentifier: snapshot.bundleIdentifier,
+            role: snapshot.role,
+            frame: snapshot.frame,
+            caretFrame: caretFrame(of: context.element),
+            isWritable: snapshot.isWritableTextTarget
+        )
+    }
+
     static func selectedText(in context: FocusedElementContext) -> String? {
         let elements = selectionElements(startingAt: context.element)
         var markerRanges: [CFTypeRef] = []
@@ -257,7 +272,8 @@ enum FocusedElementInspector {
         system: AXUIElement,
         frontmostPID: pid_t?,
         appName: String,
-        bundleIdentifier: String
+        bundleIdentifier: String,
+        logDiagnostics: Bool
     ) -> FocusResolution? {
         var attempts: [String] = []
 
@@ -267,7 +283,9 @@ enum FocusedElementInspector {
                 label: "frontmostApp(pid=\(frontmostPID))",
                 attempts: &attempts
            ) {
-            DiagnosticLog.log("[Focus] Resolved focused element via frontmost app lookup for \(appName) (\(bundleIdentifier)).")
+            if logDiagnostics {
+                DiagnosticLog.log("[Focus] Resolved focused element via frontmost app lookup for \(appName) (\(bundleIdentifier)).")
+            }
             return FocusResolution(element: element, path: "frontmostApp")
         }
 
@@ -284,7 +302,9 @@ enum FocusedElementInspector {
                 label: "systemFocusedApplication",
                 attempts: &attempts
             ) {
-                DiagnosticLog.log("[Focus] Resolved focused element via system focused application for \(appName) (\(bundleIdentifier)).")
+                if logDiagnostics {
+                    DiagnosticLog.log("[Focus] Resolved focused element via system focused application for \(appName) (\(bundleIdentifier)).")
+                }
                 return FocusResolution(element: element, path: "systemFocusedApplication")
             }
         } else {
@@ -296,13 +316,17 @@ enum FocusedElementInspector {
             label: "systemWide",
             attempts: &attempts
         ) {
-            DiagnosticLog.log("[Focus] Resolved focused element via system-wide lookup for \(appName) (\(bundleIdentifier)).")
+            if logDiagnostics {
+                DiagnosticLog.log("[Focus] Resolved focused element via system-wide lookup for \(appName) (\(bundleIdentifier)).")
+            }
             return FocusResolution(element: element, path: "systemWide")
         }
 
-        DiagnosticLog.log(
-            "[Focus] Failed to resolve focused UI element for \(appName) (\(bundleIdentifier)). attempts=\(attempts.joined(separator: " | "))"
-        )
+        if logDiagnostics {
+            DiagnosticLog.log(
+                "[Focus] Failed to resolve focused UI element for \(appName) (\(bundleIdentifier)). attempts=\(attempts.joined(separator: " | "))"
+            )
+        }
         return nil
     }
 
@@ -475,6 +499,27 @@ enum FocusedElementInspector {
         return range
     }
 
+    private static func caretFrame(of element: AXUIElement) -> NSRect? {
+        guard var range = selectedTextRangeAttribute(of: element) else { return nil }
+        range.location += range.length
+        range.length = 0
+        guard let rangeValue = AXValueCreate(.cfRange, &range) else { return nil }
+
+        var boundsRef: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            element,
+            "AXBoundsForRange" as CFString,
+            rangeValue,
+            &boundsRef
+        ) == .success,
+              let boundsRef,
+              CFGetTypeID(boundsRef) == AXValueGetTypeID() else { return nil }
+
+        var axRect = CGRect.zero
+        guard AXValueGetValue(boundsRef as! AXValue, .cgRect, &axRect) else { return nil }
+        return cocoaFrame(from: axRect)
+    }
+
     private static func frameAttribute(of element: AXUIElement) -> NSRect? {
         var frameRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, "AXFrame" as CFString, &frameRef) == .success,
@@ -484,6 +529,10 @@ enum FocusedElementInspector {
         var axRect = CGRect.zero
         guard AXValueGetValue(frameRef as! AXValue, .cgRect, &axRect) else { return nil }
 
+        return cocoaFrame(from: axRect)
+    }
+
+    private static func cocoaFrame(from axRect: CGRect) -> NSRect {
         let screenHeight = NSScreen.screens.first?.frame.height ?? 0
         return NSRect(
             x: axRect.origin.x,
