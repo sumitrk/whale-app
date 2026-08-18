@@ -222,7 +222,8 @@ enum FocusedElementInspector {
             role: snapshot.role,
             frame: snapshot.frame,
             caretFrame: caretFrame(of: context.element),
-            isWritable: snapshot.isWritableTextTarget
+            isWritable: snapshot.isWritableTextTarget,
+            isBrowserLike: snapshot.prefersSimulatedPasteOverDirectAX
         )
     }
 

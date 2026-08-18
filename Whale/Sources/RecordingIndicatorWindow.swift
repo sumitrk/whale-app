@@ -8,6 +8,9 @@ enum HUDAnchor: Equatable {
 }
 
 enum HUDPlacementPolicy {
+    private static let fieldRoles: Set<String> = [
+        "AXTextField", "AXTextArea", "AXComboBox", "AXSearchField",
+    ]
     private static let caretAnchoredBundlePrefixes = [
         "com.apple.Terminal",
         "com.googlecode.iterm2",
@@ -19,9 +22,13 @@ enum HUDPlacementPolicy {
         role: String?,
         frame: NSRect?,
         caretFrame: NSRect? = nil,
-        isWritable: Bool = true
+        isWritable: Bool = true,
+        isBrowserLike: Bool = false
     ) -> HUDAnchor {
-        guard isWritable, role != "AXWebArea" else { return .cursor }
+        guard isWritable, let role, role != "AXWebArea" else { return .cursor }
+        if isBrowserLike, !fieldRoles.contains(role) {
+            return .cursor
+        }
 
         let prefersCaret = bundleIdentifier.map { bundle in
             caretAnchoredBundlePrefixes.contains(where: bundle.hasPrefix)
@@ -30,7 +37,7 @@ enum HUDPlacementPolicy {
             guard let caretFrame, caretFrame.height > 0 else { return .cursor }
             return .caret(caretFrame)
         }
-        if let frame, !frame.isEmpty {
+        if fieldRoles.contains(role), let frame, !frame.isEmpty {
             return .field(frame)
         }
         if let caretFrame, caretFrame.height > 0 {

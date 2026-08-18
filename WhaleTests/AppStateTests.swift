@@ -69,6 +69,22 @@ final class HUDPlacementPolicyTests: XCTestCase {
         )
     }
 
+    func testBrowserGroupIsNotAFieldAnchorEvenWhenMarkedWritable() {
+        let pageFrame = NSRect(x: 80, y: 100, width: 1_200, height: 800)
+
+        XCTAssertEqual(
+            HUDPlacementPolicy.anchor(
+                bundleIdentifier: "company.thebrowser.Browser",
+                role: "AXGroup",
+                frame: pageFrame,
+                caretFrame: NSRect(x: 300, y: 400, width: 0, height: 18),
+                isWritable: true,
+                isBrowserLike: true
+            ),
+            .cursor
+        )
+    }
+
     func testGhosttyTextAreaUsesCaretInsteadOfViewport() {
         let viewport = NSRect(x: 80, y: 100, width: 1_200, height: 800)
         let caret = NSRect(x: 480, y: 220, width: 0, height: 18)
