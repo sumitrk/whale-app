@@ -337,17 +337,18 @@ private struct RecordingIndicatorView: View {
     private let barCount = 5
     private let minH: CGFloat = 3
     private let maxH: CGFloat = 20
+    private let idleHeights: [CGFloat] = [8, 14, 20, 14, 8]
 
-    @State private var heights: [CGFloat] = Array(repeating: 3, count: 5)
+    @State private var heights: [CGFloat] = [8, 14, 20, 14, 8]
 
     private let timer = Timer.publish(every: 0.07, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(alignment: .center, spacing: 3) {
+        HStack(alignment: .center, spacing: 3.5) {
             ForEach(0..<barCount, id: \.self) { i in
                 Capsule()
                     .fill(Color.white.opacity(0.9))
-                    .frame(width: 3, height: heights[i])
+                    .frame(width: 2.5, height: heights[i])
                     .animation(.easeOut(duration: 0.12), value: heights[i])
             }
         }
@@ -359,8 +360,8 @@ private struct RecordingIndicatorView: View {
         .onReceive(timer) { _ in
             let level = recorder.micLevel
             guard level > 0.02 else {
-                if heights.first != minH {
-                    heights = Array(repeating: minH, count: barCount)
+                if heights != idleHeights {
+                    heights = idleHeights
                 }
                 return
             }
