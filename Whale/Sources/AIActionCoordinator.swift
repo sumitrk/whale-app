@@ -162,6 +162,7 @@ final class AIActionCoordinator: ObservableObject {
     private func recordingDidBecomeReady() {
         guard let run = activeRun, state == .capturingContext else { return }
         state = .listening
+        playSound("Blow")
         if run.releaseRequested {
             startStopAndProcess(runID: run.id)
         }
@@ -221,7 +222,6 @@ final class AIActionCoordinator: ObservableObject {
 
             guard isCurrent(runID) else { throw AIActionCoordinatorError.superseded }
             state = .delivering
-            RecordingIndicatorWindow.shared.hide()
             TextInsertionManager.insertOrCopy(result)
             await finalizeHistory(
                 for: run,
@@ -229,6 +229,7 @@ final class AIActionCoordinator: ObservableObject {
                 instructionText: instruction,
                 resultText: result
             )
+            playSound("Bottle")
             activeRun = nil
             processingTask = nil
             state = .succeeded

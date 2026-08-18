@@ -7,6 +7,11 @@ enum InsertionStrategy: Equatable {
     case simulatedPaste
     case copyOnly(RecordingIndicatorWindow.PasteHintReason)
 
+    var showsPasteHint: Bool {
+        if case .copyOnly = self { return true }
+        return false
+    }
+
     var diagnosticName: String {
         switch self {
         case .directAX:
@@ -191,6 +196,9 @@ enum TextInsertionManager {
             "[Paste] strategy=\(strategy.diagnosticName) textLength=\(text.count) trusted=\(AXIsProcessTrusted()) " +
             "canPostEvents=\(canPostEvents) target=\(diagnosticDescription(for: snapshot))"
         )
+        if !strategy.showsPasteHint {
+            RecordingIndicatorWindow.shared.hide()
+        }
 
         switch strategy {
         case .directAX:

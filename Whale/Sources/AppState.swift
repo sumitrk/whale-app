@@ -66,6 +66,15 @@ enum RecordingActivity: Equatable {
     }
 }
 
+@discardableResult
+@MainActor
+func playSound(_ name: String) -> TimeInterval {
+    guard let sound = NSSound(named: name) else { return 0 }
+    let duration = sound.duration
+    sound.play()
+    return duration
+}
+
 @MainActor
 class AppState: ObservableObject {
     @Published var status: AppStatus = .starting
@@ -492,16 +501,6 @@ class AppState: ObservableObject {
             DiagnosticLog.log("[Recording] Failed: \(error.localizedDescription)")
             await finalizeCurrentDictation(outcome: .failed, errorText: error.localizedDescription)
         }
-    }
-
-    // MARK: - Sound
-
-    @discardableResult
-    private func playSound(_ name: String) -> TimeInterval {
-        guard let sound = NSSound(named: name) else { return 0 }
-        let duration = sound.duration
-        sound.play()
-        return duration
     }
 
     private func handleAIActionState(_ actionState: AIActionState) {

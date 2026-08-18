@@ -6,6 +6,12 @@ final class TextInsertionManagerTests: XCTestCase {
 
     // MARK: - Strategy selection
 
+    func testOnlyCopyOnlyStrategyShowsPasteHint() {
+        XCTAssertFalse(InsertionStrategy.directAX.showsPasteHint)
+        XCTAssertFalse(InsertionStrategy.simulatedPaste.showsPasteHint)
+        XCTAssertTrue(InsertionStrategy.copyOnly(.manualPasteOnly).showsPasteHint)
+    }
+
     func testSettableNativeTextFieldPrefersDirectAX() {
         let snapshot = makeSnapshot(
             appName: "Notes",
