@@ -347,7 +347,7 @@ private struct RecordingIndicatorView: View {
         HStack(alignment: .center, spacing: 3) {
             ForEach(0..<barCount, id: \.self) { i in
                 Capsule()
-                    .fill(Color.white.opacity(0.9))
+                    .fill(Color.white.opacity(0.8))
                     .frame(width: 3, height: heights[i])
                     .animation(.easeOut(duration: 0.12), value: heights[i])
             }
