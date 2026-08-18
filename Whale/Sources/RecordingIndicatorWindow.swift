@@ -320,7 +320,7 @@ private struct ProcessingIndicatorView: View {
         .frame(width: 36, height: 18)
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.72)))
+        .background(Capsule().fill(.black.opacity(0.72)))
         .animation(.easeInOut(duration: 0.15), value: activeDot)
         .onReceive(timer) { _ in
             activeDot = (activeDot + 1) % 3
@@ -356,7 +356,7 @@ private struct RecordingIndicatorView: View {
         .clipped()
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.72)))
+        .background(Capsule().fill(.black.opacity(0.72)))
         .onReceive(timer) { _ in
             let level = recorder.micLevel
             guard level > 0.02 else {
@@ -411,7 +411,7 @@ private struct PasteHintView: View {
         .font(.system(size: 12, weight: .medium))
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.72)))
+        .background(Capsule().fill(.black.opacity(0.72)))
     }
 }
 
@@ -431,6 +431,6 @@ private struct StatusMessageView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(maxWidth: 360)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.78)))
+        .background(Capsule().fill(.black.opacity(0.78)))
     }
 }
