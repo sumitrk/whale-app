@@ -155,7 +155,9 @@ final class AIActionCoordinator: ObservableObject {
         await runtime.abort(runID: run.id)
         await finalizeHistory(for: run, outcome: .cancelled, errorText: reason)
         state = .cancelled
-        RecordingIndicatorWindow.shared.showMessage("Cancelled", isError: false, duration: 1)
+        if reason != "Replaced by a newer AI Action" {
+            RecordingIndicatorWindow.shared.showMessage("Cancelled", isError: false, duration: 1)
+        }
         settleToIdle(after: .seconds(1))
     }
 
