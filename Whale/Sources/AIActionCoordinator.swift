@@ -262,6 +262,10 @@ final class AIActionCoordinator: ObservableObject {
             settings.openRouterKeyRejected = true
         }
         await finalizeHistory(for: run, outcome: .failed, errorText: message)
+        if case RecorderError.noAudioCaptured = error {
+            state = .idle
+            return
+        }
         state = .failed(message)
         RecordingIndicatorWindow.shared.showMessage(message, isError: true, duration: 4)
         settleToIdle(after: .seconds(4))
