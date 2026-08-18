@@ -86,6 +86,9 @@ final class RecordingIndicatorWindow: NSPanel {
     }
 
     static let shared = RecordingIndicatorWindow()
+    static let feedbackDismissalEvents: NSEvent.EventTypeMask = [
+        .leftMouseDown, .rightMouseDown, .otherMouseDown,
+    ]
 
     private var trackingTimer: Timer?
     private var currentAnchor: HUDAnchor = .cursor
@@ -253,16 +256,13 @@ final class RecordingIndicatorWindow: NSPanel {
     }
 
     private func installDismissalMonitors() {
-        let events: NSEvent.EventTypeMask = [
-            .leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown,
-        ]
         let id = presentationID
-        globalDismissalMonitor = NSEvent.addGlobalMonitorForEvents(matching: events) { [weak self] _ in
+        globalDismissalMonitor = NSEvent.addGlobalMonitorForEvents(matching: Self.feedbackDismissalEvents) { [weak self] _ in
             Task { @MainActor in
                 self?.dismissFeedback(presentationID: id)
             }
         }
-        localDismissalMonitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self] event in
+        localDismissalMonitor = NSEvent.addLocalMonitorForEvents(matching: Self.feedbackDismissalEvents) { [weak self] event in
             Task { @MainActor in
                 self?.dismissFeedback(presentationID: id)
             }

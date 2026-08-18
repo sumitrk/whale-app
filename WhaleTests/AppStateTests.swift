@@ -155,3 +155,49 @@ final class HUDPlacementPolicyTests: XCTestCase {
         )
     }
 }
+
+final class HUDDismissalTests: XCTestCase {
+    func testOnlyMouseDownEventsDismissFeedback() {
+        XCTAssertEqual(
+            RecordingIndicatorWindow.feedbackDismissalEvents,
+            [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        )
+    }
+
+    @MainActor
+    func testPasteHintDismissesOnMouseDown() throws {
+        let hud = RecordingIndicatorWindow.shared
+        hud.showHint(reason: .manualPasteOnly)
+
+        let event = try XCTUnwrap(
+            NSEvent.mouseEvent(
+                with: .leftMouseDown,
+                location: .zero,
+                modifierFlags: [],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                eventNumber: 0,
+                clickCount: 1,
+                pressure: 1
+            )
+        )
+        NSApplication.shared.sendEvent(event)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+
+        XCTAssertNil(hud.contentView)
+    }
+
+    @MainActor
+    func testPasteHintAutoHidesAfterTwoSeconds() {
+        let hud = RecordingIndicatorWindow.shared
+        hud.showHint(reason: .manualPasteOnly)
+        let shownAt = Date()
+
+        RunLoop.main.run(until: shownAt.addingTimeInterval(1.8))
+        XCTAssertNotNil(hud.contentView)
+
+        RunLoop.main.run(until: shownAt.addingTimeInterval(2.3))
+        XCTAssertNil(hud.contentView)
+    }
+}
