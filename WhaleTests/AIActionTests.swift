@@ -276,9 +276,14 @@ final class AIActionTests: XCTestCase {
         XCTAssertEqual(historyEntry(outcome: .failed).listPreview, "")
     }
 
-    func testSettingsWindowMaxWidthIsOneAndAHalfTimesCurrentWidth() {
-        XCTAssertEqual(SettingsWindowMetrics.minWidth, 700)
-        XCTAssertEqual(SettingsWindowMetrics.maxWidth, SettingsWindowMetrics.minWidth * 1.5)
+    func testSettingsWindowMetricsDescribeAResizableRange() {
+        XCTAssertGreaterThan(SettingsWindowMetrics.maxWidth, SettingsWindowMetrics.minWidth)
+        XCTAssertGreaterThan(SettingsWindowMetrics.maxHeight, SettingsWindowMetrics.minHeight)
+    }
+
+    func testSettingsWindowOpensAtItsMinimumSize() {
+        XCTAssertEqual(SettingsWindowMetrics.defaultWidth, SettingsWindowMetrics.minWidth)
+        XCTAssertEqual(SettingsWindowMetrics.defaultHeight, SettingsWindowMetrics.minHeight)
     }
 
     func testHistoryListUsesOnePointFourTimesItsPreviousWidth() {

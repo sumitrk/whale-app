@@ -2,13 +2,18 @@ import AppKit
 import SwiftUI
 import Sparkle
 
+/// The Settings window's size limits. This is the single source of truth: `SettingsView`
+/// declares them as its frame and `.windowResizability(.contentSize)` turns them into the
+/// window's bounds. Nothing writes `NSWindow.minSize`/`maxSize` directly.
 enum SettingsWindowMetrics {
     static let minWidth: CGFloat = 700
-    static let idealWidth: CGFloat = minWidth
     static let maxWidth: CGFloat = minWidth * 1.5
     static let minHeight: CGFloat = 540
-    static let idealHeight: CGFloat = minHeight
     static let maxHeight: CGFloat = 900
+
+    /// Used only on first launch, before the window has an autosaved frame to restore.
+    static let defaultWidth: CGFloat = minWidth
+    static let defaultHeight: CGFloat = minHeight
 }
 
 enum SettingsSection: String, CaseIterable, Identifiable {
@@ -41,57 +46,64 @@ private enum SettingsAppVersion {
     }()
 }
 
-private struct SettingsWindowAccessor: NSViewRepresentable {
+/// Bridges the SwiftUI `Settings` scene to the two window facts SwiftUI cannot express:
+/// the resizable style mask and the frame autosave name.
+///
+/// Size limits are deliberately *not* set here. `NSWindow.minSize`/`maxSize` and
+/// `contentMinSize`/`contentMaxSize` are the same constraint in two coordinate spaces, and
+/// writing them makes SwiftUI's settings window controller re-assert its own sizing — which
+/// rewrites the whole style mask and drops `.resizable`, leaving the window stuck at whatever
+/// size it had. The window's bounds come from `SettingsView`'s frame plus
+/// `.windowResizability(.contentSize)` instead.
+private struct SettingsWindowBridge: NSViewRepresentable {
     let title: String
-    let onResolve: (NSWindow?) -> Void
+    let onAttach: (NSWindow) -> Void
 
-    func makeCoordinator() -> SettingsWindowStyler {
-        SettingsWindowStyler()
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            context.coordinator.style(view.window, title: title)
-            onResolve(view.window)
-        }
+    func makeNSView(context: Context) -> SettingsWindowBridgeView {
+        let view = SettingsWindowBridgeView()
+        view.onAttach = onAttach
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            context.coordinator.style(nsView.window, title: title)
-            onResolve(nsView.window)
-        }
+    func updateNSView(_ nsView: SettingsWindowBridgeView, context: Context) {
+        nsView.attachIfNeeded()
+        nsView.window?.title = title
     }
 }
 
-private final class SettingsWindowStyler {
-    private weak var window: NSWindow?
+private final class SettingsWindowBridgeView: NSView {
+    var onAttach: ((NSWindow) -> Void)?
+    private weak var attachedWindow: NSWindow?
 
-    func style(_ window: NSWindow?, title: String) {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        attachIfNeeded()
+    }
+
+    func attachIfNeeded() {
         guard let window else { return }
 
-        window.title = title
-        window.titleVisibility = .visible
-        window.titlebarAppearsTransparent = false
-        window.toolbarStyle = .automatic
-        window.styleMask.insert([.resizable, .fullSizeContentView])
-        window.isMovableByWindowBackground = false
-        window.minSize = NSSize(width: SettingsWindowMetrics.minWidth, height: SettingsWindowMetrics.minHeight)
-        window.maxSize = NSSize(width: SettingsWindowMetrics.maxWidth, height: SettingsWindowMetrics.maxHeight)
-
-        if self.window !== window {
-            self.window = window
+        if attachedWindow !== window {
+            attachedWindow = window
             window.setFrameAutosaveName("SettingsWindow")
+            onAttach?(window)
+            // SwiftUI writes the settings window's style mask after the view is attached, so an
+            // assertion made now would be overwritten. Re-assert once the current turn settles.
+            DispatchQueue.main.async { [weak window] in
+                guard let window else { return }
+                Self.makeResizable(window)
+            }
         }
 
-        var frame = window.frame
-        frame.size.width = min(max(frame.size.width, SettingsWindowMetrics.minWidth), SettingsWindowMetrics.maxWidth)
-        frame.size.height = min(max(frame.size.height, SettingsWindowMetrics.minHeight), SettingsWindowMetrics.maxHeight)
-        if frame.size != window.frame.size {
-            window.setFrame(frame, display: true)
-        }
+        Self.makeResizable(window)
+    }
+
+    /// SwiftUI's `Settings` scene never sets `.resizable`, so without this the window cannot be
+    /// resized at all. Idempotent, so later view updates can cheaply re-assert it — assigning
+    /// `styleMask` unconditionally would be a needless window reconfiguration.
+    private static func makeResizable(_ window: NSWindow) {
+        guard !window.styleMask.contains(.resizable) else { return }
+        window.styleMask.insert(.resizable)
     }
 }
 
@@ -129,10 +141,10 @@ struct SettingsView: View {
         .navigationSplitViewStyle(.balanced)
         .frame(
             minWidth: SettingsWindowMetrics.minWidth,
-            idealWidth: SettingsWindowMetrics.idealWidth,
+            idealWidth: SettingsWindowMetrics.defaultWidth,
             maxWidth: SettingsWindowMetrics.maxWidth,
             minHeight: SettingsWindowMetrics.minHeight,
-            idealHeight: SettingsWindowMetrics.idealHeight,
+            idealHeight: SettingsWindowMetrics.defaultHeight,
             maxHeight: SettingsWindowMetrics.maxHeight
         )
         .toolbar {
@@ -155,7 +167,7 @@ struct SettingsView: View {
             }
         }
         .background(
-            SettingsWindowAccessor(title: settingsCoordinator.selection.rawValue) { window in
+            SettingsWindowBridge(title: settingsCoordinator.selection.rawValue) { window in
                 settingsCoordinator.registerSettingsWindow(window)
             }
         )
