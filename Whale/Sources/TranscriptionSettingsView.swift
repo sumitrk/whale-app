@@ -10,6 +10,8 @@ struct TranscriptionSettingsView: View {
             TranscriptionModelManagementSections()
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 8, for: .scrollContent)
         .task { await modelStore.refreshNow() }
     }
 }

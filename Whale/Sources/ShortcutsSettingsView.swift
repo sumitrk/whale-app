@@ -145,6 +145,8 @@ struct ShortcutsSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 8, for: .scrollContent)
         .onAppear {
             pttPreset = derivedPreset()
             actionPreset = derivedActionPreset()

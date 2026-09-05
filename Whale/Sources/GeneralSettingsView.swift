@@ -29,17 +29,26 @@ struct GeneralSettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return build.map { "\(version) (\($0))" } ?? version
     }
 
     var body: some View {
         Form {
-            Section("Startup") {
-                Toggle("Launch at login", isOn: $store.launchAtLogin)
-                    .toggleStyle(.switch)
+            Section("System") {
+                Toggle(isOn: $store.launchAtLogin) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Launch at Login")
+                        Text("Start Whale automatically when you sign in.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
             }
 
-            Section("About") {
+            Section("Updates") {
                 LabeledContent("Version", value: appVersion)
 
                 if let updater = updaterState.updater {
@@ -54,5 +63,7 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 8, for: .scrollContent)
     }
 }
