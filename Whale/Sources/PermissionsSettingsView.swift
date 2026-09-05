@@ -63,6 +63,8 @@ struct PermissionsSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 8, for: .scrollContent)
         .onAppear {
             checkMic()
             accessibility.refresh()

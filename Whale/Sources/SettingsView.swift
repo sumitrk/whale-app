@@ -2,105 +2,6 @@ import AppKit
 import SwiftUI
 import Sparkle
 
-private enum SettingsWindowMetrics {
-    static let minWidth: CGFloat = 720
-    static let idealWidth: CGFloat = 860
-    static let maxWidth: CGFloat = 1120
-    static let minHeight: CGFloat = 520
-    static let idealHeight: CGFloat = 620
-    static let maxHeight: CGFloat = 820
-
-    // Native NavigationSplitView keeps this divider resizable.
-    // Change these fractions to resize the Settings navigation pane.
-    static let sidebarMinFraction: CGFloat = 0.18
-    static let sidebarMaxFraction: CGFloat = 0.30
-    static let sidebarIdealFraction: CGFloat =
-        sidebarMinFraction + (sidebarMaxFraction - sidebarMinFraction) * 0.5
-}
-
-private struct SettingsWindowAccessor: NSViewRepresentable {
-    let onResolve: (NSWindow?) -> Void
-
-    func makeCoordinator() -> TrafficLightPositioner {
-        TrafficLightPositioner()
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            context.coordinator.style(view.window)
-            onResolve(view.window)
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            context.coordinator.style(nsView.window)
-            onResolve(nsView.window)
-        }
-    }
-}
-
-private final class TrafficLightPositioner {
-    private weak var window: NSWindow?
-
-    func style(_ window: NSWindow?) {
-        guard let window else { return }
-
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.styleMask.insert([.resizable, .fullSizeContentView])
-        // Dropping the toolbar entirely (rather than just hiding its sidebar-toggle
-        // item) removes the reserved title-bar strip, so the traffic lights sit
-        // directly over the sidebar and the native full-size-content safe area lines
-        // the sidebar list up right underneath them.
-        window.toolbar = nil
-
-        if self.window !== window {
-            self.window = window
-        }
-
-        hideSidebarToggle(in: window.contentView)
-        preventSidebarCollapse(in: window.contentViewController)
-    }
-
-    private func hideSidebarToggle(in view: NSView?) {
-        guard let view else { return }
-
-        if let button = view as? NSButton {
-            let identifier = button.identifier?.rawValue.lowercased() ?? ""
-            let title = button.title.lowercased()
-            let toolTip = button.toolTip?.lowercased() ?? ""
-            let imageName = button.image?.name()?.lowercased() ?? ""
-
-            if identifier.contains("sidebar") || title.contains("sidebar") ||
-                toolTip.contains("sidebar") || imageName.contains("sidebar") {
-                button.isHidden = true
-                button.isEnabled = false
-            }
-        }
-
-        for subview in view.subviews {
-            hideSidebarToggle(in: subview)
-        }
-    }
-
-    private func preventSidebarCollapse(in viewController: NSViewController?) {
-        guard let viewController else { return }
-
-        if let splitViewController = viewController as? NSSplitViewController,
-           let sidebarItem = splitViewController.splitViewItems.first {
-            sidebarItem.canCollapse = false
-            sidebarItem.isCollapsed = false
-        }
-
-        for child in viewController.children {
-            preventSidebarCollapse(in: child)
-        }
-    }
-}
-
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general       = "General"
     case shortcuts     = "Shortcuts"
@@ -123,8 +24,65 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
 }
 
+private enum SettingsAppVersion {
+    static let displayString: String = {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        return "Version \(version) (\(build))"
+    }()
+}
+
+private struct SettingsWindowAccessor: NSViewRepresentable {
+    let onResolve: (NSWindow?) -> Void
+
+    func makeCoordinator() -> SettingsWindowStyler {
+        SettingsWindowStyler()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            context.coordinator.style(view.window)
+            onResolve(view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            context.coordinator.style(nsView.window)
+            onResolve(nsView.window)
+        }
+    }
+}
+
+private final class SettingsWindowStyler {
+    private weak var window: NSWindow?
+
+    func style(_ window: NSWindow?) {
+        guard let window else { return }
+
+        window.title = "Settings"
+        window.titleVisibility = .visible
+        window.titlebarAppearsTransparent = false
+        window.toolbarStyle = .automatic
+        window.styleMask.insert([.resizable, .fullSizeContentView])
+        window.isMovableByWindowBackground = false
+        window.minSize = NSSize(width: 620, height: 460)
+
+        if self.window !== window {
+            self.window = window
+            window.setFrameAutosaveName("SettingsWindow")
+        }
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var settingsCoordinator: SettingsCoordinator
+    @State private var navigationHistory: [SettingsSection] = [.general]
+    @State private var historyIndex = 0
+    @State private var isHistoryNavigation = false
+
     let updater: SPUUpdater?
 
     private var sidebarSelection: Binding<SettingsSection?> {
@@ -139,39 +97,83 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            NavigationSplitView {
-                List(SettingsSection.allCases, selection: sidebarSelection) { section in
-                    Label(section.rawValue, systemImage: section.icon)
-                        .tag(section)
-                }
-                .listStyle(.sidebar)
-                .navigationSplitViewColumnWidth(
-                    min: geometry.size.width * SettingsWindowMetrics.sidebarMinFraction,
-                    ideal: geometry.size.width * SettingsWindowMetrics.sidebarIdealFraction,
-                    max: geometry.size.width * SettingsWindowMetrics.sidebarMaxFraction
-                )
+        NavigationSplitView(columnVisibility: .constant(.all)) {
+            SettingsSidebarView(selection: sidebarSelection)
+                .frame(width: 200)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 200, max: 200)
                 .toolbar(removing: .sidebarToggle)
-            } detail: {
-                selectedSettingsView
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-            .navigationSplitViewStyle(.balanced)
-            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            selectedSettingsView
+                .navigationTitle(settingsCoordinator.selection.rawValue)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(
-            minWidth: SettingsWindowMetrics.minWidth,
-            idealWidth: SettingsWindowMetrics.idealWidth,
-            maxWidth: SettingsWindowMetrics.maxWidth,
-            minHeight: SettingsWindowMetrics.minHeight,
-            idealHeight: SettingsWindowMetrics.idealHeight,
-            maxHeight: SettingsWindowMetrics.maxHeight
-        )
+        .navigationTitle("Settings")
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 660, minHeight: 540)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                Button {
+                    goBack()
+                } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .disabled(!canGoBack)
+                .help("Back")
+
+                Button {
+                    goForward()
+                } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .disabled(!canGoForward)
+                .help("Forward")
+            }
+        }
         .background(
             SettingsWindowAccessor { window in
                 settingsCoordinator.registerSettingsWindow(window)
             }
         )
+        .onChange(of: settingsCoordinator.selection) { _, _ in
+            recordNavigation()
+        }
+    }
+
+    private var canGoBack: Bool {
+        historyIndex > 0
+    }
+
+    private var canGoForward: Bool {
+        historyIndex < navigationHistory.count - 1
+    }
+
+    private func goBack() {
+        guard canGoBack else { return }
+        isHistoryNavigation = true
+        historyIndex -= 1
+        settingsCoordinator.selection = navigationHistory[historyIndex]
+        DispatchQueue.main.async { isHistoryNavigation = false }
+    }
+
+    private func goForward() {
+        guard canGoForward else { return }
+        isHistoryNavigation = true
+        historyIndex += 1
+        settingsCoordinator.selection = navigationHistory[historyIndex]
+        DispatchQueue.main.async { isHistoryNavigation = false }
+    }
+
+    private func recordNavigation() {
+        guard !isHistoryNavigation else { return }
+        let section = settingsCoordinator.selection
+        guard navigationHistory.last != section else { return }
+
+        if historyIndex < navigationHistory.count - 1 {
+            navigationHistory = Array(navigationHistory.prefix(historyIndex + 1))
+        }
+
+        navigationHistory.append(section)
+        historyIndex = navigationHistory.count - 1
     }
 
     @ViewBuilder
@@ -184,5 +186,31 @@ struct SettingsView: View {
         case .history:       HistoryView()
         case .permissions:   PermissionsSettingsView()
         }
+    }
+}
+
+private struct SettingsSidebarView: View {
+    @Binding var selection: SettingsSection?
+
+    var body: some View {
+        List(selection: $selection) {
+            ForEach(SettingsSection.allCases) { section in
+                Label(section.rawValue, systemImage: section.icon)
+                    .foregroundStyle(.primary)
+                    .tag(section)
+            }
+
+            Text(SettingsAppVersion.displayString)
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+                .fontDesign(.monospaced)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 8)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 6, trailing: 0))
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("Settings")
     }
 }

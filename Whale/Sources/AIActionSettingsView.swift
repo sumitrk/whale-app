@@ -52,6 +52,8 @@ struct AIActionSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 8, for: .scrollContent)
         .onAppear { refreshKeyStatus() }
     }
 
