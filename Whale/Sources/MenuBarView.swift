@@ -10,51 +10,67 @@ struct MenuBarView: View {
 
     var body: some View {
         if !accessibility.isTrusted {
-            Text("Accessibility permission required. Global shortcuts and auto-paste are disabled.")
+            Text("Accessibility permission required.\nGlobal shortcuts and auto-paste are disabled.")
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
 
             if appState.isRecording {
-                Button("Stop Dictation") {
+                Button {
                     Task { await appState.stopRecording() }
+                } label: {
+                    Label("Stop Dictation", systemImage: "stop.fill")
                 }
             } else {
-                Button("Start Dictation (Clipboard Only)") {
+                Button {
                     appState.startClipboardOnlyDictation()
+                } label: {
+                    Label("Start Dictation (Clipboard Only)", systemImage: "mic.fill")
                 }
             }
 
-            Button("Open Permissions") {
+            Button {
                 openSettingsWindow(section: .permissions)
+            } label: {
+                Label("Open Permissions", systemImage: "hand.raised.fill")
             }
 
-            Button("Re-check") {
+            Button {
                 accessibility.refresh()
+            } label: {
+                Label("Re-check", systemImage: "arrow.clockwise")
             }
 
             Divider()
         }
 
         if let updater {
-            Button("Check for Updates…") {
+            Button {
                 updater.checkForUpdates()
+            } label: {
+                Label("Check for Updates…", systemImage: "arrow.down.circle")
             }
             .disabled(!updater.canCheckForUpdates)
 
             Divider()
         }
 
-        Button("Settings…") {
+        Button {
             openSettingsWindow(section: settingsCoordinator.selection)
+        } label: {
+            Label("Settings…", systemImage: "gearshape")
         }
         .keyboardShortcut(",", modifiers: .command)
 
-        Button("History…") {
+        Button {
             openSettingsWindow(section: .history)
+        } label: {
+            Label("History…", systemImage: "clock.arrow.circlepath")
         }
 
-        Button("View Log") {
+        Button {
             DiagnosticLog.openInFinder()
+        } label: {
+            Label("View Log", systemImage: "doc.text.magnifyingglass")
         }
 
         Button("Quit") {
