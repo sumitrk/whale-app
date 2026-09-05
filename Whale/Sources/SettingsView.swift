@@ -46,8 +46,8 @@ private enum SettingsAppVersion {
     }()
 }
 
-/// Bridges the SwiftUI `Settings` scene to the two window facts SwiftUI cannot express:
-/// the resizable style mask and the frame autosave name.
+/// Bridges the SwiftUI `Settings` scene to the window chrome SwiftUI does not expose:
+/// the toolbar style, the resizable style mask, and the frame autosave name.
 ///
 /// Size limits are deliberately *not* set here. `NSWindow.minSize`/`maxSize` and
 /// `contentMinSize`/`contentMaxSize` are the same constraint in two coordinate spaces, and
@@ -87,23 +87,39 @@ private final class SettingsWindowBridgeView: NSView {
             attachedWindow = window
             window.setFrameAutosaveName("SettingsWindow")
             onAttach?(window)
-            // SwiftUI writes the settings window's style mask after the view is attached, so an
-            // assertion made now would be overwritten. Re-assert once the current turn settles.
+            // SwiftUI configures the settings window after the view is attached, so chrome
+            // applied now would be overwritten. Re-apply once the current turn settles.
             DispatchQueue.main.async { [weak window] in
                 guard let window else { return }
-                Self.makeResizable(window)
+                Self.applyChrome(to: window)
             }
         }
 
-        Self.makeResizable(window)
+        Self.applyChrome(to: window)
     }
 
-    /// SwiftUI's `Settings` scene never sets `.resizable`, so without this the window cannot be
-    /// resized at all. Idempotent, so later view updates can cheaply re-assert it — assigning
-    /// `styleMask` unconditionally would be a needless window reconfiguration.
-    private static func makeResizable(_ window: NSWindow) {
-        guard !window.styleMask.contains(.resizable) else { return }
-        window.styleMask.insert(.resizable)
+    /// A SwiftUI `Settings` window defaults to the tall `.preference` toolbar style — centred
+    /// title, centred toolbar items, and a sidebar pushed down below it — and never sets
+    /// `.resizable`. Both have to be corrected here.
+    ///
+    /// Every write is guarded, so later view updates re-assert this for free: assigning
+    /// `styleMask` or `toolbarStyle` unconditionally reconfigures the window for nothing.
+    private static func applyChrome(to window: NSWindow) {
+        if window.toolbarStyle != .automatic {
+            window.toolbarStyle = .automatic
+        }
+        if window.titleVisibility != .visible {
+            window.titleVisibility = .visible
+        }
+        if window.titlebarAppearsTransparent {
+            window.titlebarAppearsTransparent = false
+        }
+        if window.isMovableByWindowBackground {
+            window.isMovableByWindowBackground = false
+        }
+        if !window.styleMask.contains([.resizable, .fullSizeContentView]) {
+            window.styleMask.insert([.resizable, .fullSizeContentView])
+        }
     }
 }
 
