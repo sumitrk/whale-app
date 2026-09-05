@@ -42,9 +42,18 @@ struct PermissionsSettingsView: View {
                 }
 
                 if !accessibility.isTrusted {
-                    Text("Global shortcuts and auto-paste are currently disabled until Accessibility permission is granted.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Global shortcuts and auto-paste are currently disabled until Accessibility permission is granted.")
+                        Text("If \(appDisplayName) is not listed, click + in that pane and choose the app shown in Finder.")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    HStack(spacing: 12) {
+                        Button("Show in Finder") {
+                            accessibility.revealAppInFinder()
+                        }
+                    }
                 }
             }
 
@@ -69,6 +78,10 @@ struct PermissionsSettingsView: View {
             checkMic()
             accessibility.refresh()
         }
+    }
+
+    private var appDisplayName: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Whale"
     }
 
     // MARK: - Checks

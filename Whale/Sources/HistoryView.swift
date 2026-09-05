@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 
-private enum HistoryLayoutMetrics {
-    // This is the History list's share of the detail container. Change it to resize the list.
-    static let listFraction: CGFloat = 0.38
+enum HistoryLayoutMetrics {
+    // Previous share was 0.38. The list was too narrow, so it is 1.4× that width.
+    static let listFraction: CGFloat = 0.38 * 1.4
 }
 
 struct HistoryView: View {
@@ -42,6 +42,7 @@ struct HistoryView: View {
                             .frame(width: detailWidth, height: geometry.size.height)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task(id: "\(query)|\(controller.revision)") { await load() }

@@ -42,6 +42,7 @@ private enum SettingsAppVersion {
 }
 
 private struct SettingsWindowAccessor: NSViewRepresentable {
+    let title: String
     let onResolve: (NSWindow?) -> Void
 
     func makeCoordinator() -> SettingsWindowStyler {
@@ -51,7 +52,7 @@ private struct SettingsWindowAccessor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
-            context.coordinator.style(view.window)
+            context.coordinator.style(view.window, title: title)
             onResolve(view.window)
         }
         return view
@@ -59,7 +60,7 @@ private struct SettingsWindowAccessor: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
-            context.coordinator.style(nsView.window)
+            context.coordinator.style(nsView.window, title: title)
             onResolve(nsView.window)
         }
     }
@@ -68,10 +69,10 @@ private struct SettingsWindowAccessor: NSViewRepresentable {
 private final class SettingsWindowStyler {
     private weak var window: NSWindow?
 
-    func style(_ window: NSWindow?) {
+    func style(_ window: NSWindow?, title: String) {
         guard let window else { return }
 
-        window.title = "Settings"
+        window.title = title
         window.titleVisibility = .visible
         window.titlebarAppearsTransparent = false
         window.toolbarStyle = .automatic
@@ -122,9 +123,9 @@ struct SettingsView: View {
         } detail: {
             selectedSettingsView
                 .navigationTitle(settingsCoordinator.selection.rawValue)
+                .navigationSplitViewColumnWidth(min: 360, ideal: 500, max: SettingsWindowMetrics.maxWidth)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .navigationTitle("Settings")
         .navigationSplitViewStyle(.balanced)
         .frame(
             minWidth: SettingsWindowMetrics.minWidth,
@@ -154,7 +155,7 @@ struct SettingsView: View {
             }
         }
         .background(
-            SettingsWindowAccessor { window in
+            SettingsWindowAccessor(title: settingsCoordinator.selection.rawValue) { window in
                 settingsCoordinator.registerSettingsWindow(window)
             }
         )
@@ -235,6 +236,5 @@ private struct SettingsSidebarView: View {
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 6, trailing: 0))
         }
         .listStyle(.sidebar)
-        .navigationTitle("Settings")
     }
 }

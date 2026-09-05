@@ -31,7 +31,9 @@ final class AccessibilityController: ObservableObject {
         // appear repeatedly even while the old Settings row is enabled. The
         // explicit recovery dialog below explains the identity migration and
         // lets the user reset the record before opening Settings.
-        let shouldOfferRecovery = promptOnLaunch && !isTestProcess
+        let shouldOfferRecovery = promptOnLaunch
+            && !isTestProcess
+            && Self.shouldOfferIdentityRecovery(bundleIdentifier: Bundle.main.bundleIdentifier)
         refresh()
 
         if shouldOfferRecovery && !isTrusted {
@@ -115,13 +117,27 @@ final class AccessibilityController: ObservableObject {
     }
 
     func openSystemAccessibilitySettingsAndWatch() {
-        // Re-register the current signed app after a TCC reset so macOS adds
-        // it back to the Accessibility list before opening System Settings.
+        // Register this exact binary with TCC before opening the pane. Opening
+        // Settings immediately can steal focus and leave the app off the list.
+        NSApp.activate(ignoringOtherApps: true)
         requestPrompt()
-        NSWorkspace.shared.open(
-            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        )
         startPolling()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            NSWorkspace.shared.open(Self.accessibilitySettingsURL)
+        }
+    }
+
+    func revealAppInFinder() {
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+    }
+
+    nonisolated static func shouldOfferIdentityRecovery(bundleIdentifier: String?) -> Bool {
+        guard let bundleIdentifier, !bundleIdentifier.hasSuffix("Tests") else { return false }
+        return !bundleIdentifier.hasSuffix(".dev")
+    }
+
+    nonisolated static var accessibilitySettingsURL: URL {
+        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
     }
 
     private func updateTrustState(_ trusted: Bool) {

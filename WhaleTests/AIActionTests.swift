@@ -281,6 +281,17 @@ final class AIActionTests: XCTestCase {
         XCTAssertEqual(SettingsWindowMetrics.maxWidth, SettingsWindowMetrics.minWidth * 1.5)
     }
 
+    func testHistoryListUsesOnePointFourTimesItsPreviousWidth() {
+        XCTAssertEqual(HistoryLayoutMetrics.listFraction, 0.38 * 1.4)
+    }
+
+    func testAccessibilityRecoveryIsSkippedForDevAndTestBundles() {
+        XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.transcribe-meeting.dev"))
+        XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.transcribe-meetingTests"))
+        XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: nil))
+        XCTAssertTrue(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.transcribe-meeting"))
+    }
+
     func testHistoryListDimsFailedAndCancelledEntries() {
         XCTAssertFalse(historyEntry(outcome: .succeeded).isDimmedInList)
         XCTAssertFalse(historyEntry(outcome: .running).isDimmedInList)
