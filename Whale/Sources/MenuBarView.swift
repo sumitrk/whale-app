@@ -37,19 +37,8 @@ struct MenuBarView: View {
             Button {
                 accessibility.refresh()
             } label: {
-                Label("Re-check", systemImage: "arrow.clockwise")
+                Label("Re-check Permission", systemImage: "arrow.clockwise")
             }
-
-            Divider()
-        }
-
-        if let updater {
-            Button {
-                updater.checkForUpdates()
-            } label: {
-                Label("Check for Updates…", systemImage: "arrow.down.circle")
-            }
-            .disabled(!updater.canCheckForUpdates)
 
             Divider()
         }
@@ -67,13 +56,18 @@ struct MenuBarView: View {
             Label("History…", systemImage: "clock.arrow.circlepath")
         }
 
-        Button {
-            DiagnosticLog.openInFinder()
-        } label: {
-            Label("View Log", systemImage: "doc.text.magnifyingglass")
+        if let updater {
+            Button {
+                updater.checkForUpdates()
+            } label: {
+                Label("Check for Updates…", systemImage: "arrow.down.circle")
+            }
+            .disabled(!updater.canCheckForUpdates)
         }
 
-        Button("Quit") {
+        Divider()
+
+        Button("Quit Whale") {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q", modifiers: .command)
