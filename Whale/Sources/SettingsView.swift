@@ -2,6 +2,15 @@ import AppKit
 import SwiftUI
 import Sparkle
 
+enum SettingsWindowMetrics {
+    static let minWidth: CGFloat = 700
+    static let idealWidth: CGFloat = minWidth
+    static let maxWidth: CGFloat = minWidth * 1.5
+    static let minHeight: CGFloat = 540
+    static let idealHeight: CGFloat = minHeight
+    static let maxHeight: CGFloat = 900
+}
+
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general       = "General"
     case shortcuts     = "Shortcuts"
@@ -68,11 +77,19 @@ private final class SettingsWindowStyler {
         window.toolbarStyle = .automatic
         window.styleMask.insert([.resizable, .fullSizeContentView])
         window.isMovableByWindowBackground = false
-        window.minSize = NSSize(width: 620, height: 460)
+        window.minSize = NSSize(width: SettingsWindowMetrics.minWidth, height: SettingsWindowMetrics.minHeight)
+        window.maxSize = NSSize(width: SettingsWindowMetrics.maxWidth, height: SettingsWindowMetrics.maxHeight)
 
         if self.window !== window {
             self.window = window
             window.setFrameAutosaveName("SettingsWindow")
+        }
+
+        var frame = window.frame
+        frame.size.width = min(max(frame.size.width, SettingsWindowMetrics.minWidth), SettingsWindowMetrics.maxWidth)
+        frame.size.height = min(max(frame.size.height, SettingsWindowMetrics.minHeight), SettingsWindowMetrics.maxHeight)
+        if frame.size != window.frame.size {
+            window.setFrame(frame, display: true)
         }
     }
 }
@@ -109,7 +126,14 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 660, minHeight: 540)
+        .frame(
+            minWidth: SettingsWindowMetrics.minWidth,
+            idealWidth: SettingsWindowMetrics.idealWidth,
+            maxWidth: SettingsWindowMetrics.maxWidth,
+            minHeight: SettingsWindowMetrics.minHeight,
+            idealHeight: SettingsWindowMetrics.idealHeight,
+            maxHeight: SettingsWindowMetrics.maxHeight
+        )
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button {

@@ -62,6 +62,21 @@ struct HistoryEntry: Identifiable, Sendable, Equatable {
     let resultText: String?
     let errorText: String?
     let contextInputs: [ContextInput]
+
+    var listTitle: String {
+        let name = sourceAppName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? "Unknown App" : name
+    }
+
+    var listPreview: String {
+        [resultText, instructionText, errorText]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? ""
+    }
+
+    var isDimmedInList: Bool {
+        outcome == .failed || outcome == .cancelled
+    }
 }
 
 enum SHA256Digest {

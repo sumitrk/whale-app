@@ -54,7 +54,7 @@ struct TranscribeMeetingApp: App {
                 .environmentObject(accessibilityController)
                 .environmentObject(settingsCoordinator)
         }
-        .defaultSize(width: 700, height: 540)
-        .windowResizability(.contentSize)
+        .defaultSize(width: SettingsWindowMetrics.idealWidth, height: SettingsWindowMetrics.idealHeight)
+        .windowResizability(.contentMinSize)
     }
 }

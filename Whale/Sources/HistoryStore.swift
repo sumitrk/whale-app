@@ -497,6 +497,8 @@ final class HistoryController: ObservableObject {
 
     @Published private(set) var errorMessage: String?
     @Published private(set) var revision = 0
+    var lastSelectedID: UUID?
+    var lastSelectedEntry: HistoryEntry?
     private var store: HistoryStore?
 
     func prepare() async throws {
@@ -522,6 +524,8 @@ final class HistoryController: ObservableObject {
 
     func reset() async throws {
         store = nil
+        lastSelectedID = nil
+        lastSelectedEntry = nil
         let opened = try await HistoryStore.resetDefault()
         store = opened
         errorMessage = nil

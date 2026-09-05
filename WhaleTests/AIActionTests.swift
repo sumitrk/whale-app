@@ -247,4 +247,65 @@ final class AIActionTests: XCTestCase {
             XCTFail("Expected a wrong-key failure")
         } catch { }
     }
+
+    func testHistoryListTitleUsesSourceAppName() {
+        XCTAssertEqual(historyEntry(sourceAppName: "ChatGPT").listTitle, "ChatGPT")
+        XCTAssertEqual(historyEntry(sourceAppName: "  Notes  ").listTitle, "Notes")
+        XCTAssertEqual(historyEntry(sourceAppName: nil).listTitle, "Unknown App")
+        XCTAssertEqual(historyEntry(sourceAppName: " ").listTitle, "Unknown App")
+    }
+
+    func testHistoryListPreviewPrefersResultThenInstructionThenError() {
+        XCTAssertEqual(
+            historyEntry(instructionText: "Instruction", resultText: "Result", errorText: "Error").listPreview,
+            "Result"
+        )
+        XCTAssertEqual(
+            historyEntry(instructionText: "Instruction", resultText: nil, errorText: "Error").listPreview,
+            "Instruction"
+        )
+        XCTAssertEqual(
+            historyEntry(instructionText: nil, resultText: nil, errorText: "Error").listPreview,
+            "Error"
+        )
+        XCTAssertEqual(historyEntry().listPreview, "")
+    }
+
+    func testHistoryListPreviewOmitsOutcomeLabels() {
+        XCTAssertEqual(historyEntry(outcome: .succeeded).listPreview, "")
+        XCTAssertEqual(historyEntry(outcome: .failed).listPreview, "")
+    }
+
+    func testSettingsWindowMaxWidthIsOneAndAHalfTimesCurrentWidth() {
+        XCTAssertEqual(SettingsWindowMetrics.minWidth, 700)
+        XCTAssertEqual(SettingsWindowMetrics.maxWidth, SettingsWindowMetrics.minWidth * 1.5)
+    }
+
+    func testHistoryListDimsFailedAndCancelledEntries() {
+        XCTAssertFalse(historyEntry(outcome: .succeeded).isDimmedInList)
+        XCTAssertFalse(historyEntry(outcome: .running).isDimmedInList)
+        XCTAssertTrue(historyEntry(outcome: .failed).isDimmedInList)
+        XCTAssertTrue(historyEntry(outcome: .cancelled).isDimmedInList)
+    }
+
+    private func historyEntry(
+        outcome: HistoryOutcome = .succeeded,
+        sourceAppName: String? = "ChatGPT",
+        instructionText: String? = nil,
+        resultText: String? = nil,
+        errorText: String? = nil
+    ) -> HistoryEntry {
+        HistoryEntry(
+            id: UUID(),
+            kind: .dictation,
+            createdAt: Date(),
+            completedAt: Date(),
+            outcome: outcome,
+            sourceAppName: sourceAppName,
+            instructionText: instructionText,
+            resultText: resultText,
+            errorText: errorText,
+            contextInputs: []
+        )
+    }
 }
