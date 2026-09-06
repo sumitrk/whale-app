@@ -129,13 +129,11 @@ private struct ModelRow: View {
         .contextMenu { contextMenu(for: row) }
     }
 
-    /// While a download or check is running the phase text is the whole story; the language
-    /// only earns its place next to a settled status.
     private func statusLine(for row: TranscriptionModelRowModel) -> String {
-        if case .working = row.status {
-            return row.statusText
-        }
-        return "\(row.statusText) · \(model.languageLabel)"
+        row.statusLine(
+            capabilityLabel: model.capabilityLabel,
+            hasLanguageControl: languageControl(for: row) != nil
+        )
     }
 
     private func dotColor(for status: TranscriptionModelStatus) -> Color {
@@ -147,17 +145,48 @@ private struct ModelRow: View {
         }
     }
 
+    /// The language control lands where the Download button was, so the right-hand column
+    /// reads the same all the way down the list. The local folder is the one row that keeps a
+    /// button as well — it still has to be repointed — and that button sits to the left so the
+    /// language stays in the column the eye is scanning.
     @ViewBuilder
     private func accessory(for row: TranscriptionModelRowModel) -> some View {
         if row.isBusy {
             ProgressView()
                 .controlSize(.small)
-        } else if let title = row.primaryActionTitle {
-            // Deliberately not `.borderedProminent`: nothing on this pane is the one thing
-            // the user came here to do, so no row gets to claim the screen's default action.
-            Button(title) { triggerPrimaryAction() }
-                .buttonStyle(.bordered)
+        } else {
+            HStack(spacing: 8) {
+                if let title = row.primaryActionTitle {
+                    // Deliberately not `.borderedProminent`: nothing on this pane is the one
+                    // thing the user came here to do, so no row gets to claim the screen's
+                    // default action.
+                    Button(title) { triggerPrimaryAction() }
+                        .buttonStyle(.bordered)
+                }
+
+                if let control = languageControl(for: row) {
+                    ModelLanguageControlView(control: control) { option in
+                        settings.setLanguageCode(option.decodingLanguageCode, for: model.id)
+                    }
+                }
+            }
+            // Without this the title takes the space it wants and a long language name
+            // squeezes the button beside it down to a sliver.
+            .fixedSize()
+            .layoutPriority(1)
         }
+    }
+
+    /// Only an installed model gets a language control — including one that is installed but
+    /// inactive, so a language can be set before switching to it rather than after.
+    private func languageControl(for row: TranscriptionModelRowModel) -> ModelLanguageControl? {
+        guard row.isReady else { return nil }
+
+        return ModelLanguageResolver.control(
+            for: model,
+            detected: settings.detectedLanguageCapability(for: model.id),
+            storedCode: settings.languageCode(for: model.id)
+        )
     }
 
     @ViewBuilder
@@ -214,6 +243,129 @@ private struct ModelRow: View {
 
         guard panel.runModal() == .OK, let folderURL = panel.url else { return }
         modelStore.connectLocalModel(model.id, folderURL: folderURL)
+    }
+}
+
+/// The trailing language control, in both of its shapes, so their styling cannot drift apart.
+///
+/// Both shapes are a plain bordered `Button`, which is what makes them match the Download
+/// button they stand in for. SwiftUI's own `Menu` cannot be used here: inside
+/// `.formStyle(.grouped)` macOS renders it — and `NSPopUpButton` with it — in the inline
+/// System Settings style, bare text beside a detached chevron badge, and no `menuStyle` or
+/// `buttonStyle` overrides that. A `Button` keeps its bezel in the same context, so the
+/// control is a real button that carries the chevron in its label and raises a real `NSMenu`.
+/// That also buys the things a 100-item SwiftUI menu does badly: scrolling, type-ahead, and
+/// checkmarks that survive the same language appearing in two groups.
+private struct ModelLanguageControlView: View {
+    let control: ModelLanguageControl
+    let onSelect: (TranscriptionLanguageOption) -> Void
+
+    @State private var anchor = LanguageMenuAnchor()
+    @State private var controller = LanguageMenuController()
+
+    var body: some View {
+        if control.allowsSelection {
+            Button {
+                guard let view = anchor.view else { return }
+                controller.present(control: control, from: view, onSelect: onSelect)
+            } label: {
+                HStack(spacing: 4) {
+                    Text(control.selection.title)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.bordered)
+            .background(LanguageMenuAnchorView(anchor: anchor))
+            .fixedSize()
+        } else {
+            // The same bezel holding the one settled answer. Disabled because there is nothing
+            // to choose, and declining to hit-test so the click falls through to the row
+            // underneath rather than leaving a dead patch in the middle of a clickable row.
+            Button(control.selection.title) {}
+                .buttonStyle(.bordered)
+                .disabled(true)
+                .allowsHitTesting(false)
+                .accessibilityRemoveTraits(.isButton)
+                .fixedSize()
+        }
+    }
+}
+
+/// Somewhere to keep the AppKit view the menu hangs off, so the popup lands under the button
+/// rather than under the mouse.
+@MainActor
+private final class LanguageMenuAnchor {
+    weak var view: NSView?
+}
+
+private struct LanguageMenuAnchorView: NSViewRepresentable {
+    let anchor: LanguageMenuAnchor
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        anchor.view = view
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        anchor.view = nsView
+    }
+}
+
+/// Builds and raises the language menu. Items carry their index as a tag rather than a code,
+/// because the user's own languages deliberately appear twice and only the tapped one should
+/// answer.
+@MainActor
+private final class LanguageMenuController: NSObject {
+    private var options: [TranscriptionLanguageOption] = []
+    private var onSelect: ((TranscriptionLanguageOption) -> Void)?
+
+    func present(
+        control: ModelLanguageControl,
+        from view: NSView,
+        onSelect: @escaping (TranscriptionLanguageOption) -> Void
+    ) {
+        self.onSelect = onSelect
+
+        // SwiftUI hands representables an unflipped view, so "just under the button" is below
+        // `minY`, not above `maxY`. Getting this backwards opens the menu over the control it
+        // belongs to, so honour the flag rather than hardcoding today's answer.
+        let below = view.isFlipped ? view.bounds.maxY + 4 : view.bounds.minY - 4
+
+        makeMenu(for: control)
+            .popUp(positioning: nil, at: NSPoint(x: view.bounds.minX, y: below), in: view)
+    }
+
+    /// Split from `present` so the menu it builds can be inspected without raising it.
+    func makeMenu(for control: ModelLanguageControl) -> NSMenu {
+        options = []
+
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+
+        for (index, group) in control.optionGroups.enumerated() {
+            if index > 0 {
+                menu.addItem(.separator())
+            }
+
+            for option in group {
+                let item = NSMenuItem(title: option.title, action: #selector(pick(_:)), keyEquivalent: "")
+                item.target = self
+                item.tag = options.count
+                item.state = option == control.selection ? .on : .off
+                options.append(option)
+                menu.addItem(item)
+            }
+        }
+
+        return menu
+    }
+
+    @objc private func pick(_ sender: NSMenuItem) {
+        guard options.indices.contains(sender.tag) else { return }
+        onSelect?(options[sender.tag])
     }
 }
 

@@ -98,6 +98,18 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(builtInModelLocalBookmarks, forKey: Keys.builtInModelLocalBookmarks) }
     }
 
+    /// Language per model, because the choice belongs to the model rather than to the app:
+    /// Whisper can be left on German while Parakeet stays what it has always been.
+    @Published private var builtInModelLanguages: [String: String] {
+        didSet { ud.set(builtInModelLanguages, forKey: Keys.builtInModelLanguages) }
+    }
+
+    /// What loading each model last revealed about the languages it can decode. Only a folder
+    /// the user supplied needs this; models we pin declare it in the catalog.
+    @Published private var builtInModelLanguageCapabilities: [String: String] {
+        didSet { ud.set(builtInModelLanguageCapabilities, forKey: Keys.builtInModelLanguageCapabilities) }
+    }
+
     /// Rewrite spoken numbers, money, dates, and times in a transcript into
     /// their written form. On by default; the toggle exists because the rewrite
     /// also misreads some ordinary phrasing, so anyone it bites can switch it
@@ -144,6 +156,8 @@ class SettingsStore: ObservableObject {
         ) ?? .parakeetEnglishV2
         builtInModelLocalPaths   = ud.dictionary(forKey: Keys.builtInModelLocalPaths) as? [String: String] ?? [:]
         builtInModelLocalBookmarks = ud.dictionary(forKey: Keys.builtInModelLocalBookmarks) as? [String: String] ?? [:]
+        builtInModelLanguages    = ud.dictionary(forKey: Keys.builtInModelLanguages) as? [String: String] ?? [:]
+        builtInModelLanguageCapabilities = ud.dictionary(forKey: Keys.builtInModelLanguageCapabilities) as? [String: String] ?? [:]
         smartFormattingEnabled   = (ud.object(forKey: Keys.smartFormattingEnabled) as? Bool) ?? true
         aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
         openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
@@ -176,6 +190,37 @@ class SettingsStore: ObservableObject {
         stopAccessingLocalModel(for: modelID)
         builtInModelLocalPaths[modelID.rawValue] = url?.path
         builtInModelLocalBookmarks[modelID.rawValue] = makeBookmarkString(for: url)
+    }
+
+    /// The language chosen for this model, or `nil` for auto-detect. Absence *is* the default,
+    /// which is why there is no sentinel string here to collide with a real language code.
+    func languageCode(for modelID: BuiltInModelID) -> String? {
+        builtInModelLanguages[modelID.rawValue]
+    }
+
+    /// Nothing is validated on the way in. A stored language that a model cannot currently
+    /// offer is resolved away on read, so choosing Spanish, repointing at an English-only
+    /// folder, and repointing back leaves the Spanish intact.
+    func setLanguageCode(_ code: String?, for modelID: BuiltInModelID) {
+        builtInModelLanguages[modelID.rawValue] = code
+    }
+
+    func detectedLanguageCapability(for modelID: BuiltInModelID) -> ModelLanguageCapability? {
+        guard let stored = builtInModelLanguageCapabilities[modelID.rawValue] else { return nil }
+        return ModelLanguageCapability(storageValue: stored)
+    }
+
+    /// Recorded on every model load, including the cached one before each dictation, so it has
+    /// to stay silent when nothing changed — otherwise every transcription would republish the
+    /// store and redraw the settings pane for no reason.
+    func setDetectedLanguageCapability(
+        _ capability: ModelLanguageCapability,
+        for modelID: BuiltInModelID
+    ) {
+        guard builtInModelLanguageCapabilities[modelID.rawValue] != capability.storageValue else {
+            return
+        }
+        builtInModelLanguageCapabilities[modelID.rawValue] = capability.storageValue
     }
 
     // MARK: - Key name helper
@@ -303,6 +348,8 @@ class SettingsStore: ObservableObject {
         static let selectedBuiltInModelID = "selectedBuiltInModelID"
         static let builtInModelLocalPaths = "builtInModelLocalPaths"
         static let builtInModelLocalBookmarks = "builtInModelLocalBookmarks"
+        static let builtInModelLanguages = "builtInModelLanguages"
+        static let builtInModelLanguageCapabilities = "builtInModelLanguageCapabilities"
         static let smartFormattingEnabled = "smartFormattingEnabled"
         static let aiActionMasterPrompt = "aiActionMasterPrompt"
         static let openRouterKeyRejected = "openRouterKeyRejected"

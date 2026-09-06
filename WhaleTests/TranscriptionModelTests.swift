@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 import FluidAudio
 @testable import Whale
@@ -83,7 +84,7 @@ final class TranscriptionModelTests: XCTestCase {
             [.whisperLocalFolder]
         )
         XCTAssertEqual(
-            BuiltInModelCatalog.allModels.map(\.languageLabel),
+            BuiltInModelCatalog.allModels.map(\.capabilityLabel),
             ["English only", "Multilingual", "Auto-detect"]
         )
     }
@@ -262,10 +263,20 @@ final class TranscriptionModelTests: XCTestCase {
     }
 
     func testWhisperBuiltInDetectsLanguageFromSpeech() {
-        let options = WhisperBuiltInConfiguration.decodingOptions()
+        let options = WhisperBuiltInConfiguration.decodingOptions(language: nil)
 
         XCTAssertNil(options.language)
         XCTAssertTrue(options.detectLanguage)
+        XCTAssertEqual(options.task, .transcribe)
+    }
+
+    /// Naming a language has to switch detection off, not merely supply a hint: leaving
+    /// `detectLanguage` on would let the decoder overrule the user's explicit choice.
+    func testWhisperBuiltInPinsTheChosenLanguageAndStopsDetecting() {
+        let options = WhisperBuiltInConfiguration.decodingOptions(language: "es")
+
+        XCTAssertEqual(options.language, "es")
+        XCTAssertFalse(options.detectLanguage)
         XCTAssertEqual(options.task, .transcribe)
     }
 
@@ -913,5 +924,324 @@ final class ParakeetModelDirectoryContractTests: XCTestCase {
             AppRuntimeInfo.legacyParakeetEnglishV2DirectoryName,
             AppRuntimeInfo.parakeetEnglishV2DirectoryName
         )
+    }
+}
+
+@MainActor
+final class TranscriptionLanguageTests: XCTestCase {
+
+    // MARK: - Catalog
+
+    /// Whisper publishes 112 name→code pairs for 100 codes — `castilian` and `spanish` are
+    /// both `es`. Iterating the raw dictionary would put Spanish in the menu twice.
+    func testCatalogDeduplicatesAliasedLanguageCodes() {
+        XCTAssertEqual(TranscriptionLanguageCatalog.supportedCodes.count, 100)
+        XCTAssertEqual(TranscriptionLanguageCatalog.allOptions.count, 100)
+
+        let ids = TranscriptionLanguageCatalog.allOptions.map(\.id)
+        XCTAssertEqual(Set(ids).count, ids.count, "a language code reached the menu twice")
+
+        XCTAssertEqual(ids.filter { $0 == "es" }.count, 1)
+        XCTAssertEqual(ids.filter { $0 == "zh" }.count, 1)
+    }
+
+    func testEveryLanguageHasAReadableName() {
+        for option in TranscriptionLanguageCatalog.allOptions {
+            XCTAssertFalse(option.title.isEmpty, "\(option.id) has no display name")
+            XCTAssertNotEqual(
+                option.title,
+                option.id,
+                "\(option.id) fell back to its raw code instead of a name"
+            )
+        }
+
+        XCTAssertEqual(TranscriptionLanguageOption.language(code: "en").title, "English")
+        XCTAssertEqual(TranscriptionLanguageOption.autoDetect.title, "Auto-detect")
+    }
+
+    func testLanguagesAreSortedByTheNameShownRatherThanByCode() {
+        let titles = TranscriptionLanguageCatalog.allOptions.map(\.title)
+        let sorted = titles.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+
+        XCTAssertEqual(titles, sorted)
+    }
+
+    func testAutoDetectAsksTheDecoderToDetectAndALanguageDoesNot() {
+        XCTAssertNil(TranscriptionLanguageOption.autoDetect.decodingLanguageCode)
+        XCTAssertEqual(TranscriptionLanguageOption.language(code: "de").decodingLanguageCode, "de")
+    }
+
+    // MARK: - Capability
+
+    /// Not knowing is the absence of a record, so it round-trips as a missing key rather than
+    /// as a stored value meaning "no".
+    func testCapabilityRoundTripsThroughStorageExceptWhenUnknown() {
+        XCTAssertEqual(
+            ModelLanguageCapability(storageValue: ModelLanguageCapability.multilingual.storageValue!),
+            .multilingual
+        )
+        XCTAssertEqual(
+            ModelLanguageCapability(storageValue: ModelLanguageCapability.single(code: "en").storageValue!),
+            .single(code: "en")
+        )
+        XCTAssertNil(ModelLanguageCapability.unknown.storageValue)
+        XCTAssertNil(ModelLanguageCapability(storageValue: "nonsense"))
+        XCTAssertNil(ModelLanguageCapability(storageValue: "single:"))
+    }
+
+    /// A pinned checkpoint describes itself. Whatever was last loaded does not get to overrule
+    /// the catalog — only a folder we did not choose is answered by measurement.
+    func testDeclaredCapabilityOutranksWhateverWasLastLoaded() {
+        XCTAssertEqual(
+            ModelLanguageResolver.capability(
+                for: BuiltInModelID.parakeetEnglishV2.descriptor,
+                detected: .multilingual
+            ),
+            .single(code: "en")
+        )
+        XCTAssertEqual(
+            ModelLanguageResolver.capability(
+                for: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+                detected: .single(code: "en")
+            ),
+            .multilingual
+        )
+        XCTAssertEqual(
+            ModelLanguageResolver.capability(
+                for: BuiltInModelID.whisperLocalFolder.descriptor,
+                detected: .multilingual
+            ),
+            .multilingual
+        )
+    }
+
+    // MARK: - Control shape
+
+    func testEnglishOnlyModelOffersOneSettledOptionAndNoMenu() {
+        let control = ModelLanguageResolver.control(
+            for: BuiltInModelID.parakeetEnglishV2.descriptor,
+            detected: nil,
+            storedCode: nil
+        )
+
+        XCTAssertEqual(control?.options, [.language(code: "en")])
+        XCTAssertEqual(control?.selection.title, "English")
+        XCTAssertEqual(control?.allowsSelection, false)
+    }
+
+    func testMultilingualModelOffersAutoDetectPlusEveryLanguage() {
+        let control = ModelLanguageResolver.control(
+            for: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+            detected: nil,
+            storedCode: nil
+        )
+
+        XCTAssertEqual(control?.options.count, 101)
+        XCTAssertEqual(control?.options.first, .autoDetect)
+        XCTAssertEqual(control?.selection, .autoDetect)
+        XCTAssertEqual(control?.allowsSelection, true)
+    }
+
+    /// The menu leads with Auto-detect and ends with the full list; the user's own languages
+    /// sit in between so a non-English speaker is not made to scroll on every change.
+    func testMultilingualMenuLeadsWithAutoDetectAndEndsWithTheFullList() {
+        let groups = ModelLanguageResolver.control(
+            for: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+            detected: nil,
+            storedCode: nil
+        )?.optionGroups
+
+        XCTAssertEqual(groups?.first, [.autoDetect])
+        XCTAssertEqual(groups?.last, TranscriptionLanguageCatalog.allOptions)
+        XCTAssertFalse(groups?.contains(where: \.isEmpty) ?? true, "an empty group would draw a stray divider")
+    }
+
+    /// Until a supplied folder has been loaded once there is nothing honest to show, so the
+    /// row keeps its capability blurb and shows no control at all.
+    func testUnmeasuredLocalFolderHasNoLanguageControl() {
+        XCTAssertNil(
+            ModelLanguageResolver.control(
+                for: BuiltInModelID.whisperLocalFolder.descriptor,
+                detected: nil,
+                storedCode: nil
+            )
+        )
+    }
+
+    func testMeasuredLocalFolderTakesTheShapeOfWhatWasLoaded() {
+        let multilingual = ModelLanguageResolver.control(
+            for: BuiltInModelID.whisperLocalFolder.descriptor,
+            detected: .multilingual,
+            storedCode: nil
+        )
+        XCTAssertEqual(multilingual?.options.count, 101)
+        XCTAssertEqual(multilingual?.allowsSelection, true)
+
+        let englishOnly = ModelLanguageResolver.control(
+            for: BuiltInModelID.whisperLocalFolder.descriptor,
+            detected: .single(code: "en"),
+            storedCode: nil
+        )
+        XCTAssertEqual(englishOnly?.selection.title, "English")
+        XCTAssertEqual(englishOnly?.allowsSelection, false)
+    }
+
+    // MARK: - Read-time resolution
+
+    func testStoredLanguageIsUsedWhenTheModelCanOfferIt() {
+        let control = ModelLanguageResolver.control(
+            for: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+            detected: nil,
+            storedCode: "es"
+        )
+
+        XCTAssertEqual(control?.selection, .language(code: "es"))
+        XCTAssertEqual(
+            ModelLanguageResolver.decodingLanguageCode(
+                for: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+                detected: nil,
+                storedCode: "es"
+            ),
+            "es"
+        )
+    }
+
+    func testUnofferableStoredLanguageFallsBackToTheModelsDefault() {
+        XCTAssertEqual(
+            ModelLanguageResolver.control(
+                for: BuiltInModelID.whisperLocalFolder.descriptor,
+                detected: .single(code: "en"),
+                storedCode: "es"
+            )?.selection,
+            .language(code: "en")
+        )
+
+        XCTAssertEqual(
+            ModelLanguageResolver.control(
+                for: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+                detected: nil,
+                storedCode: "not-a-language"
+            )?.selection,
+            .autoDetect
+        )
+    }
+
+    /// The point of resolving on read rather than clearing on write: repointing a folder at an
+    /// English-only checkpoint must not destroy the Spanish that was chosen for it.
+    func testRepointingAFolderAndBackRestoresTheChosenLanguage() {
+        let folder = BuiltInModelID.whisperLocalFolder.descriptor
+        let stored = "es"
+
+        XCTAssertEqual(
+            ModelLanguageResolver.decodingLanguageCode(for: folder, detected: .multilingual, storedCode: stored),
+            "es"
+        )
+        XCTAssertEqual(
+            ModelLanguageResolver.decodingLanguageCode(for: folder, detected: .single(code: "en"), storedCode: stored),
+            "en"
+        )
+        XCTAssertEqual(
+            ModelLanguageResolver.decodingLanguageCode(for: folder, detected: .multilingual, storedCode: stored),
+            "es"
+        )
+    }
+
+    /// An unmeasured folder has no control and therefore no opinion, which has to reach the
+    /// decoder as detection — the behaviour every existing install already has.
+    func testUnmeasuredFolderStillAsksTheDecoderToDetect() {
+        XCTAssertNil(
+            ModelLanguageResolver.decodingLanguageCode(
+                for: BuiltInModelID.whisperLocalFolder.descriptor,
+                detected: nil,
+                storedCode: "es"
+            )
+        )
+    }
+
+    // MARK: - The subtitle rule
+
+    func testLanguageAppearsInExactlyOnePlacePerRow() {
+        let ready = TranscriptionModelRowModel(
+            model: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+            installState: .ready,
+            isSelected: true
+        )
+        XCTAssertEqual(ready.statusLine(capabilityLabel: "Multilingual", hasLanguageControl: true), "Active")
+
+        let notInstalled = TranscriptionModelRowModel(
+            model: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+            installState: .notInstalled,
+            isSelected: false
+        )
+        XCTAssertEqual(
+            notInstalled.statusLine(capabilityLabel: "Multilingual", hasLanguageControl: false),
+            "Not Installed · Multilingual"
+        )
+
+        let failed = TranscriptionModelRowModel(
+            model: BuiltInModelID.whisperLocalFolder.descriptor,
+            installState: .failed("boom"),
+            isSelected: false
+        )
+        XCTAssertEqual(
+            failed.statusLine(capabilityLabel: "Auto-detect", hasLanguageControl: false),
+            "Needs Attention · Auto-detect"
+        )
+
+        let downloading = TranscriptionModelRowModel(
+            model: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+            installState: .downloading(progress: 0.5, phase: "Downloading"),
+            isSelected: false
+        )
+        XCTAssertEqual(
+            downloading.statusLine(capabilityLabel: "Multilingual", hasLanguageControl: false),
+            "Downloading · 50%"
+        )
+    }
+
+    // MARK: - Persistence
+
+    func testLanguageAndCapabilityPersistPerModel() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defaults.removePersistentDomain(forName: #function)
+        let store = SettingsStore(userDefaults: defaults)
+
+        XCTAssertNil(store.languageCode(for: .whisperLargeV3Turbo))
+
+        store.setLanguageCode("de", for: .whisperLargeV3Turbo)
+        store.setDetectedLanguageCapability(.multilingual, for: .whisperLocalFolder)
+
+        // Per model, not per app: pinning Whisper to German leaves Parakeet alone.
+        XCTAssertNil(store.languageCode(for: .parakeetEnglishV2))
+        XCTAssertNil(store.detectedLanguageCapability(for: .whisperLargeV3Turbo))
+
+        let reloaded = SettingsStore(userDefaults: defaults)
+        XCTAssertEqual(reloaded.languageCode(for: .whisperLargeV3Turbo), "de")
+        XCTAssertEqual(reloaded.detectedLanguageCapability(for: .whisperLocalFolder), .multilingual)
+
+        // Clearing returns the model to auto-detect rather than storing a sentinel.
+        reloaded.setLanguageCode(nil, for: .whisperLargeV3Turbo)
+        XCTAssertNil(SettingsStore(userDefaults: defaults).languageCode(for: .whisperLargeV3Turbo))
+    }
+
+    /// Every dictation reloads the model and re-reports its capability. Writing an unchanged
+    /// value would republish the store and redraw the settings pane on every transcription.
+    func testRerecordingTheSameCapabilityDoesNotRepublish() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defaults.removePersistentDomain(forName: #function)
+        let store = SettingsStore(userDefaults: defaults)
+
+        var publishes = 0
+        let token = store.objectWillChange.sink { _ in publishes += 1 }
+        defer { token.cancel() }
+
+        store.setDetectedLanguageCapability(.multilingual, for: .whisperLocalFolder)
+        XCTAssertEqual(publishes, 1)
+
+        store.setDetectedLanguageCapability(.multilingual, for: .whisperLocalFolder)
+        XCTAssertEqual(publishes, 1, "an unchanged capability republished the store")
+
+        store.setDetectedLanguageCapability(.single(code: "en"), for: .whisperLocalFolder)
+        XCTAssertEqual(publishes, 2)
     }
 }

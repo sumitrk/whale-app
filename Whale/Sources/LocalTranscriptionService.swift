@@ -49,8 +49,14 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
     let source: BuiltInModelSource
     let provisioning: BuiltInModelProvisioning
     let title: String
-    /// Short language capability shown after the status on the settings row.
-    let languageLabel: String
+    /// Short capability blurb shown after the status while the row has no language control —
+    /// before install, and while it needs attention. Once a language control appears it says
+    /// the same thing more precisely, so the two are never shown at once.
+    let capabilityLabel: String
+    /// What this model can decode, for models whose checkpoint we pin. `unknown` means the
+    /// answer has to be measured when the model loads, which is only true of a folder the
+    /// user supplied.
+    let declaredLanguageCapability: ModelLanguageCapability
     let detail: String
     let markdownLabel: String
 
@@ -110,7 +116,8 @@ enum BuiltInModelCatalog {
             source: .bundled,
             provisioning: .download,
             title: "Parakeet",
-            languageLabel: "English only",
+            capabilityLabel: "English only",
+            declaredLanguageCapability: .single(code: "en"),
             detail: "Parakeet TDT v2 • English only • Runs locally on-device",
             markdownLabel: "FluidAudio Parakeet v2"
         ),
@@ -120,7 +127,8 @@ enum BuiltInModelCatalog {
             source: .bundled,
             provisioning: .download,
             title: "Whisper Large v3 Turbo",
-            languageLabel: "Multilingual",
+            capabilityLabel: "Multilingual",
+            declaredLanguageCapability: .multilingual,
             detail: "WhisperKit • OpenAI Whisper large-v3-turbo • Runs locally on-device",
             markdownLabel: "Whisper Large V3 Turbo"
         ),
@@ -132,7 +140,10 @@ enum BuiltInModelCatalog {
             title: "Local Whisper Folder",
             // The folder is whatever the user picked, so we can only promise detection,
             // not multilingual support: an English-only checkpoint is a valid choice here.
-            languageLabel: "Auto-detect",
+            capabilityLabel: "Auto-detect",
+            // Measured the first time the folder loads, then remembered. Until then the row
+            // shows no language control rather than guessing at one.
+            declaredLanguageCapability: .unknown,
             detail: "WhisperKit/Core ML • Choose a converted local model folder from your Mac",
             markdownLabel: "Local Whisper Model"
         ),
@@ -194,6 +205,22 @@ struct TranscriptionModelRowModel: Equatable {
     let isReady: Bool
 
     var statusText: String { status.text }
+
+    /// The language belongs in exactly one place per row. A row showing a language control
+    /// says it there, precisely, so repeating the capability blurb beside the status would
+    /// only be redundant — and, next to a control reading "Auto-detect", faintly contradictory.
+    /// A row without one keeps the blurb, because before install it is the only way to learn
+    /// that Whisper is worth its download.
+    ///
+    /// While a download or check is running the phase text is the whole story.
+    func statusLine(capabilityLabel: String, hasLanguageControl: Bool) -> String {
+        if case .working = status {
+            return statusText
+        }
+
+        guard !hasLanguageControl else { return statusText }
+        return "\(statusText) · \(capabilityLabel)"
+    }
 
     init(
         model: BuiltInModelDescriptor,
@@ -260,16 +287,15 @@ enum WhisperBuiltInConfiguration {
     static let modelRepo = "argmaxinc/whisperkit-coreml"
     static let modelVariant = "openai_whisper-large-v3_turbo"
 
-    /// Whisper large-v3-turbo is multilingual, so the language is detected from the audio
-    /// rather than pinned. A local folder holding an English-only checkpoint still decodes —
-    /// detection simply resolves to English — which is why that row promises "Auto-detect"
-    /// rather than "Multilingual".
-    static func decodingOptions() -> DecodingOptions {
+    /// `nil` means the user left the model on Auto-detect, and the language is worked out
+    /// from the audio. Naming a language turns detection off rather than merely biasing it:
+    /// on the short clips this app records, detection has less to go on than the user does.
+    static func decodingOptions(language: String? = nil) -> DecodingOptions {
         DecodingOptions(
             task: .transcribe,
-            language: nil,
+            language: language,
             temperature: 0.0,
-            detectLanguage: true,
+            detectLanguage: language == nil,
             withoutTimestamps: true,
             wordTimestamps: false
         )
@@ -1078,6 +1104,7 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
         progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Loading model…"))
         let validation = try Self.validateStoredModelFolder(for: modelID, modelURL: modelFolder)
         _ = try await prepareWhisperKit(
+            modelID: modelID,
             runtime: Self.runtimeConfiguration(for: modelID, validation: validation),
             forceReload: true
         )
@@ -1100,6 +1127,7 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
         await persistLocalModelURL(validation.modelFolder, for: modelID)
         progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Loading model…"))
         _ = try await prepareWhisperKit(
+            modelID: modelID,
             runtime: Self.runtimeConfiguration(for: modelID, validation: validation),
             forceReload: true
         )
@@ -1113,7 +1141,9 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
         let whisperKit = try await ensureReady(modelID: modelID)
         let results = try await whisperKit.transcribe(
             audioPath: wavURL.path,
-            decodeOptions: WhisperBuiltInConfiguration.decodingOptions()
+            decodeOptions: WhisperBuiltInConfiguration.decodingOptions(
+                language: await resolvedLanguageCode(for: modelID)
+            )
         )
 
         return results
@@ -1129,15 +1159,18 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
 
         let validation = try Self.validateStoredModelFolder(for: modelID, modelURL: modelURL)
         return try await prepareWhisperKit(
+            modelID: modelID,
             runtime: Self.runtimeConfiguration(for: modelID, validation: validation)
         )
     }
 
     private func prepareWhisperKit(
+        modelID: BuiltInModelID,
         runtime: WhisperRuntimeConfiguration,
         forceReload: Bool = false
     ) async throws -> WhisperKit {
         if !forceReload, let whisperKit, loadedModelPath == runtime.modelFolderPath {
+            await recordLanguageCapability(of: whisperKit, for: modelID)
             return whisperKit
         }
 
@@ -1156,7 +1189,38 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
 
         self.whisperKit = whisperKit
         self.loadedModelPath = runtime.modelFolderPath
+        await recordLanguageCapability(of: whisperKit, for: modelID)
         return whisperKit
+    }
+
+    /// Loading is the only moment the truth about a folder is available: WhisperKit reads the
+    /// decoder's output dimension and knows whether the checkpoint carries language tokens.
+    /// Recording it on every load rather than only at connect time is what lets a folder
+    /// attached by an earlier build grow its language control the first time it is dictated
+    /// into, instead of demanding the user re-pick a folder that was never wrong.
+    private func recordLanguageCapability(
+        of whisperKit: WhisperKit,
+        for modelID: BuiltInModelID
+    ) async {
+        // Whisper's non-multilingual checkpoints are the `.en` variants, which are English by
+        // construction — there is no other single-language Whisper to confuse this with.
+        let capability: ModelLanguageCapability = whisperKit.modelVariant.isMultilingual
+            ? .multilingual
+            : .single(code: "en")
+
+        await MainActor.run {
+            SettingsStore.shared.setDetectedLanguageCapability(capability, for: modelID)
+        }
+    }
+
+    private func resolvedLanguageCode(for modelID: BuiltInModelID) async -> String? {
+        await MainActor.run {
+            ModelLanguageResolver.decodingLanguageCode(
+                for: modelID.descriptor,
+                detected: SettingsStore.shared.detectedLanguageCapability(for: modelID),
+                storedCode: SettingsStore.shared.languageCode(for: modelID)
+            )
+        }
     }
 
     private func persistedModelURL(for modelID: BuiltInModelID) async -> URL? {
