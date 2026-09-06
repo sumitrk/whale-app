@@ -44,8 +44,20 @@ struct AppRuntimeInfo: Equatable, Sendable {
         whaleSupportDirectoryURL.appendingPathComponent("Transcripts", isDirectory: true)
     }
 
+    /// Must stay equal to FluidAudio's `Repo.parakeetV2.folderName`. `AsrModels` resolves
+    /// every path as `<parent of what we pass>/<folderName>`, so a name that disagrees
+    /// means we check, reset, and report on one directory while the model lives in another.
     var parakeetEnglishV2DirectoryURL: URL {
-        modelsDirectoryURL.appendingPathComponent("parakeet-tdt-0.6b-v2-coreml", isDirectory: true)
+        modelsDirectoryURL.appendingPathComponent(Self.parakeetEnglishV2DirectoryName, isDirectory: true)
+    }
+
+    /// FluidAudio 0.15 started stripping the `-coreml` suffix when deriving the cache folder
+    /// name, so installs made by earlier Whale builds sit at the legacy path below.
+    static let parakeetEnglishV2DirectoryName = "parakeet-tdt-0.6b-v2"
+    static let legacyParakeetEnglishV2DirectoryName = "parakeet-tdt-0.6b-v2-coreml"
+
+    var legacyParakeetEnglishV2DirectoryURL: URL {
+        modelsDirectoryURL.appendingPathComponent(Self.legacyParakeetEnglishV2DirectoryName, isDirectory: true)
     }
 
     var sparkleDisabled: Bool {

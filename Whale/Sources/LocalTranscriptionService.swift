@@ -90,10 +90,12 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
         }
     }
 
+    /// Removes the downloaded model files, so name it for what it does rather than for the
+    /// cache-clearing it used to imply — the next use has to download the model again.
     var resetActionTitle: String? {
         switch id {
         case .parakeetEnglishV2:
-            return "Reset Cache"
+            return "Delete"
         case .whisperLargeV3Turbo, .whisperLocalFolder:
             return nil
         }
@@ -650,14 +652,17 @@ actor LocalTranscriptionService {
 
 protocol ParakeetManaging: Sendable {
     func transcribe(_ wavURL: URL, source: AudioSource) async throws -> String
-    func transcribeStreaming(_ wavURL: URL, source: AudioSource) async throws -> String
+    /// Chunked, disk-backed pass over the file. Constant memory regardless of length,
+    /// and a different decode path than `transcribe`, so it doubles as the retry when
+    /// the in-memory pass comes back empty.
+    func transcribeDiskBacked(_ wavURL: URL, source: AudioSource) async throws -> String
 }
 
 protocol ParakeetModelRuntime: Sendable {
     func modelsExist(at modelDirectory: URL) async -> Bool
     func downloadModels(
         to modelDirectory: URL,
-        progressHandler: DownloadUtils.ProgressHandler?
+        progressHandler: ProgressHandler?
     ) async throws
     func validateModels(at modelDirectory: URL) async throws
     func prepareManager(at modelDirectory: URL) async throws -> any ParakeetManaging
@@ -670,7 +675,7 @@ struct FluidAudioParakeetRuntime: ParakeetModelRuntime {
 
     func downloadModels(
         to modelDirectory: URL,
-        progressHandler: DownloadUtils.ProgressHandler?
+        progressHandler: ProgressHandler?
     ) async throws {
         _ = try await AsrModels.download(
             to: modelDirectory,
@@ -705,7 +710,7 @@ struct FluidAudioParakeetRuntime: ParakeetModelRuntime {
         let manager = AsrManager(config: .default)
 
         do {
-            try await manager.initialize(models: models)
+            try await manager.loadModels(models)
         } catch {
             throw LocalTranscriptionError.parakeetSetupFailed(
                 step: .preparingRuntime,
@@ -725,13 +730,19 @@ private final class FluidAudioParakeetManager: @unchecked Sendable, ParakeetMana
         self.manager = manager
     }
 
-    func transcribe(_ wavURL: URL, source: AudioSource) async throws -> String {
-        let result = try await manager.transcribe(wavURL, source: source)
+    /// `source` no longer reaches FluidAudio. It used to pick between two decoder states
+    /// the manager held internally, but both were reset after every call, so each
+    /// transcription already started from zero. A fresh state per call is the same thing,
+    /// stated directly.
+    func transcribe(_ wavURL: URL, source _: AudioSource) async throws -> String {
+        var decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+        let result = try await manager.transcribe(wavURL, decoderState: &decoderState)
         return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    func transcribeStreaming(_ wavURL: URL, source: AudioSource) async throws -> String {
-        let result = try await manager.transcribeStreaming(wavURL, source: source)
+    func transcribeDiskBacked(_ wavURL: URL, source _: AudioSource) async throws -> String {
+        var decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+        let result = try await manager.transcribeDiskBacked(wavURL, decoderState: &decoderState)
         return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
@@ -741,6 +752,7 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
     private let runtimeInfoProvider: @Sendable () -> AppRuntimeInfo
     private var manager: (any ParakeetManaging)?
     private var loadedModelDirectory: URL?
+    private var hasCheckedLegacyModelDirectory = false
 
     init(
         runtime: any ParakeetModelRuntime = FluidAudioParakeetRuntime(),
@@ -865,15 +877,15 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
                 return result
             }
 
-            Self.log("Standard transcription returned empty text at \(context.modelDirectory.path); retrying in streaming mode")
+            Self.log("Standard transcription returned empty text at \(context.modelDirectory.path); retrying disk-backed")
         } catch {
             Self.log("Standard transcription failed at \(context.modelDirectory.path): \(error.localizedDescription)")
         }
 
         do {
-            return try await manager.transcribeStreaming(wavURL, source: source)
+            return try await manager.transcribeDiskBacked(wavURL, source: source)
         } catch {
-            Self.log("Streaming transcription failed at \(context.modelDirectory.path): \(error.localizedDescription)")
+            Self.log("Disk-backed transcription failed at \(context.modelDirectory.path): \(error.localizedDescription)")
             throw Self.wrapError(
                 error,
                 step: .firstUse,
@@ -928,12 +940,12 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         }
     }
 
-    private static func phaseLabel(for phase: DownloadUtils.DownloadPhase) -> String {
+    private static func phaseLabel(for phase: DownloadPhase) -> String {
         switch phase {
         case .listing:
             return "Looking up model files…"
         case .downloading(let completedFiles, let totalFiles):
-            return "Downloading model files \(completedFiles)/\(totalFiles)…"
+            return "Downloading model files \(completedFiles)/\(totalFiles)"
         case .compiling(let modelName):
             return "Compiling \(modelName)…"
         }
@@ -945,10 +957,36 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         }
 
         let runtimeInfo = runtimeInfoProvider()
+        adoptLegacyModelDirectoryIfNeeded(for: runtimeInfo)
+
         return (
             runtimeInfo: runtimeInfo,
             modelDirectory: runtimeInfo.parakeetEnglishV2DirectoryURL
         )
+    }
+
+    /// Move a pre-0.15 install onto the folder name FluidAudio now derives, so upgrading
+    /// adopts the ~440 MB already on disk instead of re-downloading it and orphaning the old
+    /// copy. Runs at most once per backend instance, and only when there is something to move.
+    private func adoptLegacyModelDirectoryIfNeeded(for runtimeInfo: AppRuntimeInfo) {
+        guard !hasCheckedLegacyModelDirectory else { return }
+        hasCheckedLegacyModelDirectory = true
+
+        let fileManager = FileManager.default
+        let legacy = runtimeInfo.legacyParakeetEnglishV2DirectoryURL
+        let current = runtimeInfo.parakeetEnglishV2DirectoryURL
+
+        guard fileManager.fileExists(atPath: legacy.path),
+              !fileManager.fileExists(atPath: current.path)
+        else { return }
+
+        do {
+            try fileManager.moveItem(at: legacy, to: current)
+            Self.log("Adopted legacy model install \(legacy.lastPathComponent) → \(current.lastPathComponent)")
+        } catch {
+            // Not fatal: the install path below will just download a fresh copy.
+            Self.log("Could not adopt legacy model install at \(legacy.path): \(error.localizedDescription)")
+        }
     }
 
     private func prepareStorageDirectories(for runtimeInfo: AppRuntimeInfo) throws {
@@ -1283,7 +1321,7 @@ enum LocalTranscriptionError: LocalizedError {
             Reason:
             \(reason)
 
-            Use Reset Cache in Settings > Models, then install Parakeet again.
+            Use Delete in Settings > Models, then install Parakeet again.
             """
         case .invalidWhisperModelFolder(let descriptor, let folderPath, let issues):
             let bulletList = issues.map { "• \($0)" }.joined(separator: "\n")

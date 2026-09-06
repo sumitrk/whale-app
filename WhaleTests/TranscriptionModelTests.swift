@@ -127,7 +127,7 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertTrue(active.isReady)
         XCTAssertEqual(active.status, .active)
         XCTAssertEqual(active.statusText, "Active")
-        XCTAssertEqual(active.resetActionTitle, "Reset Cache")
+        XCTAssertEqual(active.resetActionTitle, "Delete")
 
         let inactive = TranscriptionModelRowModel(
             model: model,
@@ -398,7 +398,7 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(runtimeInfo.transcriptsDirectoryURL.path, "/Users/tester/Library/Application Support/Whale/Transcripts")
         XCTAssertEqual(
             runtimeInfo.parakeetEnglishV2DirectoryURL.path,
-            "/Users/tester/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2-coreml"
+            "/Users/tester/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2"
         )
     }
 
@@ -434,7 +434,7 @@ final class TranscriptionModelTests: XCTestCase {
         )
         XCTAssertEqual(
             runtimeInfo.parakeetEnglishV2DirectoryURL.path,
-            "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2-coreml"
+            "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2"
         )
         XCTAssertTrue(runtimeInfo.storageDescription.contains("sandboxed"))
     }
@@ -454,6 +454,59 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(snapshot.validatedPaths, [runtimeInfo.parakeetEnglishV2DirectoryURL.path])
         XCTAssertEqual(snapshot.preparedPaths, [runtimeInfo.parakeetEnglishV2DirectoryURL.path])
         XCTAssertTrue(snapshot.existingPaths.contains(runtimeInfo.parakeetEnglishV2DirectoryURL.path))
+    }
+
+    /// Upgrading past FluidAudio 0.15 must adopt the ~440 MB already on disk rather than
+    /// declaring the model missing and downloading it again beside the orphaned copy.
+    func testParakeetAdoptsPre015InstallInsteadOfRedownloading() async throws {
+        let fm = FileManager.default
+        let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
+        let legacy = runtimeInfo.legacyParakeetEnglishV2DirectoryURL
+        try fm.createDirectory(at: legacy, withIntermediateDirectories: true)
+        let payload = legacy.appendingPathComponent("Encoder.mlmodelc")
+        try "weights".write(to: payload, atomically: true, encoding: .utf8)
+        defer { try? fm.removeItem(at: runtimeInfo.homeDirectoryURL) }
+
+        let backend = ParakeetTranscriptionBackend(
+            runtime: FakeParakeetRuntime(),
+            runtimeInfoProvider: { runtimeInfo }
+        )
+        _ = try await backend.isInstalled(modelID: .parakeetEnglishV2)
+
+        let adopted = runtimeInfo.parakeetEnglishV2DirectoryURL
+        XCTAssertFalse(fm.fileExists(atPath: legacy.path), "legacy directory should be moved, not left behind")
+        XCTAssertTrue(fm.fileExists(atPath: adopted.path), "model should now sit at the name FluidAudio derives")
+        XCTAssertEqual(
+            try String(contentsOf: adopted.appendingPathComponent("Encoder.mlmodelc"), encoding: .utf8),
+            "weights",
+            "the existing model files should be carried over, not recreated"
+        )
+    }
+
+    /// A fresh install must not be clobbered by a stale legacy directory left over from
+    /// a partially-completed upgrade.
+    func testParakeetKeepsCurrentInstallWhenALegacyDirectoryAlsoExists() async throws {
+        let fm = FileManager.default
+        let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
+        let legacy = runtimeInfo.legacyParakeetEnglishV2DirectoryURL
+        let current = runtimeInfo.parakeetEnglishV2DirectoryURL
+        try fm.createDirectory(at: legacy, withIntermediateDirectories: true)
+        try fm.createDirectory(at: current, withIntermediateDirectories: true)
+        try "stale".write(to: legacy.appendingPathComponent("Encoder.mlmodelc"), atomically: true, encoding: .utf8)
+        try "current".write(to: current.appendingPathComponent("Encoder.mlmodelc"), atomically: true, encoding: .utf8)
+        defer { try? fm.removeItem(at: runtimeInfo.homeDirectoryURL) }
+
+        let backend = ParakeetTranscriptionBackend(
+            runtime: FakeParakeetRuntime(),
+            runtimeInfoProvider: { runtimeInfo }
+        )
+        _ = try await backend.isInstalled(modelID: .parakeetEnglishV2)
+
+        XCTAssertEqual(
+            try String(contentsOf: current.appendingPathComponent("Encoder.mlmodelc"), encoding: .utf8),
+            "current",
+            "an existing install must win over a leftover legacy directory"
+        )
     }
 
     func testParakeetInstallReportsDownloadFailuresSeparately() async {
@@ -736,7 +789,7 @@ final class FakeParakeetManager: @unchecked Sendable, ParakeetManaging {
         "ok"
     }
 
-    func transcribeStreaming(_: URL, source _: AudioSource) async throws -> String {
+    func transcribeDiskBacked(_: URL, source _: AudioSource) async throws -> String {
         "ok"
     }
 }
@@ -770,7 +823,7 @@ actor FakeParakeetRuntime: ParakeetModelRuntime {
 
     func downloadModels(
         to modelDirectory: URL,
-        progressHandler _: DownloadUtils.ProgressHandler?
+        progressHandler _: ProgressHandler?
     ) async throws {
         downloadedPaths.append(modelDirectory.path)
 
@@ -807,5 +860,30 @@ actor FakeParakeetRuntime: ParakeetModelRuntime {
         preparedPaths: [String]
     ) {
         (existingPaths, checkedPaths, downloadedPaths, validatedPaths, preparedPaths)
+    }
+}
+
+/// The Parakeet cache directory name is a contract with FluidAudio: `AsrModels` resolves
+/// every path as `<parent of what we pass>/<Repo.folderName>`, so if these two drift apart
+/// Whale checks, resets, and reports on a directory the model does not live in. FluidAudio
+/// 0.15 silently changed this name by stripping `-coreml`, which made every existing install
+/// look missing. Pin it so the next change fails here instead of in the field.
+final class ParakeetModelDirectoryContractTests: XCTestCase {
+    func testDirectoryNameMatchesFluidAudioFolderName() {
+        XCTAssertEqual(
+            AppRuntimeInfo.parakeetEnglishV2DirectoryName,
+            Repo.parakeetV2.folderName
+        )
+    }
+
+    func testLegacyDirectoryNameIsTheOneEarlierBuildsUsed() {
+        XCTAssertEqual(
+            AppRuntimeInfo.legacyParakeetEnglishV2DirectoryName,
+            "parakeet-tdt-0.6b-v2-coreml"
+        )
+        XCTAssertNotEqual(
+            AppRuntimeInfo.legacyParakeetEnglishV2DirectoryName,
+            AppRuntimeInfo.parakeetEnglishV2DirectoryName
+        )
     }
 }
