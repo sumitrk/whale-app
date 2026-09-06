@@ -72,6 +72,46 @@ final class SmartFormattingStageTests: XCTestCase {
     }
 }
 
+@MainActor
+final class SmartFormattingSettingTests: XCTestCase {
+    private func freshDefaults(_ name: String) -> UserDefaults {
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
+
+    func testSmartFormattingIsOnForSomeoneWhoNeverTouchedIt() {
+        let store = SettingsStore(userDefaults: freshDefaults(#function))
+
+        XCTAssertTrue(store.smartFormattingEnabled)
+    }
+
+    /// The reason the default is read through `object(forKey:)`: `bool(forKey:)`
+    /// returns false for "absent" and for "the user turned it off" alike, so a
+    /// `?? true` on top of it would switch the feature back on at every launch.
+    func testTurningItOffSurvivesARelaunch() {
+        let name = #function
+        let defaults = freshDefaults(name)
+
+        let first = SettingsStore(userDefaults: defaults)
+        first.smartFormattingEnabled = false
+
+        let relaunched = SettingsStore(userDefaults: defaults)
+        XCTAssertFalse(relaunched.smartFormattingEnabled)
+    }
+
+    func testTurningItBackOnPersistsToo() {
+        let name = #function
+        let defaults = freshDefaults(name)
+
+        let first = SettingsStore(userDefaults: defaults)
+        first.smartFormattingEnabled = false
+        first.smartFormattingEnabled = true
+
+        XCTAssertTrue(SettingsStore(userDefaults: defaults).smartFormattingEnabled)
+    }
+}
+
 /// Exercises the linked `text-processing-rs` engine itself, so a bad or missing
 /// binary artifact fails here rather than silently passing transcripts through.
 final class SpokenFormNormalizerTests: XCTestCase {

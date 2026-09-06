@@ -99,8 +99,10 @@ class SettingsStore: ObservableObject {
     }
 
     /// Rewrite spoken numbers, money, dates, and times in a transcript into
-    /// their written form. Off by default — the rewrite is a clear win for
-    /// figures but misreads some ordinary phrasing, so it stays opt-in.
+    /// their written form. On by default; the toggle exists because the rewrite
+    /// also misreads some ordinary phrasing, so anyone it bites can switch it
+    /// off. Read through `object(forKey:)` rather than `bool(forKey:)` so an
+    /// explicit `false` is honoured instead of collapsing into the default.
     @Published var smartFormattingEnabled: Bool {
         didSet { ud.set(smartFormattingEnabled, forKey: Keys.smartFormattingEnabled) }
     }
@@ -142,7 +144,7 @@ class SettingsStore: ObservableObject {
         ) ?? .parakeetEnglishV2
         builtInModelLocalPaths   = ud.dictionary(forKey: Keys.builtInModelLocalPaths) as? [String: String] ?? [:]
         builtInModelLocalBookmarks = ud.dictionary(forKey: Keys.builtInModelLocalBookmarks) as? [String: String] ?? [:]
-        smartFormattingEnabled   = ud.bool(forKey: Keys.smartFormattingEnabled)
+        smartFormattingEnabled   = (ud.object(forKey: Keys.smartFormattingEnabled) as? Bool) ?? true
         aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
         openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
     }

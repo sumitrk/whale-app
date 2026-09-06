@@ -63,7 +63,7 @@ private struct SmartFormattingSection: View {
         } header: {
             Text("Formatting")
         } footer: {
-            Text("Best on transcripts full of figures. Everyday phrasing can come out worse — “let's sync at ten thirty” becomes “let's sync at 40”.")
+            Text("Worth switching off if it bites you: everyday phrasing can come out worse — “I need a twenty dollar bill” becomes “I need $20 bill”.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
