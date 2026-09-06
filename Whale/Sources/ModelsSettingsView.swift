@@ -63,7 +63,7 @@ private struct ModelRow: View {
         let row = rowModel
 
         HStack(alignment: .center, spacing: 10) {
-            ModelIcon(modelID: model.id)
+            ModelIcon(model: model)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.title)
@@ -129,15 +129,10 @@ private struct ModelRow: View {
             ProgressView()
                 .controlSize(.small)
         } else if let title = row.primaryActionTitle {
-            if row.isReady {
-                Button(title) { triggerPrimaryAction() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-            } else {
-                Button(title) { triggerPrimaryAction() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-            }
+            // Deliberately not `.borderedProminent`: nothing on this pane is the one thing
+            // the user came here to do, so no row gets to claim the screen's default action.
+            Button(title) { triggerPrimaryAction() }
+                .buttonStyle(.bordered)
         }
     }
 
@@ -198,31 +193,34 @@ private struct ModelRow: View {
     }
 }
 
+/// The mark is derived from where a model comes from, never assigned per model: every
+/// Parakeet checkpoint is the blue waveform, every Whisper checkpoint the purple bubble,
+/// and anything the user supplied themselves is the orange folder whatever loads it.
+///
+/// So adding a model to a family the app already speaks costs nothing here, and adding a
+/// whole new engine fails to compile until someone picks its mark on purpose.
 private struct ModelIcon: View {
-    let modelID: BuiltInModelID
+    let model: BuiltInModelDescriptor
 
-    private var color: Color {
-        switch modelID {
-        case .parakeetEnglishV2:   return .blue
-        case .whisperLargeV3Turbo: return .purple
-        case .whisperLocalFolder:  return .orange
+    private var appearance: (color: Color, symbol: String) {
+        // A folder the user pointed at is identified by that fact, not by the engine that
+        // happens to read it — otherwise it would be indistinguishable from bundled Whisper.
+        guard model.source != .custom else {
+            return (.orange, "folder.fill")
         }
-    }
 
-    private var symbolName: String {
-        switch modelID {
-        case .parakeetEnglishV2:   return "waveform"
-        case .whisperLargeV3Turbo: return "text.bubble.fill"
-        case .whisperLocalFolder:  return "folder.fill"
+        switch model.group {
+        case .parakeet: return (.blue, "waveform")
+        case .whisper:  return (.purple, "text.bubble.fill")
         }
     }
 
     var body: some View {
         RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(color)
+            .fill(appearance.color)
             .frame(width: 28, height: 28)
             .overlay(
-                Image(systemName: symbolName)
+                Image(systemName: appearance.symbol)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
             )
