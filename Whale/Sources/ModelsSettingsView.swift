@@ -99,9 +99,12 @@ private struct ModelRow: View {
                             .frame(width: 7, height: 7)
                     }
 
+                    // The load phase explains a multi-minute wait, so let it wrap onto a
+                    // second line rather than truncating the explanation away.
                     Text(statusLine(for: row))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if let errorText = row.errorText {

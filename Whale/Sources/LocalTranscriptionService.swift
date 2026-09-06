@@ -96,15 +96,25 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
         }
     }
 
-    /// Removes the downloaded model files, so name it for what it does rather than for the
-    /// cache-clearing it used to imply — the next use has to download the model again.
-    var resetActionTitle: String? {
-        switch id {
-        case .parakeetEnglishV2:
-            return "Delete"
-        case .whisperLargeV3Turbo, .whisperLocalFolder:
-            return nil
+    /// Whether the app put these files on disk and may therefore take them off again.
+    ///
+    /// Derived from how the model is provisioned rather than listed per model, so the question
+    /// "may we delete this?" can never be answered wrongly for a model added later: anything
+    /// the app downloads it owns, anything the user points it at belongs to the user.
+    var ownsModelFiles: Bool {
+        switch provisioning {
+        case .download:    return true
+        case .localFolder: return false
         }
+    }
+
+    /// Named for what it does rather than for the cache-clearing it used to imply — the next
+    /// use has to download the model again.
+    ///
+    /// A folder the user converted themselves is only forgotten, never erased, and the wording
+    /// has to say so; the two come from one property so they cannot drift apart.
+    var resetActionTitle: String? {
+        ownsModelFiles ? "Delete" : "Disconnect"
     }
 }
 
@@ -286,6 +296,11 @@ struct TranscriptionModelRowModel: Equatable {
 enum WhisperBuiltInConfiguration {
     static let modelRepo = "argmaxinc/whisperkit-coreml"
     static let modelVariant = "openai_whisper-large-v3_turbo"
+
+    /// Core ML compiles the model for this Mac the first time it loads, out of process and for
+    /// minutes on the large checkpoints — the app itself sits idle at 0% CPU throughout. Left
+    /// to say only "Loading model…" the row looks wedged, so the wait is named up front.
+    static let loadingPhase = "Optimizing model for this Mac — first run takes a few minutes"
 
     /// `nil` means the user left the model on Auto-detect, and the language is worked out
     /// from the audio. Naming a language turns detection off rather than merely biasing it:
@@ -848,7 +863,7 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
             )
         }
 
-        progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Validating model files…"))
+        progressHandler?(ModelInstallProgress(fractionCompleted: nil, phase: "Validating model files…"))
 
         guard await runtime.modelsExist(at: context.modelDirectory) else {
             let reason = "Expected Parakeet model files were not found after download."
@@ -871,7 +886,7 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
             )
         }
 
-        progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Preparing model for first use…"))
+        progressHandler?(ModelInstallProgress(fractionCompleted: nil, phase: "Preparing model for first use…"))
 
         do {
             manager = try await runtime.prepareManager(at: context.modelDirectory)
@@ -1101,7 +1116,7 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
         )
 
         await persistModelPath(modelFolder.path, for: modelID)
-        progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Loading model…"))
+        progressHandler?(ModelInstallProgress(fractionCompleted: nil, phase: WhisperBuiltInConfiguration.loadingPhase))
         let validation = try Self.validateStoredModelFolder(for: modelID, modelURL: modelFolder)
         _ = try await prepareWhisperKit(
             modelID: modelID,
@@ -1125,7 +1140,7 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
             descriptor: modelID.descriptor
         )
         await persistLocalModelURL(validation.modelFolder, for: modelID)
-        progressHandler?(ModelInstallProgress(fractionCompleted: 1.0, phase: "Loading model…"))
+        progressHandler?(ModelInstallProgress(fractionCompleted: nil, phase: WhisperBuiltInConfiguration.loadingPhase))
         _ = try await prepareWhisperKit(
             modelID: modelID,
             runtime: Self.runtimeConfiguration(for: modelID, validation: validation),
@@ -1210,6 +1225,33 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
 
         await MainActor.run {
             SettingsStore.shared.setDetectedLanguageCapability(capability, for: modelID)
+        }
+    }
+
+    /// Deleting is for the checkpoint the app downloaded; the folder the user chose is only
+    /// forgotten. Both drop the loaded instance and the measured capability, because the next
+    /// folder behind that row need not speak the same languages as the last.
+    func resetModel(modelID: BuiltInModelID) async throws {
+        guard modelID.descriptor.group == .whisper else {
+            throw LocalTranscriptionError.unsupportedModel(modelID)
+        }
+
+        let modelURL = await persistedModelURL(for: modelID)
+
+        whisperKit = nil
+        loadedModelPath = nil
+
+        // A folder that is already gone is the state Delete was asking for, so do not turn it
+        // into an error the row has to display.
+        if modelID.descriptor.ownsModelFiles,
+           let modelURL,
+           FileManager.default.fileExists(atPath: modelURL.path) {
+            try FileManager.default.removeItem(at: modelURL)
+        }
+
+        await MainActor.run {
+            SettingsStore.shared.setLocalModelPath(nil, for: modelID)
+            SettingsStore.shared.setDetectedLanguageCapability(.unknown, for: modelID)
         }
     }
 

@@ -928,6 +928,96 @@ final class ParakeetModelDirectoryContractTests: XCTestCase {
 }
 
 @MainActor
+final class ModelInstallFeedbackTests: XCTestCase {
+
+    /// The percent belongs to the transfer. Carrying it into the phases that follow renders
+    /// "· 100%" beside a spinner, which is what made a working three-minute Core ML compile
+    /// look like a wedged download.
+    func testWorkPhasesAfterTheTransferCarryNoPercent() {
+        let model = BuiltInModelID.whisperLargeV3Turbo.descriptor
+
+        let loading = TranscriptionModelRowModel(
+            model: model,
+            installState: .downloading(progress: nil, phase: WhisperBuiltInConfiguration.loadingPhase),
+            isSelected: false
+        )
+
+        XCTAssertEqual(loading.statusText, WhisperBuiltInConfiguration.loadingPhase)
+        XCTAssertFalse(loading.statusText.contains("%"))
+        XCTAssertNil(loading.progress)
+        XCTAssertTrue(loading.isBusy)
+    }
+
+    /// A real transfer still reports where it has got to.
+    func testTransferPhaseStillShowsItsPercent() {
+        let downloading = TranscriptionModelRowModel(
+            model: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+            installState: .downloading(progress: 0.42, phase: "Downloading"),
+            isSelected: false
+        )
+
+        XCTAssertEqual(downloading.statusText, "Downloading · 42%")
+    }
+
+    /// The app sits at 0% CPU while Core ML compiles out of process, so the row is the only
+    /// place the user can learn the wait is expected rather than a hang.
+    func testLoadingPhaseNamesTheWait() {
+        let phase = WhisperBuiltInConfiguration.loadingPhase
+
+        XCTAssertTrue(
+            phase.lowercased().contains("minute"),
+            "the load phase has to say how long it can take, or it reads as stuck"
+        )
+        XCTAssertFalse(phase.contains("%"))
+    }
+
+    /// Deleting is only offered for checkpoints the app downloaded. The custom row points at
+    /// a folder the user converted themselves, and erasing that would be indefensible.
+    func testOnlyAppDownloadedModelsOfferDeletion() {
+        XCTAssertEqual(BuiltInModelID.parakeetEnglishV2.descriptor.resetActionTitle, "Delete")
+        XCTAssertEqual(BuiltInModelID.whisperLargeV3Turbo.descriptor.resetActionTitle, "Delete")
+        XCTAssertEqual(BuiltInModelID.whisperLocalFolder.descriptor.resetActionTitle, "Disconnect")
+    }
+
+    /// The safety property, stated directly: nothing the user supplied may be deleted, and it
+    /// is decided by how a model is provisioned so a model added later cannot get it wrong.
+    func testTheAppNeverClaimsOwnershipOfFilesTheUserSupplied() {
+        for model in BuiltInModelCatalog.allModels {
+            switch model.provisioning {
+            case .download:
+                XCTAssertTrue(model.ownsModelFiles, "\(model.id) downloads its own files")
+                XCTAssertEqual(model.resetActionTitle, "Delete")
+            case .localFolder:
+                XCTAssertFalse(
+                    model.ownsModelFiles,
+                    "\(model.id) points at the user's folder and must never delete it"
+                )
+                XCTAssertEqual(model.resetActionTitle, "Disconnect")
+            }
+        }
+    }
+
+    /// The reset action only reaches the row once the model is installed, which is what makes
+    /// "Delete" safe to show unconditionally in the menu.
+    func testResetIsOfferedOnlyOnceInstalled() {
+        let model = BuiltInModelID.whisperLargeV3Turbo.descriptor
+
+        let ready = TranscriptionModelRowModel(model: model, installState: .ready, isSelected: false)
+        XCTAssertEqual(ready.resetActionTitle, "Delete")
+
+        let notInstalled = TranscriptionModelRowModel(model: model, installState: .notInstalled, isSelected: false)
+        XCTAssertNil(notInstalled.resetActionTitle)
+
+        let downloading = TranscriptionModelRowModel(
+            model: model,
+            installState: .downloading(progress: nil, phase: "x"),
+            isSelected: false
+        )
+        XCTAssertNil(downloading.resetActionTitle)
+    }
+}
+
+@MainActor
 final class TranscriptionLanguageTests: XCTestCase {
 
     // MARK: - Catalog
