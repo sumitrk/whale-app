@@ -105,9 +105,7 @@ struct HistoryView: View {
     @ViewBuilder
     private var historyDetail: some View {
         if let selectedEntry {
-            HistoryEntryDetail(entry: selectedEntry) {
-                if let selectedID { Task { await delete(selectedID) } }
-            }
+            HistoryEntryDetail(entry: selectedEntry, relativeTo: relativeTimeReference)
         } else if hasLoaded && entries.isEmpty {
             ContentUnavailableView {
                 Label(query.isEmpty ? "No History" : "No matching History", systemImage: "clock.arrow.circlepath")
@@ -280,6 +278,7 @@ private struct HistoryEntryRow: View {
 
 private struct SourceAppIconView: View {
     let appName: String?
+    var size: CGFloat = 16
 
     var body: some View {
         Group {
@@ -294,7 +293,7 @@ private struct SourceAppIconView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: 16, height: 16)
+        .frame(width: size, height: size)
     }
 }
 
@@ -371,20 +370,30 @@ private enum SourceAppIcon {
 
 private struct HistoryEntryDetail: View {
     let entry: HistoryEntry
-    let delete: () -> Void
+    let relativeTo: Date
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Text(entry.kind == .dictation ? "Dictation" : "AI Action").font(.title2.bold())
-                    Spacer()
-                    Button("Delete", role: .destructive, action: delete)
-                }
-                Text(entry.createdAt.formatted(date: .abbreviated, time: .standard))
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        SourceAppIconView(appName: entry.sourceAppName, size: 20)
+                        Text(entry.listTitle).font(.title2.bold())
+                    }
+                    HStack(spacing: 6) {
+                        Text(entry.kind == .dictation ? "Dictation" : "AI Action")
+                        Text("·")
+                        Text(relativeTime)
+                    }
                     .foregroundStyle(.secondary)
-                if let app = entry.sourceAppName { detailSection("Source application", app) }
-                if let instruction = entry.instructionText { detailSection("Instruction", instruction) }
+                }
+                if let instruction = entry.instructionText {
+                    if entry.kind == .dictation {
+                        detailText(instruction)
+                    } else {
+                        detailSection("Instruction", instruction)
+                    }
+                }
                 ForEach(entry.contextInputs) { input in
                     switch input.content {
                     case .text(let text):
@@ -398,7 +407,9 @@ private struct HistoryEntryDetail: View {
                         }
                     }
                 }
-                if let result = entry.resultText, result != entry.instructionText { detailSection("Result", result) }
+                if let result = entry.resultText, result != entry.instructionText {
+                    detailSection(entry.kind == .dictation ? "Result" : "Output", result)
+                }
                 if let error = entry.errorText { detailSection(entry.outcome == .cancelled ? "Cancellation" : "Failure", error) }
             }
             .padding(22)
@@ -406,12 +417,22 @@ private struct HistoryEntryDetail: View {
         }
     }
 
+    private var relativeTime: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: entry.createdAt, relativeTo: relativeTo)
+    }
+
     private func detailSection(_ title: String, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.headline)
-            Text(text)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
+            detailText(text)
         }
+    }
+
+    private func detailText(_ text: String) -> some View {
+        Text(text)
+            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
     }
 }
