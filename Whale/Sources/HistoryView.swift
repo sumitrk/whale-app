@@ -369,6 +369,11 @@ private enum SourceAppIcon {
 }
 
 private struct HistoryEntryDetail: View {
+    private static let iconSize: CGFloat = 20
+    private static let iconSpacing: CGFloat = 6
+    // 1.35em leading for the body font.
+    private static let bodyLineSpacing = NSFont.preferredFont(forTextStyle: .body).pointSize * 0.35
+
     let entry: HistoryEntry
     let relativeTo: Date
 
@@ -376,16 +381,18 @@ private struct HistoryEntryDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        SourceAppIconView(appName: entry.sourceAppName, size: 20)
+                    HStack(spacing: Self.iconSpacing) {
+                        SourceAppIconView(appName: entry.sourceAppName, size: Self.iconSize)
                         Text(entry.listTitle).font(.title2.bold())
                     }
-                    HStack(spacing: 6) {
+                    HStack(spacing: 3) {
                         Text(entry.kind == .dictation ? "Dictation" : "AI Action")
                         Text("·")
                         Text(relativeTime)
                     }
                     .foregroundStyle(.secondary)
+                    // Align the subtitle with the app name, not the icon.
+                    .padding(.leading, Self.iconSize + Self.iconSpacing)
                 }
                 if let instruction = entry.instructionText {
                     if entry.kind == .dictation {
@@ -432,6 +439,7 @@ private struct HistoryEntryDetail: View {
 
     private func detailText(_ text: String) -> some View {
         Text(text)
+            .lineSpacing(Self.bodyLineSpacing)
             .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
     }
