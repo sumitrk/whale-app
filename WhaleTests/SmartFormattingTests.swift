@@ -115,4 +115,44 @@ final class SpokenFormNormalizerTests: XCTestCase {
     func testEmptyInputStaysEmpty() {
         XCTAssertEqual(SpokenFormNormalizer.writtenForm(""), "")
     }
+
+    /// Parakeet writes "twenty-one" whenever it falls back to spoken form, which
+    /// is the case this whole stage exists to repair.
+    func testRewritesHyphenatedCompoundNumbers() {
+        XCTAssertEqual(
+            SpokenFormNormalizer.writtenForm("I have twenty-one apples."),
+            "I have 21 apples."
+        )
+        XCTAssertEqual(
+            SpokenFormNormalizer.writtenForm("It cost thirty-five dollars."),
+            "It cost $35."
+        )
+    }
+
+    func testLeavesHyphenatedWordsThatAreNotNumbersAlone() {
+        let plain = "we shipped a state-of-the-art build"
+        XCTAssertEqual(SpokenFormNormalizer.writtenForm(plain), plain)
+    }
+
+    /// A compound number inside a longer hyphen chain is left alone: opening it
+    /// hands the engine a dangling "one-gun" and it mangles the phrase.
+    func testHyphenChainsAreLeftAlone() {
+        let text = "the well-known twenty-one-gun salute tradition"
+        XCTAssertEqual(SpokenFormNormalizer.writtenForm(text), text)
+    }
+
+    /// Documents a known engine limitation rather than endorsing it: the
+    /// indefinite article is absorbed into a numeric span, so "a twenty dollar
+    /// bill" loses its "a". A definite article survives. If an engine bump ever
+    /// fixes this, this test fails and the settings copy can be softened.
+    func testKnownLimitationIndefiniteArticleIsAbsorbed() {
+        XCTAssertEqual(
+            SpokenFormNormalizer.writtenForm("I need a twenty dollar bill"),
+            "I need $20 bill"
+        )
+        XCTAssertEqual(
+            SpokenFormNormalizer.writtenForm("the twenty first century problem"),
+            "the 21st century problem"
+        )
+    }
 }
