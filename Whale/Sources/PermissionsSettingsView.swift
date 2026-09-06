@@ -163,6 +163,8 @@ private struct PermissionRow: View {
     let actions: [PermissionAction]
     var revealInFinder: (() -> Void)? = nil
 
+    @State private var isShowingInfo = false
+
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             PermissionIcon(symbol: descriptor.symbol)
@@ -176,9 +178,21 @@ private struct PermissionRow: View {
                     if style == .settings {
                         Image(systemName: "info.circle")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .help(helpText)
+                            .foregroundStyle(isShowingInfo ? .primary : .secondary)
                             .accessibilityHidden(true)
+                            .contentShape(Rectangle())
+                            .onHover { isShowingInfo = $0 }
+                            // A popover rather than `.help`: AppKit holds a tooltip back for
+                            // about a second and offers no way to shorten it, which reads as
+                            // the hint being broken. This one is up the moment the pointer
+                            // lands on the badge.
+                            .popover(isPresented: $isShowingInfo, arrowEdge: .bottom) {
+                                Text(helpText)
+                                    .font(.callout)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: 260, alignment: .leading)
+                                    .padding(12)
+                            }
                     }
                 }
 
