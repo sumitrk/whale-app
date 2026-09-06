@@ -62,10 +62,6 @@ private struct SmartFormattingSection: View {
             .toggleStyle(.switch)
         } header: {
             Text("Formatting")
-        } footer: {
-            Text("Worth switching off if it bites you: everyday phrasing can come out worse — “I need a twenty dollar bill” becomes “I need $20 bill”.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
     }
 }
@@ -146,7 +142,7 @@ private struct ModelRow: View {
         switch status {
         case .active:                   return .green
         case .needsAttention:           return .red
-        case .inactive, .notInstalled:  return .secondary
+        case .inactive, .notInstalled:  return .secondary.opacity(0.5)
         case .working:                  return .clear
         }
     }
