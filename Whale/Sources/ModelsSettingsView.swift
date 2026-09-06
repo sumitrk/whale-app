@@ -1,0 +1,231 @@
+import AppKit
+import SwiftUI
+
+struct ModelsSettingsView: View {
+    @ObservedObject private var modelStore = TranscriptionModelStore.shared
+
+    var body: some View {
+        Form {
+            ModelListSections()
+        }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 8, for: .scrollContent)
+        .task { await modelStore.refreshNow() }
+    }
+}
+
+/// The model list itself, without a `Form` around it, so the settings pane and the
+/// onboarding step present exactly the same rows.
+///
+/// Two boxes rather than one: the models Whale ships and installs itself, then the
+/// bring-your-own folder under its own header.
+struct ModelListSections: View {
+    var body: some View {
+        Section {
+            ForEach(BuiltInModelCatalog.models(from: .bundled)) { model in
+                ModelRow(model: model)
+            }
+        }
+
+        Section {
+            ForEach(BuiltInModelCatalog.models(from: .custom)) { model in
+                ModelRow(model: model)
+            }
+        } header: {
+            Text("Custom")
+        } footer: {
+            Text("All models run locally on your Mac. Audio never leaves the device.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// One model in the list. The row *is* the picker: clicking an installed row makes it the
+/// active model, which is why there is no separate "Active Model" dropdown above the list.
+private struct ModelRow: View {
+    @ObservedObject private var modelStore = TranscriptionModelStore.shared
+    @ObservedObject private var settings = SettingsStore.shared
+    @State private var isHovering = false
+
+    let model: BuiltInModelDescriptor
+
+    private var rowModel: TranscriptionModelRowModel {
+        TranscriptionModelRowModel(
+            model: model,
+            installState: modelStore.installState(for: model.id),
+            isSelected: settings.selectedBuiltInModelID == model.id
+        )
+    }
+
+    var body: some View {
+        let row = rowModel
+
+        HStack(alignment: .center, spacing: 10) {
+            ModelIcon(modelID: model.id)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.title)
+
+                HStack(spacing: 5) {
+                    if row.status.showsDot {
+                        Circle()
+                            .fill(dotColor(for: row.status))
+                            .frame(width: 7, height: 7)
+                    }
+
+                    Text(statusLine(for: row))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let errorText = row.errorText {
+                    Text(errorText)
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            accessory(for: row)
+        }
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.primary.opacity(isHovering && row.isReady ? 0.06 : 0))
+                .padding(.horizontal, -6)
+        )
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .onTapGesture { activate(row) }
+        .contextMenu { contextMenu(for: row) }
+    }
+
+    /// While a download or check is running the phase text is the whole story; the language
+    /// only earns its place next to a settled status.
+    private func statusLine(for row: TranscriptionModelRowModel) -> String {
+        if case .working = row.status {
+            return row.statusText
+        }
+        return "\(row.statusText) · \(model.languageLabel)"
+    }
+
+    private func dotColor(for status: TranscriptionModelStatus) -> Color {
+        switch status {
+        case .active:                   return .green
+        case .needsAttention:           return .red
+        case .inactive, .notInstalled:  return .secondary
+        case .working:                  return .clear
+        }
+    }
+
+    @ViewBuilder
+    private func accessory(for row: TranscriptionModelRowModel) -> some View {
+        if row.isBusy {
+            ProgressView()
+                .controlSize(.small)
+        } else if let title = row.primaryActionTitle {
+            if row.isReady {
+                Button(title) { triggerPrimaryAction() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            } else {
+                Button(title) { triggerPrimaryAction() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func contextMenu(for row: TranscriptionModelRowModel) -> some View {
+        if let path = localModelPath {
+            Button("Show in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+            }
+            .disabled(!FileManager.default.fileExists(atPath: path))
+
+            Button("Copy Path") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(path, forType: .string)
+            }
+        }
+
+        if let resetActionTitle = row.resetActionTitle {
+            Divider()
+            Button(resetActionTitle) { modelStore.reset(model.id) }
+        }
+    }
+
+    private func activate(_ row: TranscriptionModelRowModel) {
+        guard row.isReady else { return }
+        settings.selectedBuiltInModelID = model.id
+    }
+
+    private var localModelPath: String? {
+        switch model.id {
+        case .parakeetEnglishV2:
+            return AppRuntimeInfo.current.parakeetEnglishV2DirectoryURL.path
+        case .whisperLargeV3Turbo, .whisperLocalFolder:
+            return settings.localModelPath(for: model.id)
+        }
+    }
+
+    private func triggerPrimaryAction() {
+        switch model.provisioning {
+        case .download:
+            modelStore.install(model.id)
+        case .localFolder:
+            chooseLocalFolder()
+        }
+    }
+
+    private func chooseLocalFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        panel.prompt = "Choose Folder"
+        panel.message = "Select a WhisperKit/Core ML folder that contains MelSpectrogram, AudioEncoder, and TextDecoder."
+
+        guard panel.runModal() == .OK, let folderURL = panel.url else { return }
+        modelStore.connectLocalModel(model.id, folderURL: folderURL)
+    }
+}
+
+private struct ModelIcon: View {
+    let modelID: BuiltInModelID
+
+    private var color: Color {
+        switch modelID {
+        case .parakeetEnglishV2:   return .blue
+        case .whisperLargeV3Turbo: return .purple
+        case .whisperLocalFolder:  return .orange
+        }
+    }
+
+    private var symbolName: String {
+        switch modelID {
+        case .parakeetEnglishV2:   return "waveform"
+        case .whisperLargeV3Turbo: return "text.bubble.fill"
+        case .whisperLocalFolder:  return "folder.fill"
+        }
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(color)
+            .frame(width: 28, height: 28)
+            .overlay(
+                Image(systemName: symbolName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+            )
+            .accessibilityHidden(true)
+    }
+}

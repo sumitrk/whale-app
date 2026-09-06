@@ -36,20 +36,30 @@ enum BuiltInModelID: String, CaseIterable, Codable, Identifiable, Sendable {
     }
 }
 
+/// Which box a model lives in on the Models settings pane: models Whale ships and can
+/// install itself, versus a checkpoint the user points at on disk.
+enum BuiltInModelSource: String, Codable, CaseIterable, Sendable {
+    case bundled
+    case custom
+}
+
 struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
     let id: BuiltInModelID
     let group: BuiltInModelGroup
+    let source: BuiltInModelSource
     let provisioning: BuiltInModelProvisioning
     let title: String
+    /// Short language capability shown after the status on the settings row.
+    let languageLabel: String
     let detail: String
     let markdownLabel: String
 
     var installationPrompt: String {
         switch provisioning {
         case .download:
-            return "\(title) is not installed. Open Settings > Transcription and install it."
+            return "\(title) is not installed. Open Settings > Models and install it."
         case .localFolder:
-            return "\(title) is not configured yet. Open Settings > Transcription, choose a WhisperKit/Core ML folder, and try again."
+            return "\(title) is not configured yet. Open Settings > Models, choose a WhisperKit/Core ML folder, and try again."
         }
     }
 
@@ -95,24 +105,32 @@ enum BuiltInModelCatalog {
         BuiltInModelDescriptor(
             id: .parakeetEnglishV2,
             group: .parakeet,
+            source: .bundled,
             provisioning: .download,
-            title: "FluidAudio English",
+            title: "Parakeet",
+            languageLabel: "English only",
             detail: "Parakeet TDT v2 • English only • Runs locally on-device",
             markdownLabel: "FluidAudio Parakeet v2"
         ),
         BuiltInModelDescriptor(
             id: .whisperLargeV3Turbo,
             group: .whisper,
+            source: .bundled,
             provisioning: .download,
-            title: "Whisper Large V3 Turbo",
+            title: "Whisper Large v3 Turbo",
+            languageLabel: "Multilingual",
             detail: "WhisperKit • OpenAI Whisper large-v3-turbo • Runs locally on-device",
             markdownLabel: "Whisper Large V3 Turbo"
         ),
         BuiltInModelDescriptor(
             id: .whisperLocalFolder,
             group: .whisper,
+            source: .custom,
             provisioning: .localFolder,
             title: "Local Whisper Folder",
+            // The folder is whatever the user picked, so we can only promise detection,
+            // not multilingual support: an English-only checkpoint is a valid choice here.
+            languageLabel: "Auto-detect",
             detail: "WhisperKit/Core ML • Choose a converted local model folder from your Mac",
             markdownLabel: "Local Whisper Model"
         ),
@@ -128,16 +146,52 @@ enum BuiltInModelCatalog {
     static func models(in group: BuiltInModelGroup) -> [BuiltInModelDescriptor] {
         allModels.filter { $0.group == group }
     }
+
+    static func models(from source: BuiltInModelSource) -> [BuiltInModelDescriptor] {
+        allModels.filter { $0.source == source }
+    }
+}
+
+/// The one-line state a model row reports. Deliberately separate from
+/// `NativeModelInstallState`: install state is about the bytes on disk, this is what the
+/// settings row says, which also folds in whether the model is the selected one.
+enum TranscriptionModelStatus: Equatable {
+    /// Installed and selected — new recordings use this model.
+    case active
+    /// Installed but not selected.
+    case inactive
+    case notInstalled
+    /// A download, validation, or cache check is in flight. Carries the phase text.
+    case working(String)
+    case needsAttention
+
+    var text: String {
+        switch self {
+        case .active:              return "Active"
+        case .inactive:            return "Inactive"
+        case .notInstalled:        return "Not Installed"
+        case .working(let phase):  return phase
+        case .needsAttention:      return "Needs Attention"
+        }
+    }
+
+    /// Transient work gets a spinner in the row's trailing slot instead of a status dot.
+    var showsDot: Bool {
+        if case .working = self { return false }
+        return true
+    }
 }
 
 struct TranscriptionModelRowModel: Equatable {
-    let statusText: String
+    let status: TranscriptionModelStatus
     let primaryActionTitle: String?
     let progress: Double?
-    let showsProgress: Bool
+    let isBusy: Bool
     let errorText: String?
     let resetActionTitle: String?
     let isReady: Bool
+
+    var statusText: String { status.text }
 
     init(
         model: BuiltInModelDescriptor,
@@ -146,55 +200,50 @@ struct TranscriptionModelRowModel: Equatable {
     ) {
         switch installState {
         case .checking:
-            statusText = "Checking the local model cache…"
+            status = .working("Checking…")
             primaryActionTitle = nil
             progress = nil
-            showsProgress = true
+            isBusy = true
             errorText = nil
             resetActionTitle = nil
             isReady = false
 
         case .notInstalled:
-            statusText = "Install or validate this model before selecting it for transcription."
+            status = .notInstalled
             primaryActionTitle = model.actionTitle
             progress = nil
-            showsProgress = false
+            isBusy = false
             errorText = nil
             resetActionTitle = nil
             isReady = false
 
-        case .downloading(let progress, let phase):
-            statusText = phase
+        case .downloading(let fraction, let phase):
+            let percent = fraction.map { " · \(Int(($0 * 100).rounded()))%" } ?? ""
+            status = .working(phase + percent)
             primaryActionTitle = nil
-            self.progress = progress
-            showsProgress = true
+            progress = fraction
+            isBusy = true
             errorText = nil
             resetActionTitle = nil
             isReady = false
 
         case .ready:
-            switch model.provisioning {
-            case .download:
-                statusText = isSelected
-                    ? "Active and ready. New recordings will use this model."
-                    : "Installed and ready."
-            case .localFolder:
-                statusText = isSelected
-                    ? "Active and ready. New recordings will use this local Whisper model."
-                    : "Validated and ready."
-            }
+            // A model only reads "Active" while it is genuinely usable. Selection is never
+            // reassigned behind the user's back, so an uninstalled-but-selected model just
+            // reads "Not Installed" and nothing in the list claims to be active.
+            status = isSelected ? .active : .inactive
             primaryActionTitle = model.changeActionTitle
             progress = nil
-            showsProgress = false
+            isBusy = false
             errorText = nil
             resetActionTitle = model.resetActionTitle
             isReady = true
 
         case .failed(let message):
-            statusText = "This model needs attention."
+            status = .needsAttention
             primaryActionTitle = model.retryActionTitle
             progress = nil
-            showsProgress = false
+            isBusy = false
             errorText = message
             resetActionTitle = model.resetActionTitle
             isReady = false
@@ -205,14 +254,17 @@ struct TranscriptionModelRowModel: Equatable {
 enum WhisperBuiltInConfiguration {
     static let modelRepo = "argmaxinc/whisperkit-coreml"
     static let modelVariant = "openai_whisper-large-v3_turbo"
-    static let defaultLanguageCode = "en"
 
+    /// Whisper large-v3-turbo is multilingual, so the language is detected from the audio
+    /// rather than pinned. A local folder holding an English-only checkpoint still decodes —
+    /// detection simply resolves to English — which is why that row promises "Auto-detect"
+    /// rather than "Multilingual".
     static func decodingOptions() -> DecodingOptions {
         DecodingOptions(
             task: .transcribe,
-            language: defaultLanguageCode,
+            language: nil,
             temperature: 0.0,
-            detectLanguage: false,
+            detectLanguage: true,
             withoutTimestamps: true,
             wordTimestamps: false
         )
@@ -488,34 +540,11 @@ final class TranscriptionModelStore: ObservableObject {
         return false
     }
 
+    /// The selection is never reassigned when a model stops being ready. Silently swapping
+    /// the transcription engine underneath the user is more surprising than a Models pane
+    /// where nothing reads "Active" until they reinstall or pick another model.
     private func setInstallState(_ state: NativeModelInstallState, for modelID: BuiltInModelID) {
         installStates[modelID] = state
-        reconcileSelection()
-    }
-
-    private func reconcileSelection() {
-        let selectedModelID = SettingsStore.shared.selectedBuiltInModelID
-        switch installState(for: selectedModelID) {
-        case .ready, .checking, .downloading:
-            return
-        case .notInstalled, .failed:
-            break
-        }
-
-        let fallback = preferredReadyModelID()
-        guard let fallback, fallback != selectedModelID else { return }
-
-        SettingsStore.shared.selectedBuiltInModelID = fallback
-    }
-
-    private func preferredReadyModelID() -> BuiltInModelID? {
-        if isReady(for: .parakeetEnglishV2) {
-            return .parakeetEnglishV2
-        }
-
-        return BuiltInModelCatalog.allModels
-            .map(\.id)
-            .first(where: { isReady(for: $0) })
     }
 }
 
@@ -1254,7 +1283,7 @@ enum LocalTranscriptionError: LocalizedError {
             Reason:
             \(reason)
 
-            Use Reset Cache in Settings > Transcription, then install Parakeet again.
+            Use Reset Cache in Settings > Models, then install Parakeet again.
             """
         case .invalidWhisperModelFolder(let descriptor, let folderPath, let issues):
             let bulletList = issues.map { "• \($0)" }.joined(separator: "\n")

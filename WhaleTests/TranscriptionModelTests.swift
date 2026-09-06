@@ -73,6 +73,21 @@ final class TranscriptionModelTests: XCTestCase {
         )
     }
 
+    func testCatalogSplitsBundledModelsFromCustomFolder() {
+        XCTAssertEqual(
+            BuiltInModelCatalog.models(from: .bundled).map(\.id),
+            [.parakeetEnglishV2, .whisperLargeV3Turbo]
+        )
+        XCTAssertEqual(
+            BuiltInModelCatalog.models(from: .custom).map(\.id),
+            [.whisperLocalFolder]
+        )
+        XCTAssertEqual(
+            BuiltInModelCatalog.allModels.map(\.languageLabel),
+            ["English only", "Multilingual", "Auto-detect"]
+        )
+    }
+
     func testModelRowModelCoversEveryInstallState() {
         let model = BuiltInModelID.parakeetEnglishV2.descriptor
 
@@ -81,7 +96,8 @@ final class TranscriptionModelTests: XCTestCase {
             installState: .checking,
             isSelected: false
         )
-        XCTAssertTrue(checking.showsProgress)
+        XCTAssertTrue(checking.isBusy)
+        XCTAssertFalse(checking.status.showsDot)
         XCTAssertFalse(checking.isReady)
 
         let notInstalled = TranscriptionModelRowModel(
@@ -89,8 +105,10 @@ final class TranscriptionModelTests: XCTestCase {
             installState: .notInstalled,
             isSelected: false
         )
+        XCTAssertEqual(notInstalled.status, .notInstalled)
+        XCTAssertEqual(notInstalled.statusText, "Not Installed")
         XCTAssertEqual(notInstalled.primaryActionTitle, "Install")
-        XCTAssertFalse(notInstalled.showsProgress)
+        XCTAssertFalse(notInstalled.isBusy)
 
         let downloading = TranscriptionModelRowModel(
             model: model,
@@ -98,24 +116,63 @@ final class TranscriptionModelTests: XCTestCase {
             isSelected: false
         )
         XCTAssertEqual(downloading.progress, 0.42)
-        XCTAssertEqual(downloading.statusText, "Downloading")
+        XCTAssertEqual(downloading.statusText, "Downloading · 42%")
+        XCTAssertTrue(downloading.isBusy)
 
-        let ready = TranscriptionModelRowModel(
+        let active = TranscriptionModelRowModel(
             model: model,
             installState: .ready,
             isSelected: true
         )
-        XCTAssertTrue(ready.isReady)
-        XCTAssertTrue(ready.statusText.contains("Active and ready"))
-        XCTAssertEqual(ready.resetActionTitle, "Reset Cache")
+        XCTAssertTrue(active.isReady)
+        XCTAssertEqual(active.status, .active)
+        XCTAssertEqual(active.statusText, "Active")
+        XCTAssertEqual(active.resetActionTitle, "Reset Cache")
+
+        let inactive = TranscriptionModelRowModel(
+            model: model,
+            installState: .ready,
+            isSelected: false
+        )
+        XCTAssertEqual(inactive.status, .inactive)
+        XCTAssertEqual(inactive.statusText, "Inactive")
 
         let failed = TranscriptionModelRowModel(
             model: model,
             installState: .failed("Download failed"),
             isSelected: false
         )
+        XCTAssertEqual(failed.status, .needsAttention)
         XCTAssertEqual(failed.primaryActionTitle, "Retry")
         XCTAssertEqual(failed.errorText, "Download failed")
+    }
+
+    /// A selected model that stops being ready must not hand the selection to another engine,
+    /// and must not keep claiming to be active.
+    func testSelectionSurvivesTheActiveModelBecomingUnavailable() async {
+        let originalSelection = SettingsStore.shared.selectedBuiltInModelID
+        defer { SettingsStore.shared.selectedBuiltInModelID = originalSelection }
+
+        // Parakeet is installed, Whisper is not — exactly the shape that used to trigger the
+        // silent fallback from the selected Whisper model back to Parakeet.
+        let service = LocalTranscriptionService(backends: [
+            .parakeet: RecordingBackend(),
+            .whisper: RecordingBackend(isInstalled: false),
+        ])
+        let store = TranscriptionModelStore(service: service)
+
+        SettingsStore.shared.selectedBuiltInModelID = .whisperLargeV3Turbo
+        await store.refreshNow()
+
+        XCTAssertEqual(SettingsStore.shared.selectedBuiltInModelID, .whisperLargeV3Turbo)
+        XCTAssertEqual(store.installState(for: .whisperLargeV3Turbo), .notInstalled)
+
+        let row = TranscriptionModelRowModel(
+            model: BuiltInModelID.whisperLargeV3Turbo.descriptor,
+            installState: store.installState(for: .whisperLargeV3Turbo),
+            isSelected: true
+        )
+        XCTAssertEqual(row.status, .notInstalled)
     }
 
     func testCoordinatorRoutesByModelGroup() async throws {
@@ -166,18 +223,21 @@ final class TranscriptionModelTests: XCTestCase {
         )
         let markdown = try String(contentsOf: url, encoding: .utf8)
 
+        XCTAssertEqual(descriptor.title, "Whisper Large v3 Turbo")
+        // The markdown label is the wording baked into every exported transcript, so it is
+        // deliberately not renamed alongside the settings-row title.
         XCTAssertEqual(descriptor.markdownLabel, "Whisper Large V3 Turbo")
-        XCTAssertTrue(descriptor.installationPrompt.contains("Whisper Large V3 Turbo"))
+        XCTAssertTrue(descriptor.installationPrompt.contains(descriptor.title))
         XCTAssertTrue(markdown.contains("**Model:** Whisper Large V3 Turbo"))
         XCTAssertFalse(markdown.contains("Cleanup"))
         XCTAssertTrue(markdown.contains("## Transcript\n\nHello world"))
     }
 
-    func testWhisperBuiltInDefaultsToEnglish() {
+    func testWhisperBuiltInDetectsLanguageFromSpeech() {
         let options = WhisperBuiltInConfiguration.decodingOptions()
 
-        XCTAssertEqual(options.language, "en")
-        XCTAssertFalse(options.detectLanguage)
+        XCTAssertNil(options.language)
+        XCTAssertTrue(options.detectLanguage)
         XCTAssertEqual(options.task, .transcribe)
     }
 
@@ -283,14 +343,7 @@ final class TranscriptionModelTests: XCTestCase {
 
         let validation = try WhisperTranscriptionBackend.validateModelFolder(
             at: folder,
-            descriptor: .init(
-                id: .whisperLocalFolder,
-                group: .whisper,
-                provisioning: .localFolder,
-                title: "Local Whisper Folder",
-                detail: "",
-                markdownLabel: ""
-            )
+            descriptor: BuiltInModelID.whisperLocalFolder.descriptor
         )
 
         XCTAssertEqual(validation.modelFolder.path, folder.path)
@@ -616,9 +669,15 @@ actor RecordingBackend: BuiltInTranscriptionBackend {
     private(set) var connected: [BuiltInModelID] = []
     private(set) var transcribed: [BuiltInModelID] = []
 
+    private let isInstalledResult: Bool
+
+    init(isInstalled: Bool = true) {
+        self.isInstalledResult = isInstalled
+    }
+
     func isInstalled(modelID: BuiltInModelID) async throws -> Bool {
         checked.append(modelID)
-        return true
+        return isInstalledResult
     }
 
     func install(

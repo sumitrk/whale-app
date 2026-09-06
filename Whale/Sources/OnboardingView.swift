@@ -212,8 +212,7 @@ private struct ModelStep: View {
             .padding(.bottom, 8)
 
             Form {
-                TranscriptionActiveModelSection()
-                TranscriptionModelManagementSections()
+                ModelListSections()
 
                 if modelStore.isReady(for: settings.selectedBuiltInModelID) {
                     Section {

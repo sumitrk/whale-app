@@ -19,7 +19,7 @@ enum SettingsWindowMetrics {
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general       = "General"
     case shortcuts     = "Shortcuts"
-    case transcription = "Transcription"
+    case models        = "Models"
     case aiActions     = "AI Actions"
     case history       = "History"
     case permissions   = "Permissions"
@@ -30,7 +30,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:       return "gearshape"
         case .shortcuts:     return "keyboard"
-        case .transcription: return "waveform"
+        case .models:        return "waveform"
         case .aiActions:     return "sparkles"
         case .history:       return "clock.arrow.circlepath"
         case .permissions:   return "lock.shield"
@@ -234,7 +234,7 @@ struct SettingsView: View {
         switch settingsCoordinator.selection {
         case .general:       GeneralSettingsView(updater: updater)
         case .shortcuts:     ShortcutsSettingsView()
-        case .transcription: TranscriptionSettingsView()
+        case .models:        ModelsSettingsView()
         case .aiActions:     AIActionSettingsView()
         case .history:       HistoryView()
         case .permissions:   PermissionsSettingsView()
