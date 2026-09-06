@@ -248,6 +248,33 @@ final class AIActionTests: XCTestCase {
         } catch { }
     }
 
+    func testHistoryEntriesSupportOffsetPagination() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WhaleHistoryPaginationTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = try await HistoryStore.open(
+            url: directory.appendingPathComponent("History.sqlite3"),
+            key: Data(repeating: 0x43, count: 32)
+        )
+        var allIDs: [UUID] = []
+        for index in 0..<5 {
+            let id = try await store.createEntry(kind: .dictation)
+            try await store.finalize(id, outcome: .succeeded, resultText: "Entry \(index)")
+            allIDs.append(id)
+        }
+
+        let firstPage = try await store.entries(limit: 2, offset: 0).map(\.id)
+        let secondPage = try await store.entries(limit: 2, offset: 2).map(\.id)
+        let lastPage = try await store.entries(limit: 2, offset: 4).map(\.id)
+
+        XCTAssertEqual(firstPage.count, 2)
+        XCTAssertEqual(secondPage.count, 2)
+        XCTAssertEqual(lastPage.count, 1)
+        XCTAssertEqual(Set(firstPage + secondPage + lastPage), Set(allIDs))
+    }
+
     func testHistoryListTitleUsesSourceAppName() {
         XCTAssertEqual(historyEntry(sourceAppName: "ChatGPT").listTitle, "ChatGPT")
         XCTAssertEqual(historyEntry(sourceAppName: "  Notes  ").listTitle, "Notes")

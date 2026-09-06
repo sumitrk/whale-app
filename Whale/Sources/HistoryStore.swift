@@ -180,7 +180,7 @@ actor HistoryStore {
         }
     }
 
-    func entries(search query: String = "", limit: Int = 200) throws -> [HistoryEntry] {
+    func entries(search query: String = "", limit: Int = 200, offset: Int = 0) throws -> [HistoryEntry] {
         let terms = ftsTerms(query)
         let sql: String
         if terms.isEmpty {
@@ -189,7 +189,7 @@ actor HistoryStore {
                        instruction_text, result_text, error_text
                 FROM history_entries
                 WHERE NOT (kind = 'ai_action' AND outcome = 'cancelled')
-                ORDER BY created_at DESC LIMIT ?
+                ORDER BY created_at DESC LIMIT ? OFFSET ?
                 """
         } else {
             sql = """
@@ -197,7 +197,7 @@ actor HistoryStore {
                        e.instruction_text, e.result_text, e.error_text
                 FROM history_fts f JOIN history_entries e ON e.id = f.entry_id
                 WHERE NOT (e.kind = 'ai_action' AND e.outcome = 'cancelled')
-                  AND history_fts MATCH ? ORDER BY bm25(history_fts), e.created_at DESC LIMIT ?
+                  AND history_fts MATCH ? ORDER BY bm25(history_fts), e.created_at DESC LIMIT ? OFFSET ?
                 """
         }
 
@@ -208,6 +208,7 @@ actor HistoryStore {
                 index += 1
             }
             sqlite3_bind_int(statement, index, Int32(limit))
+            sqlite3_bind_int(statement, index + 1, Int32(max(0, offset)))
             var values: [HistoryEntry] = []
             while sqlite3_step(statement) == SQLITE_ROW {
                 values.append(entry(from: statement, contextInputs: []))

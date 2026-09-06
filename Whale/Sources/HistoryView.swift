@@ -7,6 +7,8 @@ enum HistoryLayoutMetrics {
 }
 
 struct HistoryView: View {
+    private static let pageSize = 50
+
     @ObservedObject private var controller = HistoryController.shared
     @State private var query = ""
     @State private var entries: [HistoryEntry] = []
@@ -16,6 +18,8 @@ struct HistoryView: View {
     @State private var showingClearConfirmation = false
     @State private var relativeTimeReference = Date()
     @State private var hasLoaded = false
+    @State private var hasMoreEntries = false
+    @State private var isLoadingMore = false
 
     var body: some View {
         Group {
@@ -85,6 +89,20 @@ struct HistoryView: View {
                 Text(ByteCountFormatter.string(fromByteCount: storageBytes, countStyle: .file))
                     .foregroundStyle(.secondary)
                 Spacer()
+                if hasMoreEntries {
+                    Button {
+                        Task { await loadMore() }
+                    } label: {
+                        if isLoadingMore {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Loading…")
+                        } else {
+                            Text("Load More")
+                        }
+                    }
+                    .disabled(isLoadingMore)
+                }
                 Button("Clear History…", role: .destructive) { showingClearConfirmation = true }
                     .disabled(entries.isEmpty)
             }
@@ -111,9 +129,19 @@ struct HistoryView: View {
     }
 
     private func load() async {
+        entries = []
+        hasMoreEntries = false
+        hasLoaded = false
+        isLoadingMore = false
+        let requestedQuery = query
+        let requestedRevision = controller.revision
+
         do {
             let store = try await controller.requireStore()
-            entries = try await store.entries(search: query)
+            let page = try await store.entries(search: requestedQuery, limit: Self.pageSize)
+            guard !Task.isCancelled, requestedQuery == query, requestedRevision == controller.revision else { return }
+            entries = page
+            hasMoreEntries = page.count == Self.pageSize
             storageBytes = await store.storageBytes()
             let preservedID = selectedID ?? controller.lastSelectedID
             if let preservedID, entries.contains(where: { $0.id == preservedID }) {
@@ -132,8 +160,29 @@ struct HistoryView: View {
             }
             hasLoaded = true
         } catch {
+            guard !Task.isCancelled, requestedQuery == query, requestedRevision == controller.revision else { return }
             hasLoaded = true
         }
+    }
+
+    private func loadMore() async {
+        guard hasMoreEntries, !isLoadingMore else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        let requestedQuery = query
+        let requestedRevision = controller.revision
+        do {
+            let store = try await controller.requireStore()
+            let page = try await store.entries(
+                search: requestedQuery,
+                limit: Self.pageSize,
+                offset: entries.count
+            )
+            guard !Task.isCancelled, requestedQuery == query, requestedRevision == controller.revision else { return }
+            entries.append(contentsOf: page)
+            hasMoreEntries = page.count == Self.pageSize
+        } catch { }
     }
 
     private func loadDetail(_ id: UUID?) async {
