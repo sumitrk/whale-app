@@ -971,6 +971,74 @@ final class ModelInstallFeedbackTests: XCTestCase {
         XCTAssertFalse(phase.contains("%"))
     }
 
+    /// A running install is the only state worth offering to abandon. `checking` runs on every
+    /// appearance of the pane, so a Cancel button there would flicker on all three rows.
+    func testOnlyARunningInstallOffersCancel() {
+        let model = BuiltInModelID.whisperLargeV3Turbo.descriptor
+
+        func row(_ state: NativeModelInstallState) -> TranscriptionModelRowModel {
+            TranscriptionModelRowModel(model: model, installState: state, isSelected: false)
+        }
+
+        XCTAssertTrue(row(.downloading(progress: 0.3, phase: "Downloading")).isCancellable)
+        XCTAssertTrue(
+            row(.downloading(progress: nil, phase: WhisperBuiltInConfiguration.loadingPhase)).isCancellable
+        )
+
+        XCTAssertFalse(row(.checking).isCancellable)
+        XCTAssertFalse(row(.notInstalled).isCancellable)
+        XCTAssertFalse(row(.ready).isCancellable)
+        XCTAssertFalse(row(.failed("boom")).isCancellable)
+    }
+
+    /// Cancel is only ever drawn beside the spinner, so anything cancellable must be busy.
+    func testEverythingCancellableIsAlsoBusy() {
+        let model = BuiltInModelID.whisperLargeV3Turbo.descriptor
+        let states: [NativeModelInstallState] = [
+            .checking,
+            .notInstalled,
+            .downloading(progress: 0.5, phase: "Downloading"),
+            .ready,
+            .failed("boom"),
+        ]
+
+        for state in states {
+            let row = TranscriptionModelRowModel(model: model, installState: state, isSelected: false)
+            if row.isCancellable {
+                XCTAssertTrue(row.isBusy, "\(state) offers Cancel without showing a spinner")
+            }
+        }
+    }
+
+    /// Cancelling puts the row back where it started rather than leaving it spinning, and a
+    /// retry is immediately possible.
+    func testCancellingADownloadReturnsTheRowToItsPreviousState() async {
+        let backend = ModelOperationBackend()
+        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(service: service)
+
+        store.install(.parakeetEnglishV2)
+        await backend.waitUntilStarted(.install)
+        XCTAssertTrue(
+            TranscriptionModelRowModel(
+                model: BuiltInModelID.parakeetEnglishV2.descriptor,
+                installState: store.installState(for: .parakeetEnglishV2),
+                isSelected: false
+            ).isCancellable
+        )
+
+        store.cancel(.parakeetEnglishV2)
+        XCTAssertEqual(store.installState(for: .parakeetEnglishV2), .notInstalled)
+
+        // The row is usable again straight away rather than stuck behind the abandoned work.
+        store.install(.parakeetEnglishV2)
+        await backend.waitUntilStarted(.install)
+        if case .downloading = store.installState(for: .parakeetEnglishV2) {} else {
+            XCTFail("a cancelled row could not start a new download")
+        }
+        store.cancel(.parakeetEnglishV2)
+    }
+
     /// Deleting is only offered for checkpoints the app downloaded. The custom row points at
     /// a folder the user converted themselves, and erasing that would be indefensible.
     func testOnlyAppDownloadedModelsOfferDeletion() {

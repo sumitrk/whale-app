@@ -155,8 +155,19 @@ private struct ModelRow: View {
     @ViewBuilder
     private func accessory(for row: TranscriptionModelRowModel) -> some View {
         if row.isBusy {
-            ProgressView()
-                .controlSize(.small)
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+
+                // Cancel sits on the right, where Download and the language selector sit, so
+                // the column the eye follows down the list holds the action in every state.
+                if row.isCancellable {
+                    Button("Cancel") { modelStore.cancel(model.id) }
+                        .buttonStyle(.bordered)
+                }
+            }
+            .fixedSize()
+            .layoutPriority(1)
         } else {
             HStack(spacing: 8) {
                 if let title = row.primaryActionTitle {

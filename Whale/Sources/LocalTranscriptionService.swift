@@ -213,6 +213,11 @@ struct TranscriptionModelRowModel: Equatable {
     let errorText: String?
     let resetActionTitle: String?
     let isReady: Bool
+    /// Whether to offer abandoning the work in flight.
+    ///
+    /// Only a running install earns it. A `checking` pass is sub-second and happens every time
+    /// the pane appears, so a Cancel button there would do nothing but flicker on three rows.
+    let isCancellable: Bool
 
     var statusText: String { status.text }
 
@@ -246,6 +251,7 @@ struct TranscriptionModelRowModel: Equatable {
             errorText = nil
             resetActionTitle = nil
             isReady = false
+            isCancellable = false
 
         case .notInstalled:
             // Keep the selected row visually active even before its files are downloaded. The
@@ -258,6 +264,7 @@ struct TranscriptionModelRowModel: Equatable {
             errorText = nil
             resetActionTitle = nil
             isReady = false
+            isCancellable = false
 
         case .downloading(let fraction, let phase):
             let percent = fraction.map { " · \(Int(($0 * 100).rounded()))%" } ?? ""
@@ -268,6 +275,7 @@ struct TranscriptionModelRowModel: Equatable {
             errorText = nil
             resetActionTitle = nil
             isReady = false
+            isCancellable = true
 
         case .ready:
             // A model only reads "Active" while it is genuinely usable. Selection is never
@@ -280,6 +288,7 @@ struct TranscriptionModelRowModel: Equatable {
             errorText = nil
             resetActionTitle = model.resetActionTitle
             isReady = true
+            isCancellable = false
 
         case .failed(let message):
             status = .needsAttention
@@ -289,6 +298,7 @@ struct TranscriptionModelRowModel: Equatable {
             errorText = message
             resetActionTitle = model.resetActionTitle
             isReady = false
+            isCancellable = false
         }
     }
 }
@@ -483,6 +493,13 @@ final class TranscriptionModelStore: ObservableObject {
         }
     }
 
+    /// Abandons an install in flight and puts the row back where it was.
+    ///
+    /// What this stops depends on where the work has got to. A transfer is carried by
+    /// URLSession and does stop; the Core ML compile that follows is not interruptible, so it
+    /// runs itself out in the background while the install is discarded either way. Partly
+    /// downloaded files are deliberately left alone — they let a retry resume rather than
+    /// start over, and removing files is what Delete is for.
     func cancel(_ modelID: BuiltInModelID) {
         cancelModelOperation(modelID)
     }
