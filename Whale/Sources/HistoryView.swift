@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 enum HistoryLayoutMetrics {
-    // Previous share was 0.38. The list was too narrow, so it is 1.4× that width.
-    static let listFraction: CGFloat = 0.38 * 1.4
+    /// The list takes 40% of the pane; the detail view gets the remainder.
+    static let listFraction: CGFloat = 0.4
 }
 
 struct HistoryView: View {
