@@ -14,7 +14,6 @@ struct HistoryView: View {
     @State private var entries: [HistoryEntry] = []
     @State private var selectedID: UUID?
     @State private var selectedEntry: HistoryEntry?
-    @State private var storageBytes: Int64 = 0
     @State private var showingClearConfirmation = false
     @State private var relativeTimeReference = Date()
     @State private var hasLoaded = false
@@ -80,29 +79,21 @@ struct HistoryView: View {
             List(entries, selection: $selectedID) { entry in
                 HistoryEntryRow(entry: entry, relativeTo: relativeTimeReference)
                     .tag(entry.id)
+                    .onAppear {
+                        guard entry.id == entries.last?.id else { return }
+                        Task { await loadMore() }
+                    }
                     .contextMenu {
                         Button("Delete", role: .destructive) { Task { await delete(entry.id) } }
                     }
             }
 
             HStack {
-                Text(ByteCountFormatter.string(fromByteCount: storageBytes, countStyle: .file))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if hasMoreEntries {
-                    Button {
-                        Task { await loadMore() }
-                    } label: {
-                        if isLoadingMore {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Loading…")
-                        } else {
-                            Text("Load More")
-                        }
-                    }
-                    .disabled(isLoadingMore)
+                if isLoadingMore {
+                    ProgressView("Loading more…")
+                        .controlSize(.small)
                 }
+                Spacer()
                 Button("Clear History…", role: .destructive) { showingClearConfirmation = true }
                     .disabled(entries.isEmpty)
             }
@@ -142,7 +133,6 @@ struct HistoryView: View {
             guard !Task.isCancelled, requestedQuery == query, requestedRevision == controller.revision else { return }
             entries = page
             hasMoreEntries = page.count == Self.pageSize
-            storageBytes = await store.storageBytes()
             let preservedID = selectedID ?? controller.lastSelectedID
             if let preservedID, entries.contains(where: { $0.id == preservedID }) {
                 selectedID = preservedID
