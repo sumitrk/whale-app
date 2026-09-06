@@ -107,8 +107,17 @@ final class TranscriptionModelTests: XCTestCase {
         )
         XCTAssertEqual(notInstalled.status, .notInstalled)
         XCTAssertEqual(notInstalled.statusText, "Not Installed")
-        XCTAssertEqual(notInstalled.primaryActionTitle, "Install")
+        XCTAssertEqual(notInstalled.primaryActionTitle, "Download")
         XCTAssertFalse(notInstalled.isBusy)
+
+        let selectedNotInstalled = TranscriptionModelRowModel(
+            model: model,
+            installState: .notInstalled,
+            isSelected: true
+        )
+        XCTAssertEqual(selectedNotInstalled.status, .active)
+        XCTAssertEqual(selectedNotInstalled.primaryActionTitle, "Download")
+        XCTAssertFalse(selectedNotInstalled.isReady)
 
         let downloading = TranscriptionModelRowModel(
             model: model,
@@ -147,8 +156,25 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(failed.errorText, "Download failed")
     }
 
-    /// A selected model that stops being ready must not hand the selection to another engine,
-    /// and must not keep claiming to be active.
+    func testMissingWhisperArtifactsRefreshAsNotInstalled() async throws {
+        let modelID = BuiltInModelID.whisperLargeV3Turbo
+        let folder = try makeTemporaryWhisperModelFolder(function: #function)
+        let originalPath = SettingsStore.shared.localModelPath(for: modelID)
+        defer {
+            SettingsStore.shared.setLocalModelPath(originalPath, for: modelID)
+            try? FileManager.default.removeItem(at: folder)
+        }
+
+        SettingsStore.shared.setLocalModelPath(folder.path, for: modelID)
+
+        let backend = WhisperTranscriptionBackend()
+        let isInstalled = try await backend.isInstalled(modelID: modelID)
+
+        XCTAssertFalse(isInstalled)
+    }
+
+    /// A selected model that stops being ready must not hand the selection to another engine;
+    /// it remains the active selection while offering a download action.
     func testSelectionSurvivesTheActiveModelBecomingUnavailable() async {
         let originalSelection = SettingsStore.shared.selectedBuiltInModelID
         defer { SettingsStore.shared.selectedBuiltInModelID = originalSelection }
@@ -172,7 +198,9 @@ final class TranscriptionModelTests: XCTestCase {
             installState: store.installState(for: .whisperLargeV3Turbo),
             isSelected: true
         )
-        XCTAssertEqual(row.status, .notInstalled)
+        XCTAssertEqual(row.status, .active)
+        XCTAssertEqual(row.primaryActionTitle, "Download")
+        XCTAssertFalse(row.isReady)
     }
 
     func testCoordinatorRoutesByModelGroup() async throws {

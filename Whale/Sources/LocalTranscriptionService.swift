@@ -57,7 +57,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
     var installationPrompt: String {
         switch provisioning {
         case .download:
-            return "\(title) is not installed. Open Settings > Models and install it."
+            return "\(title) is not downloaded. Open Settings > Models and download it."
         case .localFolder:
             return "\(title) is not configured yet. Open Settings > Models, choose a WhisperKit/Core ML folder, and try again."
         }
@@ -66,7 +66,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
     var actionTitle: String {
         switch provisioning {
         case .download:
-            return "Install"
+            return "Download"
         case .localFolder:
             return "Choose Folder"
         }
@@ -158,7 +158,7 @@ enum BuiltInModelCatalog {
 /// `NativeModelInstallState`: install state is about the bytes on disk, this is what the
 /// settings row says, which also folds in whether the model is the selected one.
 enum TranscriptionModelStatus: Equatable {
-    /// Installed and selected — new recordings use this model.
+    /// Selected for transcription. The download action can still be shown when its files are missing.
     case active
     /// Installed but not selected.
     case inactive
@@ -211,7 +211,10 @@ struct TranscriptionModelRowModel: Equatable {
             isReady = false
 
         case .notInstalled:
-            status = .notInstalled
+            // Keep the selected row visually active even before its files are downloaded. The
+            // Download action makes the next step clear without turning a missing model into
+            // an error state.
+            status = isSelected ? .active : .notInstalled
             primaryActionTitle = model.actionTitle
             progress = nil
             isBusy = false
@@ -1032,11 +1035,18 @@ actor WhisperTranscriptionBackend: BuiltInTranscriptionBackend {
             return false
         }
 
-        _ = try Self.validateStoredModelFolder(
-            for: modelID,
-            modelURL: modelURL
-        )
-        return true
+        do {
+            _ = try Self.validateStoredModelFolder(
+                for: modelID,
+                modelURL: modelURL
+            )
+            return true
+        } catch LocalTranscriptionError.invalidWhisperModelFolder {
+            // A stale or partial WhisperKit folder is equivalent to no downloaded model from
+            // the settings pane's perspective. Let the row offer Download instead of exposing
+            // the validation details as a red error card.
+            return false
+        }
     }
 
     func prepare(modelID: BuiltInModelID) async throws {

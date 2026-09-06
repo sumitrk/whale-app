@@ -201,9 +201,9 @@ private struct ModelStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Choose and install a model")
+                Text("Choose and download a model")
                     .font(.title2.bold())
-                Text("Models are stored on your Mac. Install the one you want to use, then continue.")
+                Text("Models are stored on your Mac. Download the one you want to use, then continue.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             }
