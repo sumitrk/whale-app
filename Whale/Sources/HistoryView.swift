@@ -249,11 +249,11 @@ private struct HistoryEntryRow: View {
     let relativeTo: Date
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
                 SourceAppIconView(appName: entry.sourceAppName)
                 Text(entry.listTitle)
-                    .font(.headline)
+                    .font(.body)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 Text(relativeTime)
@@ -294,7 +294,7 @@ private struct SourceAppIconView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: 20, height: 20)
+        .frame(width: 16, height: 16)
     }
 }
 
