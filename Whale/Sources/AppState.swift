@@ -107,10 +107,14 @@ class AppState: ObservableObject {
     ) {
         self.accessibility = accessibility
         self.pipelineFactory = pipelineFactory ?? {
-            let stages: [PipelineStage] = [
+            // Rebuilt per recording, so a settings change applies to the next one.
+            var stages: [PipelineStage] = [
                 // VoiceActivityDetectionStage(),
                 TranscriptionStage(transcriber: LocalTranscriptionService.shared),
             ]
+            if SettingsStore.shared.smartFormattingEnabled {
+                stages.append(SmartFormattingStage())
+            }
             return TranscriptionPipeline(stages: stages)
         }
         let runtime = PiRuntime()

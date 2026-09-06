@@ -58,6 +58,10 @@
 		PP0000000000000000000014 /* TextInsertionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000004 /* TextInsertionManager.swift */; };
 		PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000005 /* TranscriptionPipelineTests.swift */; };
 		PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000006 /* TextInsertionManagerTests.swift */; };
+		TP0000000000000000000001 /* SmartFormattingStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = TP0000000000000000000002 /* SmartFormattingStage.swift */; };
+		TP0000000000000000000003 /* SmartFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TP0000000000000000000004 /* SmartFormattingTests.swift */; };
+		TP0000000000000000000007 /* TextProcessing in Frameworks */ = {isa = PBXBuildFile; productRef = TP0000000000000000000005 /* TextProcessing */; };
+		TP0000000000000000000008 /* TextProcessing in Frameworks */ = {isa = PBXBuildFile; productRef = TP0000000000000000000005 /* TextProcessing */; };
 		TAW000000000000000000001 /* TranscriptArtifactWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAW000000000000000000002 /* TranscriptArtifactWriter.swift */; };
 		VAD000000000000000000011 /* VoiceActivityEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000001 /* VoiceActivityEditor.swift */; };
 		VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */; };
@@ -123,6 +127,8 @@
 		PP0000000000000000000004 /* TextInsertionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManager.swift; sourceTree = "<group>"; };
 		PP0000000000000000000005 /* TranscriptionPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipelineTests.swift; sourceTree = "<group>"; };
 		PP0000000000000000000006 /* TextInsertionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionManagerTests.swift; sourceTree = "<group>"; };
+		TP0000000000000000000002 /* SmartFormattingStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartFormattingStage.swift; sourceTree = "<group>"; };
+		TP0000000000000000000004 /* SmartFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartFormattingTests.swift; sourceTree = "<group>"; };
 		TAW000000000000000000002 /* TranscriptArtifactWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptArtifactWriter.swift; sourceTree = "<group>"; };
 		VAD000000000000000000001 /* VoiceActivityEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityEditor.swift; sourceTree = "<group>"; };
 		VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityDetectionStage.swift; sourceTree = "<group>"; };
@@ -135,6 +141,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA0000000000000000000004 /* FluidAudio in Frameworks */,
+				TP0000000000000000000008 /* TextProcessing in Frameworks */,
 				AA0000000000000000000002 /* XCTest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -145,6 +152,7 @@
 			files = (
 				7A61089AAB7BD42A35D460B5 /* CoreAudio.framework in Frameworks */,
 				1C91A4D62C0C4A0B9F20A111 /* FluidAudio in Frameworks */,
+				TP0000000000000000000007 /* TextProcessing in Frameworks */,
 				AIA000000000000000000012 /* SQLCipher in Frameworks */,
 				AA0000000000000000000001 /* WhisperKit in Frameworks */,
 				C6A3D56B2F7023BB00A16DA0 /* Sparkle in Frameworks */,
@@ -224,6 +232,7 @@
 				AAPP00000000000000000002 /* AppStateTests.swift */,
 				C0A000000000000000000002 /* AudioRecorderTests.swift */,
 				C1A000000000000000000002 /* HotkeyManagerTests.swift */,
+				TP0000000000000000000004 /* SmartFormattingTests.swift */,
 				PP0000000000000000000006 /* TextInsertionManagerTests.swift */,
 				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
 				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
@@ -259,6 +268,7 @@
 				PP0000000000000000000002 /* TranscriptionPipeline.swift */,
 				PP0000000000000000000003 /* TranscriptionStage.swift */,
 				VAD000000000000000000001 /* VoiceActivityEditor.swift */,
+				TP0000000000000000000002 /* SmartFormattingStage.swift */,
 				VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */,
 			);
 			path = Pipeline;
@@ -286,6 +296,7 @@
 				AIA000000000000000000302 /* SQLCipher */,
 				AA0000000000000000000072 /* WhisperKit */,
 				C6A3D56A2F7023BB00A16DA0 /* Sparkle */,
+				TP0000000000000000000005 /* TextProcessing */,
 			);
 			productName = TranscribeMeeting;
 			productReference = E30A00EEB7141B3BFD0B065B /* Whale Dev.app */;
@@ -306,6 +317,7 @@
 			name = WhaleTests;
 			packageProductDependencies = (
 				1C91A4D72C0C4A0B9F20A111 /* FluidAudio */,
+				TP0000000000000000000005 /* TextProcessing */,
 			);
 			productName = WhaleTests;
 			productReference = AA0000000000000000000012 /* WhaleTests.xctest */;
@@ -340,6 +352,7 @@
 			mainGroup = 8F2DCE44CE4C7CA0FB04F8BC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				TP0000000000000000000006 /* XCLocalSwiftPackageReference "Packages/TextProcessing" */,
 				1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				AIA000000000000000000301 /* XCRemoteSwiftPackageReference "SQLCipher.swift" */,
 				AA0000000000000000000071 /* XCRemoteSwiftPackageReference "WhisperKit" */,
@@ -400,6 +413,7 @@
 				AAPP00000000000000000001 /* AppStateTests.swift in Sources */,
 				C0A000000000000000000001 /* AudioRecorderTests.swift in Sources */,
 				C1A000000000000000000001 /* HotkeyManagerTests.swift in Sources */,
+				TP0000000000000000000003 /* SmartFormattingTests.swift in Sources */,
 				PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */,
 				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
 				PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */,
@@ -440,6 +454,7 @@
 				EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */,
 				F0F812B0EA8E670D04878BDD /* SettingsView.swift in Sources */,
 				94E2FF4554D92D4265DAFE60 /* ShortcutsSettingsView.swift in Sources */,
+				TP0000000000000000000001 /* SmartFormattingStage.swift in Sources */,
 				PP0000000000000000000014 /* TextInsertionManager.swift in Sources */,
 				TAW000000000000000000001 /* TranscriptArtifactWriter.swift in Sources */,
 				84740FA4C22131C091BD729B /* TranscribeMeetingApp.swift in Sources */,
@@ -721,6 +736,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		TP0000000000000000000006 /* XCLocalSwiftPackageReference "Packages/TextProcessing" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/TextProcessing;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -776,6 +798,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AIA000000000000000000301 /* XCRemoteSwiftPackageReference "SQLCipher.swift" */;
 			productName = SQLCipher;
+		};
+		TP0000000000000000000005 /* TextProcessing */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TextProcessing;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

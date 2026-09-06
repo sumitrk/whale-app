@@ -29,6 +29,10 @@ _Avoid_: Toggle Record, Toggle Recording
 A speech-recognition model that produces a transcription.
 _Avoid_: Model
 
+**Smart Formatting**:
+An optional rewrite, applied after transcription, that turns spoken numbers, money, dates, and times in a transcript into the written forms a reader expects.
+_Avoid_: ITN, inverse text normalization, normalization
+
 **Dictation**:
 A user intent in which speech becomes text without reasoning over external user content.
 _Avoid_: Basic mode, transcription operation

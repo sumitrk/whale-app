@@ -7,6 +7,7 @@ struct ModelsSettingsView: View {
     var body: some View {
         Form {
             ModelListSections()
+            SmartFormattingSection()
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
@@ -36,6 +37,33 @@ struct ModelListSections: View {
             Text("Custom")
         } footer: {
             Text("All models run locally on your Mac. Audio never leaves the device.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Post-transcription rewriting, kept out of `ModelListSections` so the onboarding
+/// step stays a plain model picker.
+private struct SmartFormattingSection: View {
+    @ObservedObject private var settings = SettingsStore.shared
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $settings.smartFormattingEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Smart Formatting")
+                    Text("Write spoken numbers, money, dates, and times the way you would type them — “twenty one dollars and fifty cents” becomes “$21.50”.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+        } header: {
+            Text("Formatting")
+        } footer: {
+            Text("Best on transcripts full of figures. Everyday phrasing can come out worse — “let's sync at ten thirty” becomes “let's sync at 40”.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

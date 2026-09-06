@@ -98,6 +98,13 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(builtInModelLocalBookmarks, forKey: Keys.builtInModelLocalBookmarks) }
     }
 
+    /// Rewrite spoken numbers, money, dates, and times in a transcript into
+    /// their written form. Off by default — the rewrite is a clear win for
+    /// figures but misreads some ordinary phrasing, so it stays opt-in.
+    @Published var smartFormattingEnabled: Bool {
+        didSet { ud.set(smartFormattingEnabled, forKey: Keys.smartFormattingEnabled) }
+    }
+
     // MARK: - AI Actions
 
     static let defaultAIActionMasterPrompt = "Follow the spoken instruction using the supplied context. Preserve the user's intended tone, language, and useful formatting."
@@ -135,6 +142,7 @@ class SettingsStore: ObservableObject {
         ) ?? .parakeetEnglishV2
         builtInModelLocalPaths   = ud.dictionary(forKey: Keys.builtInModelLocalPaths) as? [String: String] ?? [:]
         builtInModelLocalBookmarks = ud.dictionary(forKey: Keys.builtInModelLocalBookmarks) as? [String: String] ?? [:]
+        smartFormattingEnabled   = ud.bool(forKey: Keys.smartFormattingEnabled)
         aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
         openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
     }
@@ -293,6 +301,7 @@ class SettingsStore: ObservableObject {
         static let selectedBuiltInModelID = "selectedBuiltInModelID"
         static let builtInModelLocalPaths = "builtInModelLocalPaths"
         static let builtInModelLocalBookmarks = "builtInModelLocalBookmarks"
+        static let smartFormattingEnabled = "smartFormattingEnabled"
         static let aiActionMasterPrompt = "aiActionMasterPrompt"
         static let openRouterKeyRejected = "openRouterKeyRejected"
     }

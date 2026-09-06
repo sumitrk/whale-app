@@ -18,3 +18,6 @@ Spec/post-processing-local-llm/
 
 # Downloaded and verified by scripts/prepare_pi_runtime.sh before Xcode copies resources.
 Whale/Resources/Pi/pi/
+
+# SwiftPM build products for the in-repo packages.
+.build/
