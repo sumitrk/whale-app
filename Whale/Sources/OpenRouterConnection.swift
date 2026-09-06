@@ -124,7 +124,9 @@ struct AIConnectionStatus: Equatable {
                 showsRetry: false, showsTopUpLink: true
             )
         }
-        if verification == .checking {
+        // A re-check on top of a known-good key is background work — saying
+        // "Checking…" would blank out a correct answer we already have.
+        if verification == .checking && !lastKnownGood {
             return AIConnectionStatus(
                 indicator: .neutral, label: "Checking…", detail: nil,
                 showsRetry: false, showsTopUpLink: false
@@ -151,7 +153,7 @@ struct AIConnectionStatus: Equatable {
                 detail: "Couldn't re-check — you appear to be offline.",
                 showsRetry: true, showsTopUpLink: false
             )
-        case .unknown where lastKnownGood:
+        case .unknown where lastKnownGood, .checking where lastKnownGood:
             return AIConnectionStatus(
                 indicator: .good, label: "Connected", detail: nil,
                 showsRetry: false, showsTopUpLink: false
@@ -173,18 +175,26 @@ final class OpenRouterConnection: ObservableObject {
     @Published private(set) var verification: KeyVerification = .unknown
     @Published private(set) var hasKey: Bool = false
 
+    /// How long a verdict stays fresh. Opening the AI Actions tab should not
+    /// cost an OpenRouter round trip every time.
+    static let freshness: TimeInterval = 5 * 60
+
     private let settings: SettingsStore
     private let verifier: (String) async -> KeyVerification
+    private let now: () -> Date
     private var verifyTask: Task<Void, Never>?
+    private var lastVerifiedAt: Date?
 
     init(
         settings: SettingsStore = .shared,
         verifier: @escaping (String) async -> KeyVerification = {
             await OpenRouterKeyVerifier.verify(key: $0)
-        }
+        },
+        now: @escaping () -> Date = Date.init
     ) {
         self.settings = settings
         self.verifier = verifier
+        self.now = now
         self.hasKey = Self.storedKey() != nil
     }
 
@@ -200,21 +210,34 @@ final class OpenRouterConnection: ObservableObject {
     }
 
     /// Re-checks the stored key. Safe to call repeatedly — a check already in
-    /// flight is cancelled rather than raced.
-    func verifyNow() {
-        verifyTask?.cancel()
+    /// flight is cancelled rather than raced, and a verdict from the last few
+    /// minutes is reused unless the caller insists.
+    func verifyNow(force: Bool = false) {
         guard let key = Self.storedKey() else {
+            verifyTask?.cancel()
+            lastVerifiedAt = nil
             hasKey = false
             verification = .unknown
             return
         }
         hasKey = true
+        if !force, isFresh { return }
+        verifyTask?.cancel()
         verification = .checking
         verifyTask = Task { [weak self] in
             let outcome = await self?.verifier(key)
             guard !Task.isCancelled, let self, let outcome else { return }
             self.apply(outcome)
         }
+    }
+
+    /// True while there is nothing worth asking OpenRouter again. A check
+    /// already in flight counts; an unreachable network does not, so a failed
+    /// re-check is retried on the next visit.
+    private var isFresh: Bool {
+        if verification == .checking { return true }
+        guard case .valid = verification, let lastVerifiedAt else { return false }
+        return now().timeIntervalSince(lastVerifiedAt) < Self.freshness
     }
 
     /// Verifies before committing, so a truncated paste can never destroy a
@@ -235,6 +258,7 @@ final class OpenRouterConnection: ObservableObject {
             settings.openRouterKeyVerified = true
             hasKey = true
             verification = .valid
+            lastVerifiedAt = now()
             return .saved
         case .invalid(let message):
             return .failed(message)
@@ -257,11 +281,18 @@ final class OpenRouterConnection: ObservableObject {
         settings.openRouterKeyVerified = false
         hasKey = false
         verification = .unknown
+        lastVerifiedAt = nil
         return nil
     }
 
     private func apply(_ outcome: KeyVerification) {
         verification = outcome
+        switch outcome {
+        case .valid, .invalid:
+            lastVerifiedAt = now()
+        case .unreachable, .checking, .unknown:
+            break
+        }
         switch outcome {
         case .valid:
             settings.openRouterKeyVerified = true

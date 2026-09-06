@@ -247,9 +247,9 @@ private struct HistoryEntryRow: View {
     let relativeTo: Date
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                SourceAppIconView(appName: entry.sourceAppName)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                SourceAppIconView(name: entry.sourceAppName, bundleID: entry.sourceAppBundleID)
                 Text(entry.listTitle)
                     .font(.body)
                     .lineLimit(1)
@@ -277,12 +277,13 @@ private struct HistoryEntryRow: View {
 }
 
 private struct SourceAppIconView: View {
-    let appName: String?
+    let name: String?
+    let bundleID: String?
     var size: CGFloat = 16
 
     var body: some View {
         Group {
-            if let image = SourceAppIcon.image(forAppNamed: appName) {
+            if let image = SourceApp.icon(bundleID: bundleID, name: name) {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
@@ -294,77 +295,6 @@ private struct SourceAppIconView: View {
             }
         }
         .frame(width: size, height: size)
-    }
-}
-
-private enum SourceAppIcon {
-    private static let cache = NSCache<NSString, NSImage>()
-    private static var resolvedNames = Set<String>()
-
-    static func image(forAppNamed name: String?) -> NSImage? {
-        guard let name else { return nil }
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        if resolvedNames.contains(trimmed) {
-            return cache.object(forKey: trimmed as NSString)
-        }
-        resolvedNames.insert(trimmed)
-        guard let image = resolve(trimmed) else { return nil }
-        cache.setObject(image, forKey: trimmed as NSString)
-        return image
-    }
-
-    private static func resolve(_ name: String) -> NSImage? {
-        if let running = NSWorkspace.shared.runningApplications.first(where: {
-            $0.localizedName?.caseInsensitiveCompare(name) == .orderedSame
-        }) {
-            if let icon = running.icon {
-                return icon
-            }
-            if let url = running.bundleURL {
-                return NSWorkspace.shared.icon(forFile: url.path)
-            }
-        }
-
-        if let url = applicationURL(named: name) {
-            return NSWorkspace.shared.icon(forFile: url.path)
-        }
-        return nil
-    }
-
-    private static func applicationURL(named name: String) -> URL? {
-        var roots = FileManager.default.urls(
-            for: .applicationDirectory,
-            in: [.localDomainMask, .userDomainMask, .systemDomainMask]
-        )
-        roots.append(URL(fileURLWithPath: "/System/Applications"))
-        roots.append(URL(fileURLWithPath: "/System/Applications/Utilities"))
-        roots.append(URL(fileURLWithPath: "/System/Cryptexes/App/System/Applications"))
-
-        for root in roots {
-            let direct = root.appendingPathComponent("\(name).app")
-            if FileManager.default.fileExists(atPath: direct.path) {
-                return direct
-            }
-            guard let contents = try? FileManager.default.contentsOfDirectory(
-                at: root,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            ) else { continue }
-
-            for item in contents where item.pathExtension == "app" {
-                if item.deletingPathExtension().lastPathComponent.caseInsensitiveCompare(name) == .orderedSame {
-                    return item
-                }
-            }
-            for item in contents where item.pathExtension.isEmpty {
-                let nested = item.appendingPathComponent("\(name).app")
-                if FileManager.default.fileExists(atPath: nested.path) {
-                    return nested
-                }
-            }
-        }
-        return nil
     }
 }
 
@@ -382,7 +312,11 @@ private struct HistoryEntryDetail: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: Self.iconSpacing) {
-                        SourceAppIconView(appName: entry.sourceAppName, size: Self.iconSize)
+                        SourceAppIconView(
+                            name: entry.sourceAppName,
+                            bundleID: entry.sourceAppBundleID,
+                            size: Self.iconSize
+                        )
                         Text(entry.listTitle).font(.title2.bold())
                     }
                     HStack(spacing: 3) {

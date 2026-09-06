@@ -186,7 +186,7 @@ private struct OpenRouterSection: View {
     }
 
     private func retry() {
-        connection.verifyNow()
+        connection.verifyNow(force: true)
         if case .unavailable = runtime.status {
             Task { try? await runtime.restart() }
         }
