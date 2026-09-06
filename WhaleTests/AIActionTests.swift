@@ -91,6 +91,20 @@ final class AIActionTests: XCTestCase {
         XCTAssertEqual(result.indicator, .bad)
     }
 
+    /// Re-checking a key we already know is good is background work. Blanking
+    /// the verdict out to "Checking…" made the panel flicker on every visit.
+    func testAReCheckKeepsShowingTheLastKnownGoodVerdict() {
+        let result = status(verification: .checking, lastKnownGood: true)
+        XCTAssertEqual(result.label, "Connected")
+        XCTAssertEqual(result.indicator, .good)
+    }
+
+    func testTheFirstCheckOfAnUnprovenKeyStillSaysChecking() {
+        let result = status(verification: .checking, lastKnownGood: false)
+        XCTAssertEqual(result.label, "Checking…")
+        XCTAssertEqual(result.indicator, .neutral)
+    }
+
     // MARK: - Source app identity
 
     /// The accessibility inspector substitutes the literal string "unknown"
