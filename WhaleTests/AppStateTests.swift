@@ -2,6 +2,22 @@ import AppKit
 import XCTest
 @testable import Whale
 
+final class OnboardingPermissionGateTests: XCTestCase {
+    func testAccessibilityIsOptionalWhenMicrophoneIsGranted() {
+        XCTAssertTrue(
+            OnboardingPermissionGate.canAdvance(
+                microphoneAuthorized: true
+            )
+        )
+    }
+
+    func testMicrophoneStillGatesOnboarding() {
+        XCTAssertFalse(
+            OnboardingPermissionGate.canAdvance(microphoneAuthorized: false)
+        )
+    }
+}
+
 final class AppStateActivityTests: XCTestCase {
     func testEarlyPTTReleaseStaysInStartingPhaseAndRequestsStop() {
         var activity = RecordingActivity.starting(mode: .paste, stopRequested: false)

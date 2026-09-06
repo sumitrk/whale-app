@@ -2,6 +2,12 @@ import AppKit
 import AVFoundation
 import SwiftUI
 
+enum OnboardingPermissionGate {
+    static func canAdvance(microphoneAuthorized: Bool) -> Bool {
+        microphoneAuthorized
+    }
+}
+
 // MARK: - Container
 
 struct OnboardingView: View {
@@ -66,7 +72,8 @@ struct OnboardingView: View {
 
     private var canAdvance: Bool {
         switch step {
-        case 1: return micStatus == .authorized && accessibility.isTrusted
+        case 1:
+            return OnboardingPermissionGate.canAdvance(microphoneAuthorized: micStatus == .authorized)
         case 2: return hasModel
         default: return true
         }
@@ -111,9 +118,9 @@ private struct PermissionsStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Grant two permissions")
+                Text("Grant permissions")
                     .font(.title2.bold())
-                Text("Both are required for the app to work.")
+                Text("Microphone is required to record. Accessibility enables global shortcuts and auto-paste.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             }
@@ -150,7 +157,10 @@ private struct PermissionsStep: View {
     }
 
     private func requestAccessibility() {
-        accessibility.requestPrompt()
+        // Use the full settings flow here, not just AXIsProcessTrusted's prompt.
+        // The Dev bundle must be registered before System Settings opens, and the
+        // controller polls for the grant while the user is in that pane.
+        accessibility.openSystemAccessibilitySettingsAndWatch()
     }
 }
 

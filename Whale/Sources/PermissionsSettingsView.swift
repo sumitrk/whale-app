@@ -140,7 +140,7 @@ struct PermissionDescriptor {
     static let accessibility = PermissionDescriptor(
         title: "Accessibility",
         symbol: "accessibility",
-        description: "Required for global shortcuts and auto-paste transcript.",
+        description: "Enables global shortcuts and auto-paste transcript.",
         troubleshooting: "If \(PermissionDescriptor.appDisplayName) is not listed, click + in that pane and choose the app shown in Finder."
     )
 
