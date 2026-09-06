@@ -109,35 +109,36 @@ private struct PermissionsStep: View {
     @EnvironmentObject private var accessibility: AccessibilityController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
+        VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Grant two permissions")
                     .font(.title2.bold())
                 Text("Both are required for the app to work.")
                     .foregroundStyle(.secondary)
+                    .font(.callout)
             }
+            .padding(.horizontal, 28)
+            .padding(.top, 28)
+            .padding(.bottom, 8)
 
-            VStack(spacing: 0) {
-                PermissionRow(
-                    icon: "mic.fill", color: .red,
-                    title: "Microphone",
-                    description: "To record your voice during meetings.",
-                    isGranted: micStatus == .authorized,
-                    onGrant: requestMic
-                )
-                Divider().padding(.leading, 46)
-                PermissionRow(
-                    icon: "accessibility", color: .blue,
-                    title: "Accessibility",
-                    description: "To detect the push-to-talk key from any app.",
-                    isGranted: accessibility.isTrusted,
-                    onGrant: requestAccessibility
+            // The same rows the Permissions settings pane shows, so the two cannot drift
+            // apart again. Only the actions differ: on first run the OS still prompts.
+            Form {
+                PermissionListSections(
+                    style: .onboarding,
+                    micGranted: micStatus == .authorized,
+                    accessibilityGranted: accessibility.isTrusted,
+                    onMicAction: requestMic,
+                    onAccessibilityAction: requestAccessibility
                 )
             }
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+            .formStyle(.grouped)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(28)
+        .onAppear {
+            micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+            accessibility.refresh()
+        }
     }
 
     private func requestMic() {
@@ -150,44 +151,6 @@ private struct PermissionsStep: View {
 
     private func requestAccessibility() {
         accessibility.requestPrompt()
-    }
-}
-
-private struct PermissionRow: View {
-    let icon: String
-    let color: Color
-    let title: String
-    let description: String
-    let isGranted: Bool
-    let onGrant: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(color)
-                .frame(width: 28)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).fontWeight(.medium)
-                Text(description).font(.caption).foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if isGranted {
-                Label("Granted", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.callout)
-                    .fontWeight(.medium)
-            } else {
-                Button("Grant", action: onGrant)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
     }
 }
 
