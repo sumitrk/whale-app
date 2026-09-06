@@ -223,6 +223,9 @@ final class AIActionCoordinator: ObservableObject {
             }
 
             guard isCurrent(runID) else { throw AIActionCoordinatorError.superseded }
+            // A request that went through is the only proof credit exists, and
+            // the only way out of the out-of-credit state.
+            settings.openRouterOutOfCredit = false
             state = .delivering
             TextInsertionManager.insertOrCopy(result)
             await finalizeHistory(
@@ -260,8 +263,10 @@ final class AIActionCoordinator: ObservableObject {
         }
         await runtime.abort(runID: run.id)
         let message = error.localizedDescription
-        if isRejectedKeyError(message) {
-            settings.openRouterKeyRejected = true
+        switch OpenRouterFailure.classify(message) {
+        case .rejectedKey: settings.openRouterKeyRejected = true
+        case .outOfCredit: settings.openRouterOutOfCredit = true
+        case nil: break
         }
         await finalizeHistory(for: run, outcome: .failed, errorText: message)
         if case RecorderError.noAudioCaptured = error {
@@ -305,10 +310,5 @@ final class AIActionCoordinator: ObservableObject {
             guard let self, self.activeRun == nil, self.state == terminalState else { return }
             self.state = .idle
         }
-    }
-
-    private func isRejectedKeyError(_ message: String) -> Bool {
-        let value = message.lowercased()
-        return value.contains("401") || value.contains("unauthorized") || value.contains("invalid api key")
     }
 }

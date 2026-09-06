@@ -87,6 +87,7 @@ class AppState: ObservableObject {
     let hotkey   = HotkeyManager()
     let accessibility: AccessibilityController
     let piRuntime: PiRuntime
+    let openRouterConnection = OpenRouterConnection()
     let aiActionCoordinator: AIActionCoordinator
 
     private let settings = SettingsStore.shared
@@ -562,7 +563,10 @@ class AppState: ObservableObject {
             status = .error(error.localizedDescription)
             return
         }
+        // Runs alongside the engine warm start rather than gating it, so
+        // verifying the key costs the first AI Action nothing.
         piRuntime.startInBackground()
+        openRouterConnection.verifyNow()
 
         if AppRuntimeInfo.current.shouldResetParakeetCacheOnLaunch {
             do {

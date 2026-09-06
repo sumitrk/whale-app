@@ -25,6 +25,129 @@ final class AIActionTests: XCTestCase {
         XCTAssertFalse(commandTypes.contains("set_model"))
     }
 
+    // MARK: - OpenRouter connection status
+
+    private func status(
+        hasKey: Bool = true,
+        verification: KeyVerification = .valid,
+        runtime: PiRuntimeStatus = .ready(startupMilliseconds: 100),
+        lastKnownGood: Bool = true,
+        keyRejected: Bool = false,
+        outOfCredit: Bool = false
+    ) -> AIConnectionStatus {
+        AIConnectionStatus.make(
+            hasKey: hasKey,
+            verification: verification,
+            runtime: runtime,
+            lastKnownGood: lastKnownGood,
+            keyRejected: keyRejected,
+            outOfCredit: outOfCredit
+        )
+    }
+
+    func testStatusReportsNotConnectedBeforeAKeyExists() {
+        let result = status(hasKey: false, verification: .unknown, lastKnownGood: false)
+        XCTAssertEqual(result.label, "Not connected")
+        XCTAssertEqual(result.indicator, .neutral)
+        XCTAssertFalse(result.showsRetry)
+    }
+
+    func testStatusReportsConnectedOnlyWhenTheKeyVerifiedAndTheEngineIsHealthy() {
+        let result = status()
+        XCTAssertEqual(result.label, "Connected")
+        XCTAssertEqual(result.indicator, .good)
+        XCTAssertNil(result.detail)
+    }
+
+    /// A stopped or starting engine warms on demand, so it is not a fault worth
+    /// reporting — only an engine that failed outright is.
+    func testStatusStaysConnectedWhileTheEngineIsMerelyColdOrWarming() {
+        XCTAssertEqual(status(runtime: .stopped).label, "Connected")
+        XCTAssertEqual(status(runtime: .starting).label, "Connected")
+    }
+
+    func testStatusSurfacesEngineFailureEvenThoughTheKeyIsFine() {
+        let result = status(runtime: .unavailable("The bundled AI engine is missing"))
+        XCTAssertEqual(result.label, "Unavailable")
+        XCTAssertEqual(result.indicator, .bad)
+        XCTAssertEqual(result.detail, "The bundled AI engine is missing")
+        XCTAssertTrue(result.showsRetry)
+    }
+
+    func testAnInvalidKeyOutranksEveryOtherFailure() {
+        let result = status(
+            verification: .invalid("OpenRouter rejected this key."),
+            runtime: .unavailable("engine down"),
+            outOfCredit: true
+        )
+        XCTAssertEqual(result.label, "Invalid key")
+        XCTAssertEqual(result.detail, "OpenRouter rejected this key.")
+    }
+
+    func testALiveRejectionIsReportedEvenWithoutAFreshVerification() {
+        let result = status(verification: .unknown, keyRejected: true)
+        XCTAssertEqual(result.label, "Invalid key")
+        XCTAssertEqual(result.indicator, .bad)
+    }
+
+    /// Exhausted credit and a bad key are indistinguishable to the reader
+    /// unless they are named separately, and they need different remedies.
+    func testOutOfCreditIsNamedSeparatelyFromAnInvalidKey() {
+        let result = status(outOfCredit: true)
+        XCTAssertEqual(result.label, "Out of credit")
+        XCTAssertTrue(result.showsTopUpLink)
+        XCTAssertFalse(result.showsRetry)
+    }
+
+    /// Being offline says nothing about the key, so the last answer we actually
+    /// got stands rather than the row accusing a good key.
+    func testAnUnreachableCheckKeepsTheLastKnownGoodVerdict() {
+        let result = status(verification: .unreachable, lastKnownGood: true)
+        XCTAssertEqual(result.label, "Connected")
+        XCTAssertEqual(result.indicator, .good)
+        XCTAssertEqual(result.detail, "Couldn't re-check — you appear to be offline.")
+        XCTAssertTrue(result.showsRetry)
+    }
+
+    func testAnUnreachableCheckWithNothingCachedReportsNotVerified() {
+        let result = status(verification: .unreachable, lastKnownGood: false)
+        XCTAssertEqual(result.label, "Not verified")
+        XCTAssertEqual(result.indicator, .neutral)
+        XCTAssertTrue(result.showsRetry)
+    }
+
+    func testCheckingIsShownWhileVerificationIsInFlight() {
+        XCTAssertEqual(status(verification: .checking, lastKnownGood: false).label, "Checking…")
+    }
+
+    // MARK: - OpenRouter verification and failure classification
+
+    func testOnlyAnExplicitAnswerFromOpenRouterDecidesTheKey() {
+        XCTAssertEqual(OpenRouterKeyVerifier.outcome(forStatusCode: 200), .valid)
+        XCTAssertEqual(
+            OpenRouterKeyVerifier.outcome(forStatusCode: 401),
+            .invalid("OpenRouter rejected this key.")
+        )
+        XCTAssertEqual(
+            OpenRouterKeyVerifier.outcome(forStatusCode: 403),
+            .invalid("OpenRouter rejected this key.")
+        )
+        // A server fault or a rate limit is not a verdict on the key.
+        XCTAssertEqual(OpenRouterKeyVerifier.outcome(forStatusCode: 429), .unreachable)
+        XCTAssertEqual(OpenRouterKeyVerifier.outcome(forStatusCode: 500), .unreachable)
+    }
+
+    func testCreditExhaustionIsNotMistakenForARejectedKey() {
+        XCTAssertEqual(OpenRouterFailure.classify("HTTP 402: Insufficient credits"), .outOfCredit)
+        XCTAssertEqual(
+            OpenRouterFailure.classify("This request requires more credits, or fewer max_tokens"),
+            .outOfCredit
+        )
+        XCTAssertEqual(OpenRouterFailure.classify("401 Unauthorized"), .rejectedKey)
+        XCTAssertEqual(OpenRouterFailure.classify("No auth credentials found"), .rejectedKey)
+        XCTAssertNil(OpenRouterFailure.classify("The AI Action timed out after 30 seconds"))
+    }
+
     func testSelectionCaptureUsesCopyWhenAXDoesNotExposeASelectionRange() {
         XCTAssertEqual(
             ContextSnapshotCapture.selectionCaptureStrategy(

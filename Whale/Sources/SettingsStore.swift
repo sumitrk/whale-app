@@ -127,8 +127,24 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(aiActionMasterPrompt, forKey: Keys.aiActionMasterPrompt) }
     }
 
+    /// Set when OpenRouter answers 401 — either at verification time or in the
+    /// middle of a live action. Sticky, because a rejected key stays rejected
+    /// until someone replaces it or OpenRouter starts accepting it again.
     @Published var openRouterKeyRejected: Bool {
         didSet { ud.set(openRouterKeyRejected, forKey: Keys.openRouterKeyRejected) }
+    }
+
+    /// Set when OpenRouter answers 402. Deliberately does *not* block the next
+    /// action: credit can be topped up outside the app, and the only proof of
+    /// that is a request going through, so this clears on the next success.
+    @Published var openRouterOutOfCredit: Bool {
+        didSet { ud.set(openRouterOutOfCredit, forKey: Keys.openRouterOutOfCredit) }
+    }
+
+    /// The last verification that actually got an answer. Lets an offline
+    /// launch keep showing the truth instead of accusing a good key.
+    @Published var openRouterKeyVerified: Bool {
+        didSet { ud.set(openRouterKeyVerified, forKey: Keys.openRouterKeyVerified) }
     }
 
     // MARK: - Init
@@ -161,6 +177,8 @@ class SettingsStore: ObservableObject {
         smartFormattingEnabled   = (ud.object(forKey: Keys.smartFormattingEnabled) as? Bool) ?? true
         aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
         openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
+        openRouterOutOfCredit    = ud.bool(forKey: Keys.openRouterOutOfCredit)
+        openRouterKeyVerified    = ud.bool(forKey: Keys.openRouterKeyVerified)
     }
 
     func setTranscriptFolderURL(_ url: URL?) {
@@ -353,5 +371,7 @@ class SettingsStore: ObservableObject {
         static let smartFormattingEnabled = "smartFormattingEnabled"
         static let aiActionMasterPrompt = "aiActionMasterPrompt"
         static let openRouterKeyRejected = "openRouterKeyRejected"
+        static let openRouterOutOfCredit = "openRouterOutOfCredit"
+        static let openRouterKeyVerified = "openRouterKeyVerified"
     }
 }

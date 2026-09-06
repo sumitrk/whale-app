@@ -50,12 +50,12 @@ enum PiRuntimeError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey: return "Add an OpenRouter API key in Settings > AI Actions"
-        case .runtimeMissing: return "The bundled Pi runtime is missing"
+        case .runtimeMissing: return "The bundled AI engine is missing"
         case .notReady(let reason): return reason
-        case .malformedResponse: return "Pi returned an invalid response"
+        case .malformedResponse: return "The AI engine returned an invalid response"
         case .commandFailed(let reason): return reason
         case .emptyResult: return "The AI Action returned no text"
-        case .processExited: return "The Pi runtime stopped unexpectedly"
+        case .processExited: return "The AI engine stopped unexpectedly"
         }
     }
 }
@@ -179,7 +179,7 @@ final class PiRuntime: ObservableObject {
     private func start() async throws {
         if case .ready = status, process?.isRunning == true { return }
         if case .starting = status {
-            throw PiRuntimeError.notReady("Pi is still starting")
+            throw PiRuntimeError.notReady("The AI engine is still starting")
         }
         guard let apiKey = try KeychainStore.string(for: .openRouterAPIKey), !apiKey.isEmpty else {
             throw PiRuntimeError.missingAPIKey
@@ -300,7 +300,7 @@ final class PiRuntime: ObservableObject {
                 if object["success"] as? Bool == true {
                     continuation.resume(returning: object)
                 } else {
-                    let message = object["error"] as? String ?? "Pi rejected the command"
+                    let message = object["error"] as? String ?? "The AI engine rejected the command"
                     continuation.resume(throwing: PiRuntimeError.commandFailed(message))
                 }
                 continue

@@ -29,6 +29,7 @@
 		AIA000000000000000000002 /* AIActionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000102 /* AIActionModels.swift */; };
 		AIA000000000000000000003 /* AIActionPromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000103 /* AIActionPromptBuilder.swift */; };
 		AIA000000000000000000004 /* AIActionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000104 /* AIActionSettingsView.swift */; };
+		ORC000000000000000000001 /* OpenRouterConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ORC000000000000000000101 /* OpenRouterConnection.swift */; };
 		AIA000000000000000000005 /* ContextSnapshotCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000105 /* ContextSnapshotCapture.swift */; };
 		AIA000000000000000000006 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000106 /* HistoryStore.swift */; };
 		AIA000000000000000000007 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000107 /* HistoryView.swift */; };
@@ -103,6 +104,7 @@
 		AIA000000000000000000102 /* AIActionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionModels.swift; sourceTree = "<group>"; };
 		AIA000000000000000000103 /* AIActionPromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionPromptBuilder.swift; sourceTree = "<group>"; };
 		AIA000000000000000000104 /* AIActionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionSettingsView.swift; sourceTree = "<group>"; };
+		ORC000000000000000000101 /* OpenRouterConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRouterConnection.swift; sourceTree = "<group>"; };
 		AIA000000000000000000105 /* ContextSnapshotCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextSnapshotCapture.swift; sourceTree = "<group>"; };
 		AIA000000000000000000106 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
 		AIA000000000000000000107 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
@@ -183,6 +185,7 @@
 				AIA000000000000000000102 /* AIActionModels.swift */,
 				AIA000000000000000000103 /* AIActionPromptBuilder.swift */,
 				AIA000000000000000000104 /* AIActionSettingsView.swift */,
+				ORC000000000000000000101 /* OpenRouterConnection.swift */,
 				D5228B35E5BC11AB86698BDC /* AppState.swift */,
 				B7A1C001D44E4C7287B43002 /* AppRuntimeInfo.swift */,
 				A24AEF266FF0BBF055AB8CFB /* AudioRecorder.swift */,
@@ -433,6 +436,7 @@
 				AIA000000000000000000002 /* AIActionModels.swift in Sources */,
 				AIA000000000000000000003 /* AIActionPromptBuilder.swift in Sources */,
 				AIA000000000000000000004 /* AIActionSettingsView.swift in Sources */,
+				ORC000000000000000000001 /* OpenRouterConnection.swift in Sources */,
 				89E3B9353ADD0FFF6610144B /* AppState.swift in Sources */,
 				B7A1C001D44E4C7287B43001 /* AppRuntimeInfo.swift in Sources */,
 				700DD29FBEB9B95443CCDCEA /* AudioRecorder.swift in Sources */,

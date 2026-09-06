@@ -3,40 +3,13 @@ import SwiftUI
 struct AIActionSettingsView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var settings = SettingsStore.shared
-    @State private var apiKey = ""
-    @State private var hasAPIKey = false
-    @State private var keyError: String?
 
     var body: some View {
         Form {
-            Section("OpenRouter") {
-                LabeledContent("API key") {
-                    Text(hasAPIKey ? (settings.openRouterKeyRejected ? "Rejected" : "Stored in Keychain") : "Not set")
-                        .foregroundStyle(settings.openRouterKeyRejected ? .red : .secondary)
-                }
-
-                SecureField(hasAPIKey ? "Enter replacement key" : "Enter API key", text: $apiKey)
-                HStack {
-                    Button(hasAPIKey ? "Replace Key" : "Save Key") { saveKey() }
-                        .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    if hasAPIKey {
-                        Button("Clear", role: .destructive) { clearKey() }
-                    }
-                }
-                if let keyError {
-                    Text(keyError).foregroundStyle(.red)
-                }
-
-                LabeledContent("Pi runtime") {
-                    Text(appState.piRuntime.status.label)
-                        .foregroundStyle(runtimeColor)
-                }
-                if case .ready(let milliseconds) = appState.piRuntime.status {
-                    Text("Pi 0.72.1 · \(PiRuntime.model) · reasoning off · started in \(milliseconds) ms")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            OpenRouterSection(
+                connection: appState.openRouterConnection,
+                runtime: appState.piRuntime
+            )
 
             Section {
                 TextEditor(text: $settings.aiActionMasterPrompt)
@@ -54,44 +27,168 @@ struct AIActionSettingsView: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 8, for: .scrollContent)
-        .onAppear { refreshKeyStatus() }
     }
+}
 
-    private var runtimeColor: Color {
-        switch appState.piRuntime.status {
-        case .ready: return .green
-        case .unavailable: return .red
-        default: return .secondary
+/// One status row and one action. The key itself is never shown — a stored key
+/// is a fact about the account, not a field to stare at — so the input only
+/// appears when there is a key to enter.
+private struct OpenRouterSection: View {
+    @ObservedObject var connection: OpenRouterConnection
+    @ObservedObject var runtime: PiRuntime
+    /// Observed because the sticky rejected/out-of-credit flags live here and
+    /// feed the status row.
+    @ObservedObject private var settings = SettingsStore.shared
+
+    @State private var isEditing = false
+    @State private var apiKey = ""
+    @State private var isSaving = false
+    @State private var keyError: String?
+    @State private var confirmingRemoval = false
+    @FocusState private var keyFieldFocused: Bool
+
+    var body: some View {
+        Section("OpenRouter") {
+            LabeledContent("Status") {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(indicatorColor)
+                        .frame(width: 8, height: 8)
+                    Text(status.label)
+                }
+            }
+            if let detail = status.detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if isEntering {
+                SecureField("OpenRouter API key", text: $apiKey)
+                    .focused($keyFieldFocused)
+                    .onSubmit(submit)
+                    .disabled(isSaving)
+                if let keyError {
+                    Text(keyError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                HStack {
+                    Button(connection.hasKey ? "Done" : "Save Key", action: submit)
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(trimmedKey.isEmpty || isSaving)
+                    if connection.hasKey {
+                        Button("Cancel", action: cancelEditing)
+                            .keyboardShortcut(.cancelAction)
+                            .disabled(isSaving)
+                    }
+                    if isSaving {
+                        ProgressView().controlSize(.small)
+                    }
+                    Spacer()
+                    if !connection.hasKey {
+                        Link("Get a key ↗", destination: OpenRouterKeyVerifier.keysPage)
+                            .font(.caption)
+                    }
+                }
+            } else {
+                HStack {
+                    Button("Replace Key", action: beginEditing)
+                        .buttonStyle(.borderedProminent)
+                    Button("Remove Key", role: .destructive) { confirmingRemoval = true }
+                    if status.showsRetry {
+                        Button("Retry", action: retry)
+                    }
+                    Spacer()
+                    if status.showsTopUpLink {
+                        Link("Top up ↗", destination: OpenRouterKeyVerifier.creditsPage)
+                            .font(.caption)
+                    }
+                }
+            }
+        }
+        .onAppear { connection.verifyNow() }
+        .confirmationDialog(
+            "Remove OpenRouter key?",
+            isPresented: $confirmingRemoval
+        ) {
+            Button("Remove Key", role: .destructive, action: removeKey)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("AI Actions will stop working until you add a new one.")
         }
     }
 
-    private func refreshKeyStatus() {
-        hasAPIKey = (try? KeychainStore.string(for: .openRouterAPIKey))?.isEmpty == false
+    private var status: AIConnectionStatus {
+        connection.status(runtime: runtime.status)
     }
 
-    private func saveKey() {
-        do {
-            let value = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            try KeychainStore.set(value, for: .openRouterAPIKey)
-            apiKey = ""
-            settings.openRouterKeyRejected = false
-            keyError = nil
-            refreshKeyStatus()
-            Task { try? await appState.piRuntime.restart() }
-        } catch {
-            keyError = error.localizedDescription
+    private var indicatorColor: Color {
+        switch status.indicator {
+        case .good: return .green
+        case .bad: return .red
+        case .neutral: return .secondary
         }
     }
 
-    private func clearKey() {
-        do {
-            try KeychainStore.delete(.openRouterAPIKey)
-            settings.openRouterKeyRejected = false
-            appState.piRuntime.stop()
-            refreshKeyStatus()
-            keyError = nil
-        } catch {
-            keyError = error.localizedDescription
+    /// With no key the panel is useless until one is entered, so the field is
+    /// there from the start. Hiding it only earns its keep when replacing.
+    private var isEntering: Bool { isEditing || !connection.hasKey }
+
+    private var trimmedKey: String {
+        apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func beginEditing() {
+        keyError = nil
+        apiKey = ""
+        isEditing = true
+        keyFieldFocused = true
+    }
+
+    private func cancelEditing() {
+        apiKey = ""
+        keyError = nil
+        isEditing = false
+    }
+
+    private func submit() {
+        let value = trimmedKey
+        guard !value.isEmpty, !isSaving else { return }
+        isSaving = true
+        keyError = nil
+        Task {
+            let result = await connection.save(key: value)
+            isSaving = false
+            switch result {
+            case .saved:
+                apiKey = ""
+                isEditing = false
+                try? await runtime.restart()
+            case .failed(let message):
+                // The stored key is untouched, so the old one still works.
+                keyError = message
+                keyFieldFocused = true
+            }
+        }
+    }
+
+    private func removeKey() {
+        if let message = connection.remove() {
+            keyError = message
+            return
+        }
+        runtime.stop()
+        apiKey = ""
+        keyError = nil
+        isEditing = false
+    }
+
+    private func retry() {
+        connection.verifyNow()
+        if case .unavailable = runtime.status {
+            Task { try? await runtime.restart() }
         }
     }
 }
