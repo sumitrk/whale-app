@@ -359,9 +359,11 @@ class AppState: ObservableObject {
             currentModelID = modelID
             if mode == .paste {
                 let store = try await history.requireStore()
+                let frontmost = NSWorkspace.shared.frontmostApplication
                 currentHistoryEntryID = try await store.createEntry(
                     kind: .dictation,
-                    sourceAppName: NSWorkspace.shared.frontmostApplication?.localizedName
+                    sourceAppName: frontmost?.localizedName,
+                    sourceAppBundleID: SourceApp.bundleID(frontmost?.bundleIdentifier)
                 )
                 history.changed()
             }

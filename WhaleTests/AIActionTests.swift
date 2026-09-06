@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import Whale
 
@@ -88,6 +89,31 @@ final class AIActionTests: XCTestCase {
         let result = status(verification: .unknown, keyRejected: true)
         XCTAssertEqual(result.label, "Invalid key")
         XCTAssertEqual(result.indicator, .bad)
+    }
+
+    // MARK: - Source app identity
+
+    /// The accessibility inspector substitutes the literal string "unknown"
+    /// when AppKit gives it nothing; storing that would poison icon lookup.
+    func testUnknownAndEmptyBundleIdentifiersAreDiscarded() {
+        XCTAssertNil(SourceApp.bundleID("unknown"))
+        XCTAssertNil(SourceApp.bundleID("   "))
+        XCTAssertNil(SourceApp.bundleID(nil))
+        XCTAssertEqual(SourceApp.bundleID("  com.apple.Notes  "), "com.apple.Notes")
+    }
+
+    /// A display name is a bad key for an app on disk — "Visual Studio Code"
+    /// lives in "Code.app". The bundle identifier is what LaunchServices
+    /// indexes, so it must win when both are present.
+    func testIconLookupPrefersTheBundleIdentifierOverTheDisplayName() throws {
+        let expected = try XCTUnwrap(
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.finder")
+        )
+        let resolved = SourceApp.applicationURL(
+            bundleID: "com.apple.finder",
+            name: "An App That Is Not Installed"
+        )
+        XCTAssertEqual(resolved?.standardizedFileURL, expected.standardizedFileURL)
     }
 
     /// Exhausted credit and a bad key are indistinguishable to the reader
@@ -319,6 +345,7 @@ final class AIActionTests: XCTestCase {
         let id = try await store.createEntry(
             kind: .aiAction,
             sourceAppName: "Notes",
+            sourceAppBundleID: "com.apple.Notes",
             contextInputs: [
                 ContextInput(source: .selection, ordinal: 0, content: .text("orchestration target")),
                 ContextInput(source: .selection, ordinal: 1, content: .image(image)),
@@ -359,6 +386,10 @@ final class AIActionTests: XCTestCase {
         XCTAssertTrue(visibleIDs.contains(cancelledDictationID))
         XCTAssertTrue(cancelledSearchIDs.isEmpty)
         XCTAssertEqual(storedInputCount, 3)
+        let storedBundleIDs = try await store.entries().map(\.sourceAppBundleID)
+        XCTAssertTrue(storedBundleIDs.contains("com.apple.Notes"))
+        let storedBundleID = try await store.entry(id: id)?.sourceAppBundleID
+        XCTAssertEqual(storedBundleID, "com.apple.Notes")
         XCTAssertEqual(storedCancelledAction?.outcome, .cancelled)
         XCTAssertFalse(String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("orchestration target"))
 

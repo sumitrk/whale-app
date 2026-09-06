@@ -36,7 +36,23 @@ struct ContextInput: Sendable, Equatable, Identifiable {
 struct ContextSnapshot: Sendable, Equatable {
     let capturedAt: Date
     let sourceAppName: String?
+    /// The source app's bundle identifier, when we could read it. Names are a
+    /// poor key for finding an app on disk; this is the one LaunchServices
+    /// actually indexes.
+    let sourceAppBundleID: String?
     let inputs: [ContextInput]
+
+    init(
+        capturedAt: Date,
+        sourceAppName: String?,
+        sourceAppBundleID: String? = nil,
+        inputs: [ContextInput]
+    ) {
+        self.capturedAt = capturedAt
+        self.sourceAppName = sourceAppName
+        self.sourceAppBundleID = sourceAppBundleID
+        self.inputs = inputs
+    }
 }
 
 enum HistoryKind: String, Sendable, Codable {
@@ -58,10 +74,37 @@ struct HistoryEntry: Identifiable, Sendable, Equatable {
     let completedAt: Date?
     let outcome: HistoryOutcome
     let sourceAppName: String?
+    let sourceAppBundleID: String?
     let instructionText: String?
     let resultText: String?
     let errorText: String?
     let contextInputs: [ContextInput]
+
+    init(
+        id: UUID,
+        kind: HistoryKind,
+        createdAt: Date,
+        completedAt: Date?,
+        outcome: HistoryOutcome,
+        sourceAppName: String?,
+        sourceAppBundleID: String? = nil,
+        instructionText: String?,
+        resultText: String?,
+        errorText: String?,
+        contextInputs: [ContextInput]
+    ) {
+        self.id = id
+        self.kind = kind
+        self.createdAt = createdAt
+        self.completedAt = completedAt
+        self.outcome = outcome
+        self.sourceAppName = sourceAppName
+        self.sourceAppBundleID = sourceAppBundleID
+        self.instructionText = instructionText
+        self.resultText = resultText
+        self.errorText = errorText
+        self.contextInputs = contextInputs
+    }
 
     var listTitle: String {
         let name = sourceAppName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

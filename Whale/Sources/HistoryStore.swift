@@ -111,18 +111,24 @@ actor HistoryStore {
     func createEntry(
         kind: HistoryKind,
         sourceAppName: String? = nil,
+        sourceAppBundleID: String? = nil,
         contextInputs: [ContextInput] = []
     ) throws -> UUID {
         let id = UUID()
         try transaction {
             try withStatement(
-                "INSERT INTO history_entries (id, kind, created_at, outcome, source_app_name) VALUES (?, ?, ?, ?, ?)"
+                """
+                INSERT INTO history_entries
+                    (id, kind, created_at, outcome, source_app_name, source_app_bundle_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """
             ) { statement in
                 bind(id.uuidString, to: 1, in: statement)
                 bind(kind.rawValue, to: 2, in: statement)
                 sqlite3_bind_double(statement, 3, Date().timeIntervalSince1970)
                 bind(HistoryOutcome.running.rawValue, to: 4, in: statement)
                 bind(sourceAppName, to: 5, in: statement)
+                bind(sourceAppBundleID, to: 6, in: statement)
                 try stepDone(statement)
             }
             try insert(contextInputs, entryID: id)
@@ -142,9 +148,17 @@ actor HistoryStore {
 
     func setContext(_ snapshot: ContextSnapshot, for id: UUID) throws {
         try transaction {
-            try withStatement("UPDATE history_entries SET source_app_name = ? WHERE id = ?") { statement in
+            try withStatement(
+                """
+                UPDATE history_entries
+                SET source_app_name = ?,
+                    source_app_bundle_id = COALESCE(?, source_app_bundle_id)
+                WHERE id = ?
+                """
+            ) { statement in
                 bind(snapshot.sourceAppName, to: 1, in: statement)
-                bind(id.uuidString, to: 2, in: statement)
+                bind(snapshot.sourceAppBundleID, to: 2, in: statement)
+                bind(id.uuidString, to: 3, in: statement)
                 try stepDone(statement)
             }
             try insert(snapshot.inputs, entryID: id)
@@ -186,7 +200,7 @@ actor HistoryStore {
         if terms.isEmpty {
             sql = """
                 SELECT id, kind, created_at, completed_at, outcome, source_app_name,
-                       instruction_text, result_text, error_text
+                       instruction_text, result_text, error_text, source_app_bundle_id
                 FROM history_entries
                 WHERE NOT (kind = 'ai_action' AND outcome = 'cancelled')
                 ORDER BY created_at DESC LIMIT ? OFFSET ?
@@ -194,7 +208,7 @@ actor HistoryStore {
         } else {
             sql = """
                 SELECT e.id, e.kind, e.created_at, e.completed_at, e.outcome, e.source_app_name,
-                       e.instruction_text, e.result_text, e.error_text
+                       e.instruction_text, e.result_text, e.error_text, e.source_app_bundle_id
                 FROM history_fts f JOIN history_entries e ON e.id = f.entry_id
                 WHERE NOT (e.kind = 'ai_action' AND e.outcome = 'cancelled')
                   AND history_fts MATCH ? ORDER BY bm25(history_fts), e.created_at DESC LIMIT ? OFFSET ?
@@ -221,7 +235,7 @@ actor HistoryStore {
         try withStatement(
             """
             SELECT id, kind, created_at, completed_at, outcome, source_app_name,
-                   instruction_text, result_text, error_text
+                   instruction_text, result_text, error_text, source_app_bundle_id
             FROM history_entries WHERE id = ?
             """
         ) { statement in
@@ -311,6 +325,22 @@ actor HistoryStore {
             PRAGMA user_version = 1;
             """
         )
+        try addColumnIfMissing("source_app_bundle_id", table: "history_entries")
+        try execute("PRAGMA user_version = 2")
+    }
+
+    /// `ALTER TABLE ... ADD COLUMN` has no `IF NOT EXISTS`, so ask the schema
+    /// first. Cheap, and it keeps the migration re-runnable.
+    private func addColumnIfMissing(_ column: String, table: String) throws {
+        let existing = try withStatement("PRAGMA table_info(\(table))") { statement -> Set<String> in
+            var names: Set<String> = []
+            while sqlite3_step(statement) == SQLITE_ROW {
+                if let name = text(statement, 1) { names.insert(name) }
+            }
+            return names
+        }
+        guard !existing.contains(column) else { return }
+        try execute("ALTER TABLE \(table) ADD COLUMN \(column) TEXT")
     }
 
     private func insert(_ inputs: [ContextInput], entryID: UUID) throws {
@@ -410,6 +440,7 @@ actor HistoryStore {
             completedAt: sqlite3_column_type(statement, 3) == SQLITE_NULL ? nil : Date(timeIntervalSince1970: sqlite3_column_double(statement, 3)),
             outcome: HistoryOutcome(rawValue: text(statement, 4) ?? "") ?? .failed,
             sourceAppName: text(statement, 5),
+            sourceAppBundleID: text(statement, 9),
             instructionText: text(statement, 6),
             resultText: text(statement, 7),
             errorText: text(statement, 8),

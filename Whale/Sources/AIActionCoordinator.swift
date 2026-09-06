@@ -105,8 +105,13 @@ final class AIActionCoordinator: ObservableObject {
             }
 
             let store = try await history.requireStore()
-            let appName = NSWorkspace.shared.frontmostApplication?.localizedName
-            let entryID = try await store.createEntry(kind: .aiAction, sourceAppName: appName)
+            let frontmost = NSWorkspace.shared.frontmostApplication
+            let appName = frontmost?.localizedName
+            let entryID = try await store.createEntry(
+                kind: .aiAction,
+                sourceAppName: appName,
+                sourceAppBundleID: SourceApp.bundleID(frontmost?.bundleIdentifier)
+            )
             run.historyEntryID = entryID
             guard isCurrent(run.id) else {
                 await finalizeHistory(

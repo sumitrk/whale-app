@@ -51,7 +51,11 @@ enum ContextSnapshotCapture {
         }
 
         let pasteboard = NSPasteboard.general
-        let sourceAppName = focused?.snapshot.appName ?? NSWorkspace.shared.frontmostApplication?.localizedName
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let sourceAppName = focused?.snapshot.appName ?? frontmost?.localizedName
+        let sourceAppBundleID = SourceApp.bundleID(
+            focused?.snapshot.bundleIdentifier ?? frontmost?.bundleIdentifier
+        )
         let selectedText = focused.flatMap(FocusedElementInspector.selectedText(in:))
         let canPostEvents = CGPreflightPostEventAccess()
         let strategy = selectionCaptureStrategy(
@@ -68,6 +72,7 @@ enum ContextSnapshotCapture {
             return ContextSnapshot(
                 capturedAt: Date(),
                 sourceAppName: sourceAppName,
+                sourceAppBundleID: sourceAppBundleID,
                 inputs: [ContextInput(source: .selection, ordinal: 0, content: .text(selectedText))]
             )
         }
@@ -77,6 +82,7 @@ enum ContextSnapshotCapture {
             return ContextSnapshot(
                 capturedAt: Date(),
                 sourceAppName: sourceAppName,
+                sourceAppBundleID: sourceAppBundleID,
                 inputs: originalClipboardInputs
             )
         }
@@ -98,6 +104,7 @@ enum ContextSnapshotCapture {
         return ContextSnapshot(
             capturedAt: Date(),
             sourceAppName: sourceAppName,
+            sourceAppBundleID: sourceAppBundleID,
             inputs: resolvedInputs
         )
     }
