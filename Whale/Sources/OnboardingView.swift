@@ -213,6 +213,7 @@ private struct TryItStep: View {
     let onDone: () -> Void
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var store = SettingsStore.shared
+    @ObservedObject private var cleanupStore = CleanupModelStore.shared
     @State private var pttPreset: PTTPreset = .globe
     @State private var pttRecorderAutoStart = false
 
@@ -319,6 +320,88 @@ private struct TryItStep: View {
                     }
                 }
 
+                // ── Formatting ──────────────────────────────────────────
+                OnboardingCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Formatting")
+                                .fontWeight(.semibold)
+                            Text("Clean up dictation on your Mac: remove fillers, fix self-corrections, and add punctuation.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Toggle(isOn: $store.transcriptCleanupEnabled) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Clean up dictation")
+                                Text("Runs locally and keeps your audio on this Mac.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .toggleStyle(.switch)
+
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "wand.and.sparkles")
+                                .foregroundStyle(.purple)
+                                .frame(width: 20)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(S1ModelCatalog.displayName)
+                                Text(formattingModelStatus)
+                                    .font(.caption)
+                                    .foregroundStyle(formattingModelStatusColor)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            if case .notInstalled = cleanupStore.installState,
+                               store.transcriptCleanupEnabled {
+                                Button("Download") { cleanupStore.install() }
+                                    .buttonStyle(.bordered)
+                            } else if case .failed = cleanupStore.installState,
+                                      store.transcriptCleanupEnabled {
+                                Button("Retry") { cleanupStore.install() }
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+
+                        if store.transcriptCleanupEnabled {
+                            Divider()
+
+                            Text("Style controls the writing tone, Structure allows prose or lists, and Destination adapts the result for general text or email.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Picker("Style", selection: $store.cleanupStyling) {
+                                ForEach(TranscriptCleanupStyling.allCases) { styling in
+                                    Text(styling.title).tag(styling)
+                                }
+                            }
+
+                            Picker("Structure", selection: $store.cleanupStructure) {
+                                ForEach(TranscriptCleanupStructure.allCases) { structure in
+                                    Text(structure.title).tag(structure)
+                                }
+                            }
+
+                            Picker("Destination", selection: $store.cleanupContext) {
+                                ForEach(TranscriptCleanupContext.allCases) { context in
+                                    Text(context.title).tag(context)
+                                }
+                            }
+
+                            Text("You can change these choices later in Settings > Models > Formatting.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
                 OnboardingCard {
                     VStack(alignment: .leading, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -355,6 +438,34 @@ private struct TryItStep: View {
             .background(.regularMaterial)
         }
         .onAppear { pttPreset = derivedPreset() }
+        .task { await cleanupStore.installIfNeeded() }
+        .onChange(of: store.transcriptCleanupEnabled) { _, isEnabled in
+            guard isEnabled else { return }
+            Task { await cleanupStore.installIfNeeded() }
+        }
+    }
+
+    private var formattingModelStatus: String {
+        switch cleanupStore.installState {
+        case .checking:
+            return "Checking…"
+        case .notInstalled:
+            return store.transcriptCleanupEnabled
+                ? "Not downloaded yet · \(S1ModelCatalog.approximateDownloadSize)"
+                : "Not downloaded · turn on Formatting to use it"
+        case .downloading(let fraction, let phase):
+            let percent = fraction.map { " · \(Int(($0 * 100).rounded()))%" } ?? ""
+            return phase + percent
+        case .ready:
+            return "Installed · runs locally on this Mac"
+        case .failed(let message):
+            return message
+        }
+    }
+
+    private var formattingModelStatusColor: Color {
+        if case .failed = cleanupStore.installState { return .red }
+        return .secondary
     }
 
 
