@@ -110,22 +110,14 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(builtInModelLanguageCapabilities, forKey: Keys.builtInModelLanguageCapabilities) }
     }
 
-    /// Rewrite spoken numbers, money, dates, and times in a transcript into
-    /// their written form. On by default; the toggle exists because the rewrite
-    /// also misreads some ordinary phrasing, so anyone it bites can switch it
-    /// off. Read through `object(forKey:)` rather than `bool(forKey:)` so an
-    /// explicit `false` is honoured instead of collapsing into the default.
-    @Published var smartFormattingEnabled: Bool {
-        didSet { ud.set(smartFormattingEnabled, forKey: Keys.smartFormattingEnabled) }
-    }
-
     /// Hand the transcript to S1-mini after transcription: fillers removed,
     /// self-corrections resolved, punctuation and capitalization applied, and the
-    /// written-form rewrite Smart Formatting does. Off by default because it is the
-    /// one feature here that needs a 633 MB download before it can do anything.
+    /// written-form rewrite Smart Formatting does. On by default, which is what makes
+    /// the 633 MB download start on its own — the model is part of what Whale is rather
+    /// than an upsell behind a switch.
     ///
     /// A superset of Smart Formatting rather than an addition to it, so the two are
-    /// never both in the pipeline — see `usesSmartFormattingStage`.
+    /// never both in the pipeline — see `usesSmartFormattingStage(cleanupIsRunning:)`.
     @Published var transcriptCleanupEnabled: Bool {
         didSet { ud.set(transcriptCleanupEnabled, forKey: Keys.transcriptCleanupEnabled) }
     }
@@ -153,8 +145,16 @@ class SettingsStore: ObservableObject {
     /// Smart Formatting's rewrite is a strict subset of what S1-mini does, so running
     /// both would have the model re-read text a regex engine had already reshaped —
     /// which is exactly the input it was not trained on. Cleanup wins where they meet.
-    var usesSmartFormattingStage: Bool {
-        smartFormattingEnabled && !transcriptCleanupEnabled
+    ///
+    /// No longer a preference. It used to be a toggle of its own, which put two switches
+    /// in the pane for one outcome; now it is simply what runs when Cleanup is not — with
+    /// Cleanup switched off, still downloading, or deleted, spoken numbers would otherwise
+    /// go through untouched.
+    ///
+    /// `cleanupIsRunning` rather than `transcriptCleanupEnabled`, because the switch being
+    /// on is not the same as the model being on disk.
+    func usesSmartFormattingStage(cleanupIsRunning: Bool) -> Bool {
+        !cleanupIsRunning
     }
 
     // MARK: - AI Actions
@@ -212,8 +212,7 @@ class SettingsStore: ObservableObject {
         builtInModelLocalBookmarks = ud.dictionary(forKey: Keys.builtInModelLocalBookmarks) as? [String: String] ?? [:]
         builtInModelLanguages    = ud.dictionary(forKey: Keys.builtInModelLanguages) as? [String: String] ?? [:]
         builtInModelLanguageCapabilities = ud.dictionary(forKey: Keys.builtInModelLanguageCapabilities) as? [String: String] ?? [:]
-        smartFormattingEnabled   = (ud.object(forKey: Keys.smartFormattingEnabled) as? Bool) ?? true
-        transcriptCleanupEnabled = (ud.object(forKey: Keys.transcriptCleanupEnabled) as? Bool) ?? false
+        transcriptCleanupEnabled = (ud.object(forKey: Keys.transcriptCleanupEnabled) as? Bool) ?? true
         cleanupStyling           = TranscriptCleanupStyling(
             rawValue: ud.string(forKey: Keys.cleanupStyling) ?? ""
         ) ?? TranscriptCleanupOptions.default.styling
@@ -416,7 +415,6 @@ class SettingsStore: ObservableObject {
         static let builtInModelLocalBookmarks = "builtInModelLocalBookmarks"
         static let builtInModelLanguages = "builtInModelLanguages"
         static let builtInModelLanguageCapabilities = "builtInModelLanguageCapabilities"
-        static let smartFormattingEnabled = "smartFormattingEnabled"
         static let transcriptCleanupEnabled = "transcriptCleanupEnabled"
         static let cleanupStyling = "cleanupStyling"
         static let cleanupStructure = "cleanupStructure"

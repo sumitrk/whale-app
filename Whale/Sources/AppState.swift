@@ -113,7 +113,15 @@ class AppState: ObservableObject {
                 // VoiceActivityDetectionStage(),
                 TranscriptionStage(transcriber: LocalTranscriptionService.shared),
             ]
-            if SettingsStore.shared.transcriptCleanupEnabled {
+            // Switched on is not the same as ready to run: the download starts the moment
+            // the toggle flips, and a dictation fired before it lands must go through
+            // untouched rather than wait on it. Checked here rather than inside the stage
+            // so a half-downloaded model costs nothing — no load attempt, no 20-second
+            // budget spent failing — and Smart Formatting takes the slot in the meantime.
+            let cleanupIsRunning = SettingsStore.shared.transcriptCleanupEnabled
+                && S1ModelCatalog.isInstalled(.current)
+
+            if cleanupIsRunning {
                 stages.append(
                     TranscriptCleanupStage(
                         engine: S1CleanupEngine.shared,
@@ -121,7 +129,7 @@ class AppState: ObservableObject {
                     )
                 )
             }
-            if SettingsStore.shared.usesSmartFormattingStage {
+            if SettingsStore.shared.usesSmartFormattingStage(cleanupIsRunning: cleanupIsRunning) {
                 stages.append(SmartFormattingStage())
             }
             return TranscriptionPipeline(stages: stages)
@@ -139,6 +147,11 @@ class AppState: ObservableObject {
         }
 
         Task { await prepareApp() }
+
+        // Cleanup ships on, so the weights have to arrive without anyone going looking for
+        // them. Not hung off the Models pane, which most launches never open, nor off the
+        // menu bar content, which SwiftUI only builds when the menu is actually clicked.
+        Task { @MainActor in await CleanupModelStore.shared.installIfNeeded() }
 
         Publishers.CombineLatest4(
             settings.$toggleKeyCode,

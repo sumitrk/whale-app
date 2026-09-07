@@ -8,7 +8,6 @@ struct ModelsSettingsView: View {
         Form {
             ModelListSections()
             TranscriptCleanupSection()
-            SmartFormattingSection()
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
@@ -44,50 +43,18 @@ struct ModelListSections: View {
     }
 }
 
-/// Post-transcription rewriting, kept out of `ModelListSections` so the onboarding
-/// step stays a plain model picker.
+/// S1-mini: the switch, the download it starts, and the three axes it steers on.
 ///
-/// Reads as a plain toggle while Cleanup is off, and as a superseded one while it is on:
-/// S1-mini does everything this does, so leaving the switch live would offer a choice
-/// that changes nothing.
-private struct SmartFormattingSection: View {
-    @ObservedObject private var settings = SettingsStore.shared
-
-    var body: some View {
-        Section {
-            Toggle(isOn: $settings.smartFormattingEnabled) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Smart Formatting")
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-            .disabled(settings.transcriptCleanupEnabled)
-        }
-    }
-
-    private var detail: String {
-        settings.transcriptCleanupEnabled
-            ? "Handled by Cleanup while it is on — S1-mini already writes numbers, money, dates, and times in their written form."
-            : "Write spoken numbers, money, dates, and times the way you would type them — “twenty one dollars and fifty cents” becomes “$21.50”."
-    }
-}
-
-/// S1-mini: the download, the switch, and the three axes it steers on.
-///
-/// The download row comes first and the controls under it are dead until it finishes,
-/// because every one of them is a preference about work the app cannot yet do.
+/// The switch comes first and is never disabled — flipping it on is how the download
+/// begins, so gating it on a model that is not there yet would leave no way to get one.
+/// The model row appears beneath it, and the steering controls only once there is a model
+/// to steer.
 private struct TranscriptCleanupSection: View {
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var store = CleanupModelStore.shared
 
     var body: some View {
         Section {
-            CleanupModelRow()
-
             Toggle(isOn: $settings.transcriptCleanupEnabled) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Clean Up Dictation")
@@ -98,10 +65,16 @@ private struct TranscriptCleanupSection: View {
                 }
             }
             .toggleStyle(.switch)
-            .disabled(!store.isReady)
+
+            // One rule: the row exists if the model exists, or if Cleanup is on. Tying it
+            // to the toggle alone would leave 633 MB on disk with no row to delete it
+            // from, reachable only by switching a feature on to turn it off again.
+            if settings.transcriptCleanupEnabled || store.isInstalled {
+                CleanupModelRow()
+            }
 
             if settings.transcriptCleanupEnabled, store.isReady {
-                Picker("Register", selection: $settings.cleanupStyling) {
+                Picker("Style", selection: $settings.cleanupStyling) {
                     ForEach(TranscriptCleanupStyling.allCases) { styling in
                         Text(styling.title).tag(styling)
                     }
@@ -133,6 +106,12 @@ private struct TranscriptCleanupSection: View {
             Text("Cleanup runs \(S1ModelCatalog.displayName) locally. English only. Your transcript never leaves the device.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+        }
+        .onChange(of: settings.transcriptCleanupEnabled) { _, isEnabled in
+            // Switching off keeps the weights: the next dictation stops being cleaned, and
+            // switching back on costs nothing. Only Delete reclaims the disk.
+            guard isEnabled else { return }
+            Task { await store.installIfNeeded() }
         }
     }
 
@@ -176,7 +155,7 @@ private struct CleanupModelRow: View {
             accessory
         }
         .padding(.vertical, 4)
-        .task { await store.refresh() }
+        .task { await store.installIfNeeded() }
     }
 
     @ViewBuilder

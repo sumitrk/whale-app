@@ -252,17 +252,32 @@ final class TranscriptCleanupSettingsTests: XCTestCase {
     }
 
     @MainActor
-    func testCleanupIsOffUntilTheModelIsDownloaded() {
-        XCTAssertFalse(SettingsStore(userDefaults: makeDefaults()).transcriptCleanupEnabled)
+    func testCleanupIsOnOutOfTheBox() {
+        XCTAssertTrue(SettingsStore(userDefaults: makeDefaults()).transcriptCleanupEnabled)
     }
 
     @MainActor
-    func testSmartFormattingStandsDownWhileCleanupIsOn() {
+    func testTurningCleanupOffIsRemembered() {
+        let defaults = makeDefaults()
+        SettingsStore(userDefaults: defaults).transcriptCleanupEnabled = false
+        XCTAssertFalse(SettingsStore(userDefaults: defaults).transcriptCleanupEnabled)
+    }
+
+    /// Smart Formatting is no longer a preference — it fills the slot whenever Cleanup is
+    /// not actually running, which includes the switch being on while the model is still
+    /// downloading or has been deleted.
+    @MainActor
+    func testSmartFormattingFillsTheSlotWheneverCleanupIsNotRunning() {
         let store = SettingsStore(userDefaults: makeDefaults())
-        XCTAssertTrue(store.usesSmartFormattingStage)
+
+        XCTAssertFalse(store.usesSmartFormattingStage(cleanupIsRunning: true))
+        XCTAssertTrue(store.usesSmartFormattingStage(cleanupIsRunning: false))
 
         store.transcriptCleanupEnabled = true
-        XCTAssertFalse(store.usesSmartFormattingStage)
+        XCTAssertTrue(
+            store.usesSmartFormattingStage(cleanupIsRunning: false),
+            "The switch being on is not the same as the model being on disk."
+        )
     }
 
     @MainActor

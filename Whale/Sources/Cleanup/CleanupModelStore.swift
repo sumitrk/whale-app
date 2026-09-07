@@ -14,19 +14,31 @@ final class CleanupModelStore: ObservableObject {
 
     private let installer: S1ModelInstaller
     private let engine: any TranscriptCleanupEngine
+    private let settings: SettingsStore
     private var operation: Task<Void, Never>?
 
     init(
         installer: S1ModelInstaller = .shared,
-        engine: any TranscriptCleanupEngine = S1CleanupEngine.shared
+        engine: any TranscriptCleanupEngine = S1CleanupEngine.shared,
+        settings: SettingsStore = .shared
     ) {
         self.installer = installer
         self.engine = engine
+        self.settings = settings
     }
 
     var isReady: Bool {
         if case .ready = installState { return true }
         return false
+    }
+
+    /// Whether there is anything on disk worth showing a row for — which is every state
+    /// except the one that means "nothing here". Kept deliberately loose: `.checking`
+    /// counts so the row does not flash out of existence on every appearance, and
+    /// `.failed` counts because a failed download leaves part-files a Delete can reclaim.
+    var isInstalled: Bool {
+        if case .notInstalled = installState { return false }
+        return true
     }
 
     var isBusy: Bool {
@@ -39,6 +51,20 @@ final class CleanupModelStore: ObservableObject {
     func refresh() async {
         guard operation == nil else { return }
         installState = await installer.isInstalled() ? .ready : .notInstalled
+    }
+
+    /// The switch is the download. Cleanup ships on, so on a first launch this is what
+    /// fetches the weights without anyone visiting the Models pane; flipping the toggle
+    /// back on later lands here too.
+    ///
+    /// A failed state is left alone rather than retried on sight — a download that just
+    /// failed would otherwise re-fail every time the pane is opened, with the Retry
+    /// button never getting a turn.
+    func installIfNeeded() async {
+        guard settings.transcriptCleanupEnabled else { return }
+        await refresh()
+        guard case .notInstalled = installState else { return }
+        install()
     }
 
     func install() {
@@ -67,16 +93,26 @@ final class CleanupModelStore: ObservableObject {
 
     /// Abandons the transfer and leaves the partial files alone, so a retry resumes
     /// rather than starting the 633 MB over. Clearing them is what Delete is for.
+    ///
+    /// Switches Cleanup off as well. Without that, `installIfNeeded` would start the
+    /// download again on the next launch or the next time the pane is opened, and Cancel
+    /// would amount to a pause the user never asked for.
     func cancel() {
         guard let operation else { return }
         operation.cancel()
         self.operation = nil
+        settings.transcriptCleanupEnabled = false
         installState = .notInstalled
     }
 
+    /// Deleting the weights switches Cleanup off, because the alternative is a toggle that
+    /// reads as on while every dictation quietly bypasses it. Switching it off does *not*
+    /// delete anything — this is the only path that removes the 633 MB, and it is always
+    /// something the user asked for by name.
     func remove() {
         guard !isDownloading else { return }
 
+        settings.transcriptCleanupEnabled = false
         installState = .checking
         operation = Task { [installer, engine] in
             // The weights cannot be deleted out from under a loaded model, and a model
