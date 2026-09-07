@@ -119,6 +119,44 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(smartFormattingEnabled, forKey: Keys.smartFormattingEnabled) }
     }
 
+    /// Hand the transcript to S1-mini after transcription: fillers removed,
+    /// self-corrections resolved, punctuation and capitalization applied, and the
+    /// written-form rewrite Smart Formatting does. Off by default because it is the
+    /// one feature here that needs a 633 MB download before it can do anything.
+    ///
+    /// A superset of Smart Formatting rather than an addition to it, so the two are
+    /// never both in the pipeline — see `usesSmartFormattingStage`.
+    @Published var transcriptCleanupEnabled: Bool {
+        didSet { ud.set(transcriptCleanupEnabled, forKey: Keys.transcriptCleanupEnabled) }
+    }
+
+    @Published var cleanupStyling: TranscriptCleanupStyling {
+        didSet { ud.set(cleanupStyling.rawValue, forKey: Keys.cleanupStyling) }
+    }
+
+    @Published var cleanupStructure: TranscriptCleanupStructure {
+        didSet { ud.set(cleanupStructure.rawValue, forKey: Keys.cleanupStructure) }
+    }
+
+    @Published var cleanupContext: TranscriptCleanupContext {
+        didSet { ud.set(cleanupContext.rawValue, forKey: Keys.cleanupContext) }
+    }
+
+    var cleanupOptions: TranscriptCleanupOptions {
+        TranscriptCleanupOptions(
+            styling: cleanupStyling,
+            structure: cleanupStructure,
+            context: cleanupContext
+        )
+    }
+
+    /// Smart Formatting's rewrite is a strict subset of what S1-mini does, so running
+    /// both would have the model re-read text a regex engine had already reshaped —
+    /// which is exactly the input it was not trained on. Cleanup wins where they meet.
+    var usesSmartFormattingStage: Bool {
+        smartFormattingEnabled && !transcriptCleanupEnabled
+    }
+
     // MARK: - AI Actions
 
     static let defaultAIActionMasterPrompt = "Follow the spoken instruction using the supplied context. Preserve the user's intended tone, language, and useful formatting."
@@ -175,6 +213,16 @@ class SettingsStore: ObservableObject {
         builtInModelLanguages    = ud.dictionary(forKey: Keys.builtInModelLanguages) as? [String: String] ?? [:]
         builtInModelLanguageCapabilities = ud.dictionary(forKey: Keys.builtInModelLanguageCapabilities) as? [String: String] ?? [:]
         smartFormattingEnabled   = (ud.object(forKey: Keys.smartFormattingEnabled) as? Bool) ?? true
+        transcriptCleanupEnabled = (ud.object(forKey: Keys.transcriptCleanupEnabled) as? Bool) ?? false
+        cleanupStyling           = TranscriptCleanupStyling(
+            rawValue: ud.string(forKey: Keys.cleanupStyling) ?? ""
+        ) ?? TranscriptCleanupOptions.default.styling
+        cleanupStructure         = TranscriptCleanupStructure(
+            rawValue: ud.string(forKey: Keys.cleanupStructure) ?? ""
+        ) ?? TranscriptCleanupOptions.default.structure
+        cleanupContext           = TranscriptCleanupContext(
+            rawValue: ud.string(forKey: Keys.cleanupContext) ?? ""
+        ) ?? TranscriptCleanupOptions.default.context
         aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
         openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
         openRouterOutOfCredit    = ud.bool(forKey: Keys.openRouterOutOfCredit)
@@ -369,6 +417,10 @@ class SettingsStore: ObservableObject {
         static let builtInModelLanguages = "builtInModelLanguages"
         static let builtInModelLanguageCapabilities = "builtInModelLanguageCapabilities"
         static let smartFormattingEnabled = "smartFormattingEnabled"
+        static let transcriptCleanupEnabled = "transcriptCleanupEnabled"
+        static let cleanupStyling = "cleanupStyling"
+        static let cleanupStructure = "cleanupStructure"
+        static let cleanupContext = "cleanupContext"
         static let aiActionMasterPrompt = "aiActionMasterPrompt"
         static let openRouterKeyRejected = "openRouterKeyRejected"
         static let openRouterOutOfCredit = "openRouterOutOfCredit"

@@ -113,7 +113,15 @@ class AppState: ObservableObject {
                 // VoiceActivityDetectionStage(),
                 TranscriptionStage(transcriber: LocalTranscriptionService.shared),
             ]
-            if SettingsStore.shared.smartFormattingEnabled {
+            if SettingsStore.shared.transcriptCleanupEnabled {
+                stages.append(
+                    TranscriptCleanupStage(
+                        engine: S1CleanupEngine.shared,
+                        options: SettingsStore.shared.cleanupOptions
+                    )
+                )
+            }
+            if SettingsStore.shared.usesSmartFormattingStage {
                 stages.append(SmartFormattingStage())
             }
             return TranscriptionPipeline(stages: stages)
@@ -357,6 +365,12 @@ class AppState: ObservableObject {
             }
 
             currentModelID = modelID
+            // The rewrite runs after the recording stops, so the load can overlap with
+            // the user still talking. Left until then, a cold model would add seconds to
+            // the gap between releasing the key and seeing text.
+            if settings.transcriptCleanupEnabled {
+                CleanupModelStore.shared.warmIfReady()
+            }
             if mode == .paste {
                 let store = try await history.requireStore()
                 let frontmost = NSWorkspace.shared.frontmostApplication

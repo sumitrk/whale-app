@@ -4,7 +4,13 @@
 - The app no longer depends on a bundled Python server.
 - The app targets Apple Silicon Macs only.
 - Transcription runs through the `FluidAudio` Swift package and Core ML.
+- The optional dictation Cleanup stage runs S1-mini by Superwhisper through `mlx-swift` /
+  `mlx-swift-lm`. See `Whale/Resources/Licenses/S1-mini/README.md` before touching how the
+  model is named in the UI — the name is a licence term.
 - Build and package the app with Xcode and the checked-in `Whale.xcodeproj`.
+- Building requires Xcode's Metal Toolchain component, which MLX's shaders need and Xcode 26
+  no longer installs by default. On a fresh machine or CI runner:
+  `xcodebuild -downloadComponent MetalToolchain` (~690 MB, one time).
 
 ## Git Workflow
 - **Never commit directly to `main`**

@@ -7,6 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		S1C000000000000000000001 /* TranscriptCleanupOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000101 /* TranscriptCleanupOptions.swift */; };
+		S1C000000000000000000002 /* S1Prompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000102 /* S1Prompt.swift */; };
+		S1C000000000000000000003 /* TranscriptCleanupEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000103 /* TranscriptCleanupEngine.swift */; };
+		S1C000000000000000000004 /* S1ModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000104 /* S1ModelCatalog.swift */; };
+		S1C000000000000000000005 /* S1CleanupEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000105 /* S1CleanupEngine.swift */; };
+		S1C000000000000000000006 /* CleanupModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000106 /* CleanupModelStore.swift */; };
+		S1C000000000000000000007 /* TranscriptCleanupStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000107 /* TranscriptCleanupStage.swift */; };
+		S1C000000000000000000008 /* TranscriptCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000108 /* TranscriptCleanupTests.swift */; };
+		S1B000000000000000000011 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000011 /* MLX */; };
+		S1B000000000000000000012 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000012 /* MLXLLM */; };
+		S1B000000000000000000013 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000013 /* MLXLMCommon */; };
+		S1B000000000000000000014 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000014 /* Tokenizers */; };
+		S1B000000000000000000015 /* Hub in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000015 /* Hub */; };
 		0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */; };
 		173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */; };
 		1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */; };
@@ -82,6 +95,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		S1C000000000000000000101 /* TranscriptCleanupOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptCleanupOptions.swift; sourceTree = "<group>"; };
+		S1C000000000000000000102 /* S1Prompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = S1Prompt.swift; sourceTree = "<group>"; };
+		S1C000000000000000000103 /* TranscriptCleanupEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptCleanupEngine.swift; sourceTree = "<group>"; };
+		S1C000000000000000000104 /* S1ModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = S1ModelCatalog.swift; sourceTree = "<group>"; };
+		S1C000000000000000000105 /* S1CleanupEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = S1CleanupEngine.swift; sourceTree = "<group>"; };
+		S1C000000000000000000106 /* CleanupModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanupModelStore.swift; sourceTree = "<group>"; };
+		S1C000000000000000000107 /* TranscriptCleanupStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptCleanupStage.swift; sourceTree = "<group>"; };
+		S1C000000000000000000108 /* TranscriptCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptCleanupTests.swift; sourceTree = "<group>"; };
 		173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityController.swift; sourceTree = "<group>"; };
 		1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicatorWindow.swift; sourceTree = "<group>"; };
 		1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionService.swift; sourceTree = "<group>"; };
@@ -164,12 +185,30 @@
 				C6A3D56B2F7023BB00A16DA0 /* Sparkle in Frameworks */,
 				A5F1E893C1214A87B9A5BDFC /* AudioToolbox.framework in Frameworks */,
 				49AE7A1CFDC69357DD4B865D /* AVFoundation.framework in Frameworks */,
+				S1B000000000000000000011 /* MLX in Frameworks */,
+				S1B000000000000000000012 /* MLXLLM in Frameworks */,
+				S1B000000000000000000013 /* MLXLMCommon in Frameworks */,
+				S1B000000000000000000014 /* Tokenizers in Frameworks */,
+				S1B000000000000000000015 /* Hub in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		S1C000000000000000000201 /* Cleanup */ = {
+			isa = PBXGroup;
+			children = (
+				S1C000000000000000000101 /* TranscriptCleanupOptions.swift */,
+				S1C000000000000000000102 /* S1Prompt.swift */,
+				S1C000000000000000000103 /* TranscriptCleanupEngine.swift */,
+				S1C000000000000000000104 /* S1ModelCatalog.swift */,
+				S1C000000000000000000105 /* S1CleanupEngine.swift */,
+				S1C000000000000000000106 /* CleanupModelStore.swift */,
+			);
+			path = Cleanup;
+			sourceTree = "<group>";
+		};
 		1DB310FC63230A872DF63309 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -207,6 +246,7 @@
 				F9355D4C305CC2A5F0A0E16D /* ModelsSettingsView.swift */,
 				EC32008B10AB2F3A32901A8F /* OnboardingView.swift */,
 				4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */,
+				S1C000000000000000000201 /* Cleanup */,
 				PP0000000000000000000001 /* Pipeline */,
 				AIA000000000000000000109 /* PiRuntime.swift */,
 				8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */,
@@ -246,6 +286,7 @@
 				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
 				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
 				VAD000000000000000000003 /* VoiceActivityTests.swift */,
+				S1C000000000000000000108 /* TranscriptCleanupTests.swift */,
 			);
 			path = WhaleTests;
 			sourceTree = "<group>";
@@ -279,6 +320,7 @@
 				VAD000000000000000000001 /* VoiceActivityEditor.swift */,
 				TP0000000000000000000002 /* SmartFormattingStage.swift */,
 				VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */,
+				S1C000000000000000000107 /* TranscriptCleanupStage.swift */,
 			);
 			path = Pipeline;
 			sourceTree = "<group>";
@@ -306,6 +348,11 @@
 				AA0000000000000000000072 /* WhisperKit */,
 				C6A3D56A2F7023BB00A16DA0 /* Sparkle */,
 				TP0000000000000000000005 /* TextProcessing */,
+				S1A000000000000000000011 /* MLX */,
+				S1A000000000000000000012 /* MLXLLM */,
+				S1A000000000000000000013 /* MLXLMCommon */,
+				S1A000000000000000000014 /* Tokenizers */,
+				S1A000000000000000000015 /* Hub */,
 			);
 			productName = TranscribeMeeting;
 			productReference = E30A00EEB7141B3BFD0B065B /* Whale Dev.app */;
@@ -366,6 +413,9 @@
 				AIA000000000000000000301 /* XCRemoteSwiftPackageReference "SQLCipher.swift" */,
 				AA0000000000000000000071 /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				S1A000000000000000000001 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				S1A000000000000000000002 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				S1A000000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1DB310FC63230A872DF63309 /* Products */;
@@ -427,6 +477,7 @@
 				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
 				PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */,
 				VAD000000000000000000013 /* VoiceActivityTests.swift in Sources */,
+				S1C000000000000000000008 /* TranscriptCleanupTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -474,6 +525,13 @@
 				PP0000000000000000000013 /* TranscriptionStage.swift in Sources */,
 				VAD000000000000000000011 /* VoiceActivityEditor.swift in Sources */,
 				VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */,
+				S1C000000000000000000001 /* TranscriptCleanupOptions.swift in Sources */,
+				S1C000000000000000000002 /* S1Prompt.swift in Sources */,
+				S1C000000000000000000003 /* TranscriptCleanupEngine.swift in Sources */,
+				S1C000000000000000000004 /* S1ModelCatalog.swift in Sources */,
+				S1C000000000000000000005 /* S1CleanupEngine.swift in Sources */,
+				S1C000000000000000000006 /* CleanupModelStore.swift in Sources */,
+				S1C000000000000000000007 /* TranscriptCleanupStage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -756,6 +814,30 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		S1A000000000000000000001 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.31.4;
+			};
+		};
+		S1A000000000000000000002 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm.git";
+			requirement = {
+				kind = exactVersion;
+				version = 3.31.4;
+			};
+		};
+		S1A000000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-transformers.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.3.4;
+			};
+		};
 		1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
@@ -791,6 +873,31 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		S1A000000000000000000011 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = S1A000000000000000000001 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
+		};
+		S1A000000000000000000012 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = S1A000000000000000000002 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
+		};
+		S1A000000000000000000013 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = S1A000000000000000000002 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLMCommon;
+		};
+		S1A000000000000000000014 /* Tokenizers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = S1A000000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Tokenizers;
+		};
+		S1A000000000000000000015 /* Hub */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = S1A000000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Hub;
+		};
 		1C91A4D72C0C4A0B9F20A111 /* FluidAudio */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */;
