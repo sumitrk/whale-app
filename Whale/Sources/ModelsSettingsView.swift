@@ -99,13 +99,6 @@ private struct TranscriptCleanupSection: View {
             }
         } header: {
             Text("Formatting")
-        } footer: {
-            // Required by the model's licence, which asks that the name survive with this
-            // exact capitalization wherever it is used. Also the plain truth about what
-            // is doing the rewriting, which the user is owed either way.
-            Text("Cleanup runs \(S1ModelCatalog.displayName) locally. English only. Your transcript never leaves the device.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
         .onChange(of: settings.transcriptCleanupEnabled) { _, isEnabled in
             // Switching off keeps the weights: the next dictation stops being cleaned, and
@@ -135,10 +128,15 @@ private struct CleanupModelRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image(systemName: "wand.and.sparkles")
-                .font(.system(size: 16))
-                .frame(width: 24, height: 24)
-                .foregroundStyle(.secondary)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(.purple)
+                .frame(width: 28, height: 28)
+                .overlay(
+                    Image(systemName: "wand.and.sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                )
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(S1ModelCatalog.displayName)
