@@ -49,7 +49,7 @@ struct ModelListSections: View {
 /// begins, so gating it on a model that is not there yet would leave no way to get one.
 /// The model row appears beneath it, and the steering controls only once there is a model
 /// to steer.
-private struct TranscriptCleanupSection: View {
+struct TranscriptCleanupSection: View {
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var store = CleanupModelStore.shared
 

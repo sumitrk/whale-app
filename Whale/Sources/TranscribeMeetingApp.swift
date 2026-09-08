@@ -1,8 +1,20 @@
 import SwiftUI
 import Sparkle
 
+@MainActor
+private final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // The bundle launches as a regular app so Launch Services carries the user's
+        // activation intent into first-run onboarding. Returning launches become a
+        // menu-bar app before launch finishes, avoiding a Dock icon or app menu.
+        guard SettingsStore.shared.hasCompletedOnboarding else { return }
+        NSApp.setActivationPolicy(.accessory)
+    }
+}
+
 @main
 struct TranscribeMeetingApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState: AppState
     @StateObject private var accessibilityController: AccessibilityController
     @StateObject private var settingsCoordinator: SettingsCoordinator
