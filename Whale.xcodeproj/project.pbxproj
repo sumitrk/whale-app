@@ -570,7 +570,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LSUIElement = YES;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				OTHER_CFLAGS = "$(inherited) -DSQLITE_HAS_CODEC";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meeting";
@@ -766,7 +765,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LSUIElement = YES;
 				OTHER_CFLAGS = "$(inherited) -DSQLITE_HAS_CODEC";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meeting.dev";
 				PRODUCT_MODULE_NAME = Whale;

@@ -16,8 +16,6 @@
 	<string>44</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.2</string>
-	<key>LSUIElement</key>
-	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>TranscribeMeeting records your microphone during meetings.</string>
 	<key>SUEnableAutomaticChecks</key>

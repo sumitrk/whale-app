@@ -13,7 +13,7 @@ final class SettingsCoordinator: ObservableObject {
     @discardableResult
     func focus(section: SettingsSection) -> Bool {
         selection = section
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
 
         if let settingsWindow {
             settingsWindow.makeKeyAndOrderFront(nil)

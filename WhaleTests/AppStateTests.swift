@@ -2,6 +2,16 @@ import AppKit
 import XCTest
 @testable import Whale
 
+final class OnboardingLaunchConfigurationTests: XCTestCase {
+    func testHostAppIsNotDeclaredAsAnAgentApplication() {
+        XCTAssertNotEqual(
+            Bundle.main.object(forInfoDictionaryKey: "LSUIElement") as? Bool,
+            true,
+            "A static LSUIElement app cannot reliably receive first-launch activation on Sonoma"
+        )
+    }
+}
+
 final class OnboardingPermissionGateTests: XCTestCase {
     func testAccessibilityIsOptionalWhenMicrophoneIsGranted() {
         XCTAssertTrue(

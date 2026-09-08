@@ -197,15 +197,15 @@ class AppState: ObservableObject {
         let view = OnboardingView { [weak self] in
             self?.closeOnboardingWindow()
         }
-        let hosting = OnboardingHostingView(
-            rootView: AnyView(
-                view
-                    .environmentObject(self)
-                    .environmentObject(accessibility)
-            )
+        let hosting = NSHostingView(
+            rootView: view
+                .environmentObject(self)
+                .environmentObject(accessibility)
         )
         hosting.frame = NSRect(x: 0, y: 0, width: 540, height: 460)
-        let window = NSPanel(
+        // Onboarding is the app's primary UI during first launch, so it must be a
+        // main-capable window rather than an auxiliary NSPanel.
+        let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 540, height: 460),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
@@ -223,18 +223,14 @@ class AppState: ObservableObject {
         presentOnboardingWindow(window)
     }
 
-    /// `LSUIElement` means launching never activates us, and since macOS 14's
-    /// cooperative activation an inactive app's `NSApp.activate` is ignored unless it
-    /// answers a user action of ours — at launch there is none. The panel then opens
-    /// behind whatever was frontmost and never becomes key, which paints "Get Started"
-    /// in the inactive grey that reads as disabled. Turning regular for the length of
-    /// onboarding is what earns the activation; the accessory policy is restored when
-    /// the window closes.
+    /// Keep later, user-requested presentations foreground-capable as well. First launch
+    /// already starts regular so Launch Services can honor the user's activation intent;
+    /// `activate()` is the supported Sonoma API and intentionally remains a request.
     private func presentOnboardingWindow(_ window: NSWindow) {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
+        window.makeMain()
+        NSApp.activate()
     }
 
     private func restoreAccessoryActivationPolicy() {
@@ -646,12 +642,4 @@ class AppState: ObservableObject {
 
         status = .ready
     }
-}
-
-/// A click into an inactive app is normally spent activating it rather than on the
-/// control under the pointer. Should onboarding still come up inactive, that rule
-/// would turn the first press of "Get Started" into a no-op — the very press that
-/// would disprove the greyed-out button. Accepting first mouse makes it count.
-private final class OnboardingHostingView: NSHostingView<AnyView> {
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

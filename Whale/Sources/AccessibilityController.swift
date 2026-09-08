@@ -79,7 +79,7 @@ final class AccessibilityController: ObservableObject {
             alert.addButton(withTitle: "Reset & Open Settings")
             alert.addButton(withTitle: "Later")
 
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             if alert.runModal() == .alertFirstButtonReturn {
                 _ = self.resetAccessibilityGrant()
                 self.openSystemAccessibilitySettingsAndWatch()
@@ -119,7 +119,7 @@ final class AccessibilityController: ObservableObject {
     func openSystemAccessibilitySettingsAndWatch() {
         // Register this exact binary with TCC before opening the pane. Opening
         // Settings immediately can steal focus and leave the app off the list.
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         requestPrompt()
         startPolling()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
