@@ -11,21 +11,11 @@ final class OnboardingLaunchConfigurationTests: XCTestCase {
         )
     }
 
-    func testTitlebarHitsPassThroughToWindowChrome() {
-        let contentLayout = NSRect(x: 0, y: 0, width: 540, height: 432)
-
-        XCTAssertTrue(
-            OnboardingChromeHitTesting.shouldPassThroughToWindowChrome(
-                windowPoint: NSPoint(x: 12, y: 448),
-                contentLayoutRect: contentLayout
-            )
-        )
-        XCTAssertFalse(
-            OnboardingChromeHitTesting.shouldPassThroughToWindowChrome(
-                windowPoint: NSPoint(x: 270, y: 40),
-                contentLayoutRect: contentLayout
-            )
-        )
+    func testOnboardingLaunchesAsAForegroundAppAndRetiresToTheMenuBar() {
+        // Onboarding cannot take focus on demand on macOS 14+; it inherits the
+        // activation macOS grants a newly launched foreground app.
+        XCTAssertEqual(AppActivationPolicy.policy(isShowingOnboarding: true), .regular)
+        XCTAssertEqual(AppActivationPolicy.policy(isShowingOnboarding: false), .accessory)
     }
 }
 

@@ -96,8 +96,7 @@ class AppState: ObservableObject {
     private let pipelineFactory: () -> TranscriptionPipeline
     private let history = HistoryController.shared
     private var cancellables = Set<AnyCancellable>()
-    private var onboardingWindow: NSWindow?
-    private var onboardingWindowCloseObserver: NSObjectProtocol?
+    private let onboarding = OnboardingWindowController()
 
     private var currentModelID: BuiltInModelID = .parakeetEnglishV2
     private var currentHistoryEntryID: UUID?
@@ -185,85 +184,35 @@ class AppState: ObservableObject {
         rebuildHotkeys()
 
         if !settings.hasCompletedOnboarding {
-            Task { @MainActor [weak self] in self?.showOnboardingWindow() }
+            presentOnboardingAfterLaunch()
         }
     }
 
-    func showOnboardingWindow() {
-        if let onboardingWindow {
-            presentOnboardingWindow(onboardingWindow)
-            return
-        }
-        let view = OnboardingView { [weak self] in
-            self?.closeOnboardingWindow()
-        }
-        let hosting = OnboardingHostingView(
-            rootView: view
+    /// Onboarding is the app's only foreground UI, so it is presented once and closed
+    /// once; `OnboardingWindowController` owns the window and the activation policy that
+    /// goes with it.
+    private func presentOnboarding() {
+        onboarding.present {
+            OnboardingView { [weak self] in self?.onboarding.close() }
                 .environmentObject(self)
                 .environmentObject(accessibility)
-        )
-        hosting.frame = NSRect(x: 0, y: 0, width: 540, height: 460)
-        // Onboarding is the app's primary UI during first launch, so it must be a
-        // main-capable window rather than an auxiliary NSPanel.
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 540, height: 460),
-            styleMask: [.titled, .closable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        window.contentView = hosting
-        window.titlebarAppearsTransparent = true
-        // Background-drag claims the whole hosting view on Sonoma, including over
-        // controls. The title bar still moves the window once chrome hits pass through.
-        window.isMovableByWindowBackground = false
-        window.hidesOnDeactivate = false
-        window.isReleasedWhenClosed = false
-        window.title = ""
-        window.center()
-        observeOnboardingWindow(window)
-        onboardingWindow = window
-        presentOnboardingWindow(window)
-    }
-
-    /// Keep later, user-requested presentations foreground-capable as well. First launch
-    /// already starts regular so Launch Services can honor the user's activation intent;
-    /// `activate()` is the supported Sonoma API and intentionally remains a request.
-    private func presentOnboardingWindow(_ window: NSWindow) {
-        NSApp.setActivationPolicy(.regular)
-        window.makeKeyAndOrderFront(nil)
-        window.makeMain()
-        NSApp.activate()
-    }
-
-    private func restoreAccessoryActivationPolicy() {
-        NSApp.setActivationPolicy(.accessory)
-    }
-
-    private func observeOnboardingWindow(_ window: NSWindow) {
-        clearOnboardingWindowObserver()
-
-        onboardingWindowCloseObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification,
-            object: window,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.onboardingWindow = nil
-                self.clearOnboardingWindowObserver()
-                self.restoreAccessoryActivationPolicy()
-            }
         }
     }
 
-    private func closeOnboardingWindow() {
-        onboardingWindow?.close()
-    }
-
-    private func clearOnboardingWindowObserver() {
-        guard let onboardingWindowCloseObserver else { return }
-        NotificationCenter.default.removeObserver(onboardingWindowCloseObserver)
-        self.onboardingWindowCloseObserver = nil
+    /// `AppState` is built inside `App.init`, before AppKit has finished launching. A
+    /// window ordered front that early races the system's own launch activation — and
+    /// that activation is the whole reason onboarding comes up focused — so wait for
+    /// the launch to finish before showing it.
+    private func presentOnboardingAfterLaunch() {
+        var observer: NSObjectProtocol?
+        observer = NotificationCenter.default.addObserver(
+            forName: NSApplication.didFinishLaunchingNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            MainActor.assumeIsolated { self?.presentOnboarding() }
+        }
     }
 
     var isReady: Bool { status == .ready }
@@ -643,36 +592,5 @@ class AppState: ObservableObject {
         }
 
         status = .ready
-    }
-}
-
-/// `fullSizeContentView` lets the hosting view occupy the title bar. Hits in that
-/// strip must not be claimed by SwiftUI, or Sonoma never delivers hover or clicks
-/// to the traffic lights.
-enum OnboardingChromeHitTesting {
-    static func shouldPassThroughToWindowChrome(
-        windowPoint: NSPoint,
-        contentLayoutRect: NSRect
-    ) -> Bool {
-        !contentLayoutRect.contains(windowPoint)
-    }
-}
-
-/// Sonoma's `NSHostingView` refuses first mouse, so a window that never becomes key
-/// eats every click — including the ones that would prove Get Started works.
-private final class OnboardingHostingView<Content: View>: NSHostingView<Content> {
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        if let window {
-            let windowPoint = convert(point, to: nil)
-            if OnboardingChromeHitTesting.shouldPassThroughToWindowChrome(
-                windowPoint: windowPoint,
-                contentLayoutRect: window.contentLayoutRect
-            ) {
-                return nil
-            }
-        }
-        return super.hitTest(point)
     }
 }

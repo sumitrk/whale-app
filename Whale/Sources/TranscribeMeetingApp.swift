@@ -4,11 +4,12 @@ import Sparkle
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
-        // The bundle launches as a regular app so Launch Services carries the user's
-        // activation intent into first-run onboarding. Returning launches become a
-        // menu-bar app before launch finishes, avoiding a Dock icon or app menu.
-        guard SettingsStore.shared.hasCompletedOnboarding else { return }
-        NSApp.setActivationPolicy(.accessory)
+        // Decided before launch completes: a first launch has to *be* a foreground app
+        // to inherit the launch activation onboarding needs, and a returning launch has
+        // to settle into the menu bar before the Dock ever sees an icon.
+        AppActivationPolicy.apply(
+            isShowingOnboarding: !SettingsStore.shared.hasCompletedOnboarding
+        )
     }
 }
 

@@ -389,3 +389,69 @@ private struct OnboardingCard<Content: View>: View {
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
     }
 }
+
+// MARK: - Presentation
+
+/// The app is a foreground app for exactly as long as onboarding is on screen, and a
+/// menu-bar app the rest of the time.
+///
+/// This is the whole activation fix. Since macOS 14 an app cannot take focus on demand:
+/// `NSApp.activate()` is a request the system drops unless the app already holds the
+/// user's attention, and at launch a menu-bar app holds none. What macOS *does* do for
+/// free is activate a newly launched **foreground** app — so onboarding launches as one
+/// and inherits the activation, rather than trying to seize it afterwards.
+enum AppActivationPolicy {
+    static func policy(isShowingOnboarding: Bool) -> NSApplication.ActivationPolicy {
+        isShowingOnboarding ? .regular : .accessory
+    }
+
+    @MainActor
+    static func apply(isShowingOnboarding: Bool) {
+        NSApp.setActivationPolicy(policy(isShowingOnboarding: isShowingOnboarding))
+    }
+}
+
+/// Owns the onboarding window and nothing else.
+///
+/// A plain titled window on purpose. `fullSizeContentView` slides the SwiftUI content
+/// under the traffic lights, and every hit-test override, first-mouse override and
+/// `isMovableByWindowBackground` tweak that follows is a workaround for that one flag.
+/// Onboarding draws nothing into the title bar, so it doesn't pay that price: standard
+/// chrome means the close button, window dragging and key-window styling are AppKit's
+/// job again.
+@MainActor
+final class OnboardingWindowController: NSObject, NSWindowDelegate {
+    private var window: NSWindow?
+
+    func present<Content: View>(@ViewBuilder content: () -> Content) {
+        let window = self.window ?? makeWindow(hosting: NSHostingView(rootView: content()))
+        self.window = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
+    func close() {
+        window?.close()
+    }
+
+    private func makeWindow(hosting: NSView) -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 460),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hosting
+        window.title = "Welcome to Whale"
+        // Held here, so AppKit must not release it out from under us on close.
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.center()
+        return window
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        window = nil
+        AppActivationPolicy.apply(isShowingOnboarding: false)
+    }
+}
