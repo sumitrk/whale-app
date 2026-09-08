@@ -26,17 +26,22 @@ final class AccessibilityController: ObservableObject {
             }
         }
 
-        // Do not invoke Apple's automatic prompt during normal relaunches.
-        // For an existing install, a stale TCC record can make that prompt
-        // appear repeatedly even while the old Settings row is enabled. The
-        // explicit recovery dialog below explains the identity migration and
-        // lets the user reset the record before opening Settings.
-        let shouldOfferRecovery = promptOnLaunch
-            && !isTestProcess
-            && Self.shouldOfferIdentityRecovery(bundleIdentifier: Bundle.main.bundleIdentifier)
         refresh()
 
-        if shouldOfferRecovery && !isTrusted {
+        // Do not invoke Apple's automatic prompt during normal relaunches. For an
+        // existing install, a stale TCC record can make that prompt appear repeatedly
+        // even while the old Settings row is enabled. The explicit recovery dialog below
+        // explains the identity migration and lets the user reset the record before
+        // opening Settings. Asked as a `LaunchPresentation` because the answer is the
+        // same one that decided, before launch finished, whether this app is foreground
+        // enough to put a modal dialog on screen at all.
+        let presentation = LaunchPresentation.resolve(
+            hasCompletedOnboarding: promptOnLaunch,
+            isAccessibilityTrusted: isTrusted,
+            offersIdentityRecovery: Self.offersIdentityRecovery
+        )
+
+        if presentation == .accessibilityRecovery {
             presentRecoveryAlertIfNeeded()
         }
     }
@@ -79,8 +84,18 @@ final class AccessibilityController: ObservableObject {
             alert.addButton(withTitle: "Reset & Open Settings")
             alert.addButton(withTitle: "Later")
 
+            // Already active: this launch resolved to `.accessibilityRecovery`, so the
+            // app came up foreground and inherited the launch activation. The request
+            // only has to cover a later caller that has the user's attention some other
+            // way — it cannot manufacture focus, which is why the policy does it.
             NSApp.activate()
-            if alert.runModal() == .alertFirstButtonReturn {
+            let reset = alert.runModal() == .alertFirstButtonReturn
+
+            // The dialog was the only thing owing the user a window. Hand the foreground
+            // back before Settings takes over, so no Dock icon outlives the alert.
+            AppActivationPolicy.apply(needsForegroundApp: false)
+
+            if reset {
                 _ = self.resetAccessibilityGrant()
                 self.openSystemAccessibilitySettingsAndWatch()
             }
@@ -109,7 +124,13 @@ final class AccessibilityController: ObservableObject {
         }
     }
 
-    private var isTestProcess: Bool {
+    /// Whether *this* bundle should ever be offered the identity-recovery dialog.
+    /// Static so the launch decision can be made before any controller exists.
+    nonisolated static var offersIdentityRecovery: Bool {
+        !isTestProcess && shouldOfferIdentityRecovery(bundleIdentifier: Bundle.main.bundleIdentifier)
+    }
+
+    private nonisolated static var isTestProcess: Bool {
         let environment = ProcessInfo.processInfo.environment
         return environment["XCTestConfigurationFilePath"] != nil
             || environment["XCTestSessionIdentifier"] != nil

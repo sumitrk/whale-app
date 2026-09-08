@@ -392,25 +392,6 @@ private struct OnboardingCard<Content: View>: View {
 
 // MARK: - Presentation
 
-/// The app is a foreground app for exactly as long as onboarding is on screen, and a
-/// menu-bar app the rest of the time.
-///
-/// This is the whole activation fix. Since macOS 14 an app cannot take focus on demand:
-/// `NSApp.activate()` is a request the system drops unless the app already holds the
-/// user's attention, and at launch a menu-bar app holds none. What macOS *does* do for
-/// free is activate a newly launched **foreground** app — so onboarding launches as one
-/// and inherits the activation, rather than trying to seize it afterwards.
-enum AppActivationPolicy {
-    static func policy(isShowingOnboarding: Bool) -> NSApplication.ActivationPolicy {
-        isShowingOnboarding ? .regular : .accessory
-    }
-
-    @MainActor
-    static func apply(isShowingOnboarding: Bool) {
-        NSApp.setActivationPolicy(policy(isShowingOnboarding: isShowingOnboarding))
-    }
-}
-
 /// Owns the onboarding window and nothing else.
 ///
 /// A plain titled window on purpose. `fullSizeContentView` slides the SwiftUI content
@@ -452,6 +433,6 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         window = nil
-        AppActivationPolicy.apply(isShowingOnboarding: false)
+        AppActivationPolicy.apply(needsForegroundApp: false)
     }
 }

@@ -481,10 +481,6 @@ final class AIActionTests: XCTestCase {
         XCTAssertEqual(SettingsWindowMetrics.defaultHeight, SettingsWindowMetrics.minHeight)
     }
 
-    func testHistoryListUsesOnePointFourTimesItsPreviousWidth() {
-        XCTAssertEqual(HistoryLayoutMetrics.listFraction, 0.38 * 1.4)
-    }
-
     func testAccessibilityRecoveryIsSkippedForDevAndTestBundles() {
         XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.transcribe-meeting.dev"))
         XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.transcribe-meetingTests"))

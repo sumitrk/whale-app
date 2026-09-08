@@ -11,11 +11,45 @@ final class OnboardingLaunchConfigurationTests: XCTestCase {
         )
     }
 
-    func testOnboardingLaunchesAsAForegroundAppAndRetiresToTheMenuBar() {
-        // Onboarding cannot take focus on demand on macOS 14+; it inherits the
+    func testALaunchThatOwesAWindowIsAForegroundApp() {
+        // Neither window can take focus on demand on macOS 14+; both inherit the
         // activation macOS grants a newly launched foreground app.
-        XCTAssertEqual(AppActivationPolicy.policy(isShowingOnboarding: true), .regular)
-        XCTAssertEqual(AppActivationPolicy.policy(isShowingOnboarding: false), .accessory)
+        XCTAssertEqual(AppActivationPolicy.policy(needsForegroundApp: true), .regular)
+        XCTAssertEqual(AppActivationPolicy.policy(needsForegroundApp: false), .accessory)
+
+        XCTAssertTrue(LaunchPresentation.onboarding.needsForegroundApp)
+        XCTAssertTrue(LaunchPresentation.accessibilityRecovery.needsForegroundApp)
+        XCTAssertFalse(LaunchPresentation.menuBarOnly.needsForegroundApp)
+    }
+
+    func testOnboardingOutranksTheAccessibilityRecoveryAlert() {
+        // A first run has no grant to have gone stale, and two windows competing for
+        // one activation is how one of them ends up unfocused.
+        XCTAssertEqual(
+            LaunchPresentation.resolve(
+                hasCompletedOnboarding: false,
+                isAccessibilityTrusted: false,
+                offersIdentityRecovery: true
+            ),
+            .onboarding
+        )
+    }
+
+    func testRecoveryAlertOnlyLaunchesForegroundWhenItWillActuallyBeShown() {
+        func presentation(
+            trusted: Bool,
+            offersRecovery: Bool
+        ) -> LaunchPresentation {
+            LaunchPresentation.resolve(
+                hasCompletedOnboarding: true,
+                isAccessibilityTrusted: trusted,
+                offersIdentityRecovery: offersRecovery
+            )
+        }
+
+        XCTAssertEqual(presentation(trusted: false, offersRecovery: true), .accessibilityRecovery)
+        XCTAssertEqual(presentation(trusted: true, offersRecovery: true), .menuBarOnly)
+        XCTAssertEqual(presentation(trusted: false, offersRecovery: false), .menuBarOnly)
     }
 }
 
