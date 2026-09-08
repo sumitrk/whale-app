@@ -7,7 +7,7 @@ struct ModelsSettingsView: View {
     var body: some View {
         Form {
             ModelListSections()
-            SmartFormattingSection()
+            TranscriptCleanupSection()
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
@@ -43,26 +43,166 @@ struct ModelListSections: View {
     }
 }
 
-/// Post-transcription rewriting, kept out of `ModelListSections` so the onboarding
-/// step stays a plain model picker.
-private struct SmartFormattingSection: View {
+/// S1-mini: the switch, the download it starts, and the three axes it steers on.
+///
+/// The switch comes first and is never disabled — flipping it on is how the download
+/// begins, so gating it on a model that is not there yet would leave no way to get one.
+/// The model row appears beneath it, and the steering controls only once there is a model
+/// to steer.
+private struct TranscriptCleanupSection: View {
     @ObservedObject private var settings = SettingsStore.shared
+    @ObservedObject private var store = CleanupModelStore.shared
 
     var body: some View {
         Section {
-            Toggle(isOn: $settings.smartFormattingEnabled) {
+            Toggle(isOn: $settings.transcriptCleanupEnabled) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Smart Formatting")
-                    Text("Write spoken numbers, money, dates, and times the way you would type them — “twenty one dollars and fifty cents” becomes “$21.50”.")
+                    Text("Clean Up Dictation")
+                    Text("Remove “um” and “uh”, resolve “no, make that…” to what you landed on, and punctuate — all on this Mac.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .toggleStyle(.switch)
+
+            // One rule: the row exists if the model exists, or if Cleanup is on. Tying it
+            // to the toggle alone would leave 633 MB on disk with no row to delete it
+            // from, reachable only by switching a feature on to turn it off again.
+            if settings.transcriptCleanupEnabled || store.isInstalled {
+                CleanupModelRow()
+            }
+
+            if settings.transcriptCleanupEnabled, store.isReady {
+                Picker("Style", selection: $settings.cleanupStyling) {
+                    ForEach(TranscriptCleanupStyling.allCases) { styling in
+                        Text(styling.title).tag(styling)
+                    }
+                }
+
+                Picker("Structure", selection: $settings.cleanupStructure) {
+                    ForEach(TranscriptCleanupStructure.allCases) { structure in
+                        Text(structure.title).tag(structure)
+                    }
+                }
+
+                Picker("Destination", selection: $settings.cleanupContext) {
+                    ForEach(TranscriptCleanupContext.allCases) { context in
+                        Text(context.title).tag(context)
+                    }
+                }
+
+                Text(optionSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         } header: {
             Text("Formatting")
         }
+        .onChange(of: settings.transcriptCleanupEnabled) { _, isEnabled in
+            // Switching off keeps the weights: the next dictation stops being cleaned, and
+            // switching back on costs nothing. Only Delete reclaims the disk.
+            guard isEnabled else { return }
+            Task { await store.installIfNeeded() }
+        }
+    }
+
+    private var optionSummary: String {
+        let options = settings.cleanupOptions
+        return "\(options.styling.detail.capitalizedFirst); \(options.structure.detail); \(options.context.detail)."
+    }
+}
+
+private extension String {
+    var capitalizedFirst: String {
+        guard let first else { return self }
+        return first.uppercased() + dropFirst()
+    }
+}
+
+/// The S1-mini download, drawn to match the transcription-model rows above it without
+/// borrowing their machinery — there is nothing to select here, and no language to pick.
+private struct CleanupModelRow: View {
+    @ObservedObject private var store = CleanupModelStore.shared
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(.purple)
+                .frame(width: 28, height: 28)
+                .overlay(
+                    Image(systemName: "wand.and.sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(S1ModelCatalog.displayName)
+
+                Text(statusLine)
+                    .font(.subheadline)
+                    .foregroundStyle(isFailed ? .red : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+
+            Spacer(minLength: 8)
+
+            accessory
+        }
+        .padding(.vertical, 4)
+        .task { await store.installIfNeeded() }
+    }
+
+    @ViewBuilder
+    private var accessory: some View {
+        switch store.installState {
+        case .checking:
+            ProgressView().controlSize(.small)
+
+        case .downloading:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Button("Cancel") { store.cancel() }
+                    .buttonStyle(.bordered)
+            }
+            .fixedSize()
+
+        case .notInstalled:
+            Button("Download") { store.install() }
+                .buttonStyle(.bordered)
+
+        case .failed:
+            Button("Retry") { store.install() }
+                .buttonStyle(.bordered)
+
+        case .ready:
+            Button("Delete") { store.remove() }
+                .buttonStyle(.bordered)
+        }
+    }
+
+    private var statusLine: String {
+        switch store.installState {
+        case .checking:
+            return "Checking…"
+        case .notInstalled:
+            return "Not Installed · \(S1ModelCatalog.approximateDownloadSize) download"
+        case .downloading(let fraction, let phase):
+            let percent = fraction.map { " · \(Int(($0 * 100).rounded()))%" } ?? ""
+            return phase + percent
+        case .ready:
+            return "Installed · Runs locally on-device"
+        case .failed(let message):
+            return message
+        }
+    }
+
+    private var isFailed: Bool {
+        if case .failed = store.installState { return true }
+        return false
     }
 }
 
