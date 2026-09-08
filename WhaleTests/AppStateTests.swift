@@ -10,6 +10,23 @@ final class OnboardingLaunchConfigurationTests: XCTestCase {
             "A static LSUIElement app cannot reliably receive first-launch activation on Sonoma"
         )
     }
+
+    func testTitlebarHitsPassThroughToWindowChrome() {
+        let contentLayout = NSRect(x: 0, y: 0, width: 540, height: 432)
+
+        XCTAssertTrue(
+            OnboardingChromeHitTesting.shouldPassThroughToWindowChrome(
+                windowPoint: NSPoint(x: 12, y: 448),
+                contentLayoutRect: contentLayout
+            )
+        )
+        XCTAssertFalse(
+            OnboardingChromeHitTesting.shouldPassThroughToWindowChrome(
+                windowPoint: NSPoint(x: 270, y: 40),
+                contentLayoutRect: contentLayout
+            )
+        )
+    }
 }
 
 final class OnboardingPermissionGateTests: XCTestCase {

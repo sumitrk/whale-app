@@ -197,7 +197,7 @@ class AppState: ObservableObject {
         let view = OnboardingView { [weak self] in
             self?.closeOnboardingWindow()
         }
-        let hosting = NSHostingView(
+        let hosting = OnboardingHostingView(
             rootView: view
                 .environmentObject(self)
                 .environmentObject(accessibility)
@@ -213,7 +213,9 @@ class AppState: ObservableObject {
         )
         window.contentView = hosting
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
+        // Background-drag claims the whole hosting view on Sonoma, including over
+        // controls. The title bar still moves the window once chrome hits pass through.
+        window.isMovableByWindowBackground = false
         window.hidesOnDeactivate = false
         window.isReleasedWhenClosed = false
         window.title = ""
@@ -641,5 +643,36 @@ class AppState: ObservableObject {
         }
 
         status = .ready
+    }
+}
+
+/// `fullSizeContentView` lets the hosting view occupy the title bar. Hits in that
+/// strip must not be claimed by SwiftUI, or Sonoma never delivers hover or clicks
+/// to the traffic lights.
+enum OnboardingChromeHitTesting {
+    static func shouldPassThroughToWindowChrome(
+        windowPoint: NSPoint,
+        contentLayoutRect: NSRect
+    ) -> Bool {
+        !contentLayoutRect.contains(windowPoint)
+    }
+}
+
+/// Sonoma's `NSHostingView` refuses first mouse, so a window that never becomes key
+/// eats every click — including the ones that would prove Get Started works.
+private final class OnboardingHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if let window {
+            let windowPoint = convert(point, to: nil)
+            if OnboardingChromeHitTesting.shouldPassThroughToWindowChrome(
+                windowPoint: windowPoint,
+                contentLayoutRect: window.contentLayoutRect
+            ) {
+                return nil
+            }
+        }
+        return super.hitTest(point)
     }
 }
