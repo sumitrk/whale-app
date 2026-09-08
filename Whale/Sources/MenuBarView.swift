@@ -6,7 +6,11 @@ struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject private var accessibility: AccessibilityController
     @EnvironmentObject private var settingsCoordinator: SettingsCoordinator
-    let updater: SPUUpdater?
+    @StateObject private var updaterState: UpdaterState
+
+    init(updater: SPUUpdater?) {
+        _updaterState = StateObject(wrappedValue: UpdaterState(updater: updater))
+    }
 
     var body: some View {
         if !accessibility.isTrusted {
@@ -56,13 +60,13 @@ struct MenuBarView: View {
             Label("History…", systemImage: "clock.arrow.circlepath")
         }
 
-        if let updater {
+        if let updater = updaterState.updater {
             Button {
-                updater.checkForUpdates()
+                UpdateCheckAction.checkForUpdates(using: updater)
             } label: {
                 Label("Check for Updates…", systemImage: "arrow.down.circle")
             }
-            .disabled(!updater.canCheckForUpdates)
+            .disabled(!updaterState.canCheckForUpdates)
         }
 
         Divider()

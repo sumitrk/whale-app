@@ -1,4 +1,5 @@
 import ApplicationServices
+import Combine
 import Sparkle
 import SwiftUI
 
@@ -53,6 +54,47 @@ enum AppActivationPolicy {
     @MainActor
     static func apply(needsForegroundApp: Bool) {
         NSApp.setActivationPolicy(policy(needsForegroundApp: needsForegroundApp))
+    }
+}
+
+/// Starts a user-initiated Sparkle check while the menu-bar app still owns the event.
+/// Sparkle's standard user driver also requests activation, but a cooperative
+/// `NSApp.activate()` is not reliable after a menu-bar-only app loses focus. The menu
+/// action is the user's explicit request, so use the corresponding explicit activation
+/// before handing control to Sparkle.
+@MainActor
+enum UpdateCheckAction {
+    static func checkForUpdates(using updater: SPUUpdater) {
+        perform(
+            activate: { NSApp.activate(ignoringOtherApps: true) },
+            check: { updater.checkForUpdates() }
+        )
+    }
+
+    static func perform(
+        activate: @MainActor () -> Void,
+        check: @MainActor () -> Void
+    ) {
+        activate()
+        check()
+    }
+}
+
+@MainActor
+final class UpdaterState: ObservableObject {
+    @Published private(set) var canCheckForUpdates = false
+    let updater: SPUUpdater?
+    private var cancellable: AnyCancellable?
+
+    init(updater: SPUUpdater?) {
+        self.updater = updater
+        guard let updater else { return }
+
+        cancellable = updater.publisher(for: \.canCheckForUpdates, options: [.initial, .new])
+            .receive(on: RunLoop.main)
+            .sink { [weak self] canCheckForUpdates in
+                self?.canCheckForUpdates = canCheckForUpdates
+            }
     }
 }
 

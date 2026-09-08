@@ -53,6 +53,20 @@ final class OnboardingLaunchConfigurationTests: XCTestCase {
     }
 }
 
+@MainActor
+final class UpdateCheckActionTests: XCTestCase {
+    func testActivatesBeforeStartingTheUserInitiatedCheck() {
+        var events: [String] = []
+
+        UpdateCheckAction.perform(
+            activate: { events.append("activate") },
+            check: { events.append("check") }
+        )
+
+        XCTAssertEqual(events, ["activate", "check"])
+    }
+}
+
 final class OnboardingPermissionGateTests: XCTestCase {
     func testAccessibilityIsOptionalWhenMicrophoneIsGranted() {
         XCTAssertTrue(
