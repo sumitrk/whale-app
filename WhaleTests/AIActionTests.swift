@@ -482,10 +482,10 @@ final class AIActionTests: XCTestCase {
     }
 
     func testAccessibilityRecoveryIsSkippedForDevAndTestBundles() {
-        XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.transcribe-meeting.dev"))
-        XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.transcribe-meetingTests"))
+        XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: AppRuntimeInfo.developmentBundleIdentifier))
+        XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.whaleTests"))
         XCTAssertFalse(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: nil))
-        XCTAssertTrue(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: "com.sumitrk.transcribe-meeting"))
+        XCTAssertTrue(AccessibilityController.shouldOfferIdentityRecovery(bundleIdentifier: AppRuntimeInfo.productionBundleIdentifier))
     }
 
     func testHistoryListDimsFailedAndCancelledEntries() {

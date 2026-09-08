@@ -110,7 +110,7 @@ The first Developer ID release changed Whale's macOS code identity from the old 
 ## Update Expectations
 
 Stable Accessibility behavior across updates depends on:
-- the same bundle identifier: `com.sumitrk.transcribe-meeting`
+- the same bundle identifier: `com.sumitrk.whale`
 - the same signing identity
 - no ad-hoc re-signing during packaging
 

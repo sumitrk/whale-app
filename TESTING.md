@@ -18,8 +18,8 @@ Assuming “Dev and Release” are the two builds being tested:
 
 Dev and production intentionally have different bundle IDs and Accessibility permissions:
 
-- Dev: `com.sumitrk.transcribe-meeting.dev` / **Whale Dev**
-- Production: `com.sumitrk.transcribe-meeting` / **Whale**
+- Dev: `com.sumitrk.whale.dev` / **Whale Dev**
+- Production: `com.sumitrk.whale` / **Whale**
 
 ## AI Actions checks
 

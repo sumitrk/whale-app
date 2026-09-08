@@ -195,6 +195,9 @@ class SettingsStore: ObservableObject {
 
     init(userDefaults: UserDefaults = .standard) {
         ud = userDefaults
+        let didMigrateLegacyDefaults = userDefaults === UserDefaults.standard
+            ? Self.adoptLegacyDefaultsIfNeeded(into: userDefaults)
+            : false
         transcriptFolderPath     = ud.string(forKey: Keys.transcriptFolder) ?? ""
         transcriptFolderBookmark = ud.string(forKey: Keys.transcriptFolderBookmark) ?? ""
         hasCompletedOnboarding   = ud.bool(forKey: Keys.hasCompletedOnboarding)
@@ -226,6 +229,45 @@ class SettingsStore: ObservableObject {
         openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
         openRouterOutOfCredit    = ud.bool(forKey: Keys.openRouterOutOfCredit)
         openRouterKeyVerified    = ud.bool(forKey: Keys.openRouterKeyVerified)
+
+        if didMigrateLegacyDefaults && launchAtLogin {
+            try? SMAppService.mainApp.register()
+        }
+    }
+
+    /// Copies prefs from the pre-rename `transcribe-meeting` domain when this
+    /// process is the first launch under `com.sumitrk.whale`. Existing keys in
+    /// the current domain win. Returns whether any values were copied.
+    static func migrateLegacyDefaults(from legacyDomain: [String: Any], into current: UserDefaults) -> Bool {
+        guard !current.bool(forKey: migratedFromLegacyBundleIDKey) else { return false }
+
+        var copied = false
+        for (key, value) in legacyDomain where key != migratedFromLegacyBundleIDKey {
+            guard current.object(forKey: key) == nil else { continue }
+            current.set(value, forKey: key)
+            copied = true
+        }
+        current.set(true, forKey: migratedFromLegacyBundleIDKey)
+        return copied
+    }
+
+    private static let migratedFromLegacyBundleIDKey = "migratedFromTranscribeMeetingBundleID"
+
+    private static func adoptLegacyDefaultsIfNeeded(into current: UserDefaults) -> Bool {
+        let environment = ProcessInfo.processInfo.environment
+        if environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil {
+            return false
+        }
+
+        guard let legacyID = AppRuntimeInfo.legacyBundleIdentifier(
+            for: AppRuntimeInfo.currentBundleIdentifier
+        ) else {
+            return false
+        }
+
+        let legacyDomain = UserDefaults.standard.persistentDomain(forName: legacyID) ?? [:]
+        return migrateLegacyDefaults(from: legacyDomain, into: current)
     }
 
     func setTranscriptFolderURL(_ url: URL?) {

@@ -428,7 +428,7 @@ final class TranscriptionModelTests: XCTestCase {
             homeDirectoryURL: URL(fileURLWithPath: "/Users/tester", isDirectory: true),
             appSupportDirectoryURL: URL(fileURLWithPath: "/Users/tester/Library/Application Support", isDirectory: true),
             environment: [:],
-            bundleIdentifier: "com.sumitrk.transcribe-meeting"
+            bundleIdentifier: AppRuntimeInfo.productionBundleIdentifier
         )
 
         XCTAssertFalse(runtimeInfo.isSandboxed)
@@ -443,37 +443,89 @@ final class TranscriptionModelTests: XCTestCase {
 
     func testAppRuntimeInfoSeparatesDevelopmentApplicationSupportPath() {
         XCTAssertEqual(
-            AppRuntimeInfo.historyDirectoryName(for: "com.sumitrk.transcribe-meeting"),
+            AppRuntimeInfo.historyDirectoryName(for: AppRuntimeInfo.productionBundleIdentifier),
             "Whale"
         )
         XCTAssertEqual(
-            AppRuntimeInfo.historyDirectoryName(for: "com.sumitrk.transcribe-meeting.dev"),
+            AppRuntimeInfo.historyDirectoryName(for: AppRuntimeInfo.developmentBundleIdentifier),
             "Whale-Dev"
         )
+        XCTAssertEqual(
+            AppRuntimeInfo.legacyBundleIdentifier(for: AppRuntimeInfo.productionBundleIdentifier),
+            AppRuntimeInfo.legacyProductionBundleIdentifier
+        )
+        XCTAssertEqual(
+            AppRuntimeInfo.legacyBundleIdentifier(for: AppRuntimeInfo.developmentBundleIdentifier),
+            AppRuntimeInfo.legacyDevelopmentBundleIdentifier
+        )
+        XCTAssertNil(AppRuntimeInfo.legacyBundleIdentifier(for: "com.example.other"))
+    }
+
+    func testLegacyDefaultsMigrateIntoCurrentDomainOnce() {
+        let suiteName = "test.legacyDefaults.\(UUID().uuidString)"
+        let current = UserDefaults(suiteName: suiteName)!
+        current.removePersistentDomain(forName: suiteName)
+
+        let copied = SettingsStore.migrateLegacyDefaults(
+            from: ["hasCompletedOnboarding": true, "pttKeyCode": 12],
+            into: current
+        )
+
+        XCTAssertTrue(copied)
+        XCTAssertTrue(current.bool(forKey: "hasCompletedOnboarding"))
+        XCTAssertEqual(current.object(forKey: "pttKeyCode") as? Int, 12)
+
+        let copiedAgain = SettingsStore.migrateLegacyDefaults(
+            from: ["hasCompletedOnboarding": false, "pttKeyCode": 99],
+            into: current
+        )
+        XCTAssertFalse(copiedAgain)
+        XCTAssertTrue(current.bool(forKey: "hasCompletedOnboarding"))
+        XCTAssertEqual(current.object(forKey: "pttKeyCode") as? Int, 12)
+
+        current.removePersistentDomain(forName: suiteName)
+    }
+
+    func testLegacyDefaultsDoNotOverwriteExistingKeys() {
+        let suiteName = "test.legacyDefaultsExisting.\(UUID().uuidString)"
+        let current = UserDefaults(suiteName: suiteName)!
+        current.removePersistentDomain(forName: suiteName)
+        current.set(false, forKey: "hasCompletedOnboarding")
+
+        let copied = SettingsStore.migrateLegacyDefaults(
+            from: ["hasCompletedOnboarding": true, "pttKeyCode": 12],
+            into: current
+        )
+
+        XCTAssertTrue(copied)
+        XCTAssertFalse(current.bool(forKey: "hasCompletedOnboarding"))
+        XCTAssertEqual(current.object(forKey: "pttKeyCode") as? Int, 12)
+
+        current.removePersistentDomain(forName: suiteName)
     }
 
     func testAppRuntimeInfoUsesSandboxContainerPath() {
         let runtimeInfo = AppRuntimeInfo(
             homeDirectoryURL: URL(
-                fileURLWithPath: "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data",
+                fileURLWithPath: "/Users/tester/Library/Containers/com.sumitrk.whale/Data",
                 isDirectory: true
             ),
             appSupportDirectoryURL: URL(
-                fileURLWithPath: "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data/Library/Application Support",
+                fileURLWithPath: "/Users/tester/Library/Containers/com.sumitrk.whale/Data/Library/Application Support",
                 isDirectory: true
             ),
-            environment: ["APP_SANDBOX_CONTAINER_ID": "com.sumitrk.transcribe-meeting"],
-            bundleIdentifier: "com.sumitrk.transcribe-meeting"
+            environment: ["APP_SANDBOX_CONTAINER_ID": AppRuntimeInfo.productionBundleIdentifier],
+            bundleIdentifier: AppRuntimeInfo.productionBundleIdentifier
         )
 
         XCTAssertTrue(runtimeInfo.isSandboxed)
         XCTAssertEqual(
             runtimeInfo.transcriptsDirectoryURL.path,
-            "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data/Library/Application Support/Whale/Transcripts"
+            "/Users/tester/Library/Containers/com.sumitrk.whale/Data/Library/Application Support/Whale/Transcripts"
         )
         XCTAssertEqual(
             runtimeInfo.parakeetEnglishV2DirectoryURL.path,
-            "/Users/tester/Library/Containers/com.sumitrk.transcribe-meeting/Data/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2"
+            "/Users/tester/Library/Containers/com.sumitrk.whale/Data/Library/Application Support/Whale/Models/parakeet-tdt-0.6b-v2"
         )
         XCTAssertTrue(runtimeInfo.storageDescription.contains("sandboxed"))
     }

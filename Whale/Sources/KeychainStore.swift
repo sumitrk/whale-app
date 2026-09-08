@@ -8,19 +8,24 @@ enum KeychainStore {
     }
 
     private static var service: String {
-        Bundle.main.bundleIdentifier ?? "com.sumitrk.whale"
+        Bundle.main.bundleIdentifier ?? AppRuntimeInfo.productionBundleIdentifier
+    }
+
+    private static var legacyService: String? {
+        AppRuntimeInfo.legacyBundleIdentifier(for: service)
     }
 
     static func data(for key: Key) throws -> Data? {
-        var query: [String: Any] = baseQuery(for: key)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        if let data = try data(for: key, service: service) {
+            return data
+        }
 
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess else { throw error(status) }
-        return item as? Data
+        guard let legacyService, let data = try data(for: key, service: legacyService) else {
+            return nil
+        }
+
+        try? set(data, for: key)
+        return data
     }
 
     static func string(for key: Key) throws -> String? {
@@ -46,14 +51,29 @@ enum KeychainStore {
     }
 
     static func delete(_ key: Key) throws {
-        let status = SecItemDelete(baseQuery(for: key) as CFDictionary)
+        let status = SecItemDelete(baseQuery(for: key, service: service) as CFDictionary)
+        if let legacyService {
+            _ = SecItemDelete(baseQuery(for: key, service: legacyService) as CFDictionary)
+        }
         guard status == errSecSuccess || status == errSecItemNotFound else { throw error(status) }
     }
 
-    private static func baseQuery(for key: Key) -> [String: Any] {
+    private static func data(for key: Key, service: String) throws -> Data? {
+        var query: [String: Any] = baseQuery(for: key, service: service)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else { throw error(status) }
+        return item as? Data
+    }
+
+    private static func baseQuery(for key: Key, service: String? = nil) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+            kSecAttrService as String: service ?? self.service,
             kSecAttrAccount as String: key.rawValue,
         ]
     }

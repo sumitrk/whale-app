@@ -111,7 +111,7 @@ final class AccessibilityController: ObservableObject {
         process.arguments = [
             "reset",
             "Accessibility",
-            Bundle.main.bundleIdentifier ?? "com.sumitrk.transcribe-meeting"
+            Bundle.main.bundleIdentifier ?? AppRuntimeInfo.productionBundleIdentifier
         ]
 
         do {

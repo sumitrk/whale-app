@@ -11,6 +11,34 @@ final class OnboardingLaunchConfigurationTests: XCTestCase {
         )
     }
 
+    func testHostAppDeclaresCFBundleExecutableMatchingBinary() {
+        XCTAssertEqual(
+            Bundle.main.infoDictionary?["CFBundleExecutable"] as? String,
+            Bundle.main.executableURL?.lastPathComponent
+        )
+    }
+
+    func testHostAppBundleIdentifierIsWhale() {
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        XCTAssertTrue(
+            bundleID.hasPrefix("com.sumitrk.whale"),
+            "unexpected host bundle identifier: \(bundleID)"
+        )
+        XCTAssertFalse(bundleID.contains("transcribe-meeting"), bundleID)
+    }
+
+    func testSourceInfoPlistDeclaresExecutableBuildSetting() throws {
+        let infoPlist = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Whale/Info.plist")
+        let data = try Data(contentsOf: infoPlist)
+        let plist = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        )
+        XCTAssertEqual(plist["CFBundleExecutable"] as? String, "$(EXECUTABLE_NAME)")
+    }
+
     func testALaunchThatOwesAWindowIsAForegroundApp() {
         // Neither window can take focus on demand on macOS 14+; both inherit the
         // activation macOS grants a newly launched foreground app.

@@ -201,12 +201,22 @@ sign_for_distribution() {
 }
 
 verify_app_bundle() {
-  local smoke_root smoke_app app_codesign_details app_requirement pi_binary
+  local smoke_root smoke_app app_codesign_details app_requirement pi_binary executable_name bundle_id
 
   pi_binary="$APP_PATH/Contents/Resources/Pi/pi/pi"
 
   echo ""
   echo "▶ Verifying app bundle..."
+  executable_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Contents/Info.plist")
+  bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Contents/Info.plist")
+  if [ -z "$executable_name" ] || [ ! -x "$APP_PATH/Contents/MacOS/$executable_name" ]; then
+    echo "❌ CFBundleExecutable is missing or does not match Contents/MacOS/$executable_name"
+    exit 1
+  fi
+  if [ "$bundle_id" != "com.sumitrk.whale" ]; then
+    echo "❌ Unexpected CFBundleIdentifier: $bundle_id (expected com.sumitrk.whale)"
+    exit 1
+  fi
   codesign --verify --deep --strict --verbose=4 "$APP_PATH"
   codesign --verify --strict --verbose=4 "$pi_binary"
   if ! codesign -d --entitlements - "$pi_binary" 2>&1 | grep -q "com.apple.security.cs.allow-jit"; then

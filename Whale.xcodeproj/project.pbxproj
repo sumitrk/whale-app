@@ -572,7 +572,7 @@
 				);
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				OTHER_CFLAGS = "$(inherited) -DSQLITE_HAS_CODEC";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meeting";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.whale";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -654,7 +654,7 @@
 				DEVELOPMENT_TEAM = W23Z9F5RG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.whaleTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -674,7 +674,7 @@
 				DEVELOPMENT_TEAM = W23Z9F5RG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meetingTests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.whaleTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -766,7 +766,7 @@
 					"@executable_path/../Frameworks",
 				);
 				OTHER_CFLAGS = "$(inherited) -DSQLITE_HAS_CODEC";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.transcribe-meeting.dev";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sumitrk.whale.dev";
 				PRODUCT_MODULE_NAME = Whale;
 				SDKROOT = macosx;
 			};

@@ -4,6 +4,26 @@ struct AppRuntimeInfo: Equatable, Sendable {
     static let disableSparkleEnvironmentKey = "WHALE_DISABLE_SPARKLE"
     static let resetParakeetCacheEnvironmentKey = "WHALE_RESET_PARAKEET_CACHE_ON_LAUNCH"
 
+    static let productionBundleIdentifier = "com.sumitrk.whale"
+    static let developmentBundleIdentifier = "com.sumitrk.whale.dev"
+    static let legacyProductionBundleIdentifier = "com.sumitrk.transcribe-meeting"
+    static let legacyDevelopmentBundleIdentifier = "com.sumitrk.transcribe-meeting.dev"
+
+    static var currentBundleIdentifier: String {
+        Bundle.main.bundleIdentifier ?? productionBundleIdentifier
+    }
+
+    static func legacyBundleIdentifier(for bundleIdentifier: String?) -> String? {
+        switch bundleIdentifier {
+        case productionBundleIdentifier:
+            return legacyProductionBundleIdentifier
+        case developmentBundleIdentifier:
+            return legacyDevelopmentBundleIdentifier
+        default:
+            return nil
+        }
+    }
+
     let homeDirectoryURL: URL
     let appSupportDirectoryURL: URL
     let environment: [String: String]
@@ -95,11 +115,19 @@ struct AppRuntimeInfo: Equatable, Sendable {
     /// only acts when the container exists and the destination is empty/missing.
     static func migrateSandboxDataIfNeeded() {
         let fm = FileManager.default
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.sumitrk.transcribe-meeting"
-        let containerWhale = fm.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Containers/\(bundleID)/Data/Library/Application Support/Whale", isDirectory: true)
+        let bundleID = currentBundleIdentifier
+        let candidateIDs = [bundleID, legacyBundleIdentifier(for: bundleID)].compactMap { $0 }
+        let containerWhale = candidateIDs
+            .map { id in
+                fm.homeDirectoryForCurrentUser
+                    .appendingPathComponent(
+                        "Library/Containers/\(id)/Data/Library/Application Support/Whale",
+                        isDirectory: true
+                    )
+            }
+            .first { fm.fileExists(atPath: $0.path) }
 
-        guard fm.fileExists(atPath: containerWhale.path) else { return }
+        guard let containerWhale else { return }
 
         let standardWhale = current.whaleSupportDirectoryURL
 
