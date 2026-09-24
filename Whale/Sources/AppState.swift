@@ -86,7 +86,7 @@ class AppState: ObservableObject {
     let recorder = AudioRecorder()
     let hotkey   = HotkeyManager()
     let accessibility: AccessibilityController
-    let piRuntime: PiRuntime
+    let openRouterClient = OpenRouterClient()
     let openRouterConnection = OpenRouterConnection()
     let aiActionCoordinator: AIActionCoordinator
 
@@ -133,10 +133,8 @@ class AppState: ObservableObject {
             }
             return TranscriptionPipeline(stages: stages)
         }
-        let runtime = PiRuntime()
-        self.piRuntime = runtime
         self.aiActionCoordinator = AIActionCoordinator(
-            runtime: runtime,
+            client: openRouterClient,
             history: .shared,
             settings: .shared,
             canStart: { true }
@@ -563,9 +561,8 @@ class AppState: ObservableObject {
             status = .error(error.localizedDescription)
             return
         }
-        // Runs alongside the engine warm start rather than gating it, so
-        // verifying the key costs the first AI Action nothing.
-        piRuntime.startInBackground()
+        // Runs in the background, so verifying the key costs the first AI
+        // Action nothing.
         openRouterConnection.verifyNow()
 
         if AppRuntimeInfo.current.shouldResetParakeetCacheOnLaunch {

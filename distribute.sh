@@ -43,8 +43,6 @@ SPARKLE_BIN=""
 ED_SIGNATURE=""
 DMG_LENGTH=""
 DMG_URL=""
-PI_VERSION="0.72.1"
-PI_SHA256="d2ab03267a9d13d029195aa374ecfe9bd0305e3fcf120c92c96bedfac25bd2dc"
 
 resolve_sparkle_tools() {
   SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData -name "sign_update" \
@@ -110,61 +108,25 @@ build_app() {
   echo "✅ Built: $APP_PATH"
 }
 
-prepare_pi_runtime() {
-  echo ""
-  echo "▶ Preparing pinned Pi runtime..."
-  ./scripts/prepare_pi_runtime.sh
-}
+verify_app_architecture() {
+  local app_arches
 
-verify_embedded_runtime() {
-  local app_arches app_binary pi_arches pi_binary pi_hash pi_version notices
-
-  app_binary="$APP_PATH/Contents/MacOS/$APP_NAME"
-  pi_binary="$APP_PATH/Contents/Resources/Pi/pi/pi"
-  notices="$APP_PATH/Contents/Resources/Pi/THIRD_PARTY_NOTICES.txt"
-
-  if [ ! -x "$pi_binary" ]; then
-    echo "❌ Bundled Pi executable is missing or not executable: $pi_binary"
+  app_arches=$(lipo -archs "$APP_PATH/Contents/MacOS/$APP_NAME")
+  if [ "$app_arches" != "arm64" ]; then
+    echo "❌ Whale must be arm64-only (found: $app_arches)"
     exit 1
   fi
-  if [ ! -f "$notices" ]; then
-    echo "❌ AI Actions third-party notices are missing: $notices"
-    exit 1
-  fi
-
-  app_arches=$(lipo -archs "$app_binary")
-  pi_arches=$(lipo -archs "$pi_binary")
-  pi_hash=$(shasum -a 256 "$pi_binary" | awk '{print $1}')
-  pi_version=$($pi_binary --version)
-  if [ "$app_arches" != "arm64" ] || [ "$pi_arches" != "arm64" ]; then
-    echo "❌ Whale and Pi must both be arm64 (Whale: $app_arches, Pi: $pi_arches)"
-    exit 1
-  fi
-  if [ "$pi_hash" != "$PI_SHA256" ] || [ "$pi_version" != "$PI_VERSION" ]; then
-    echo "❌ Bundled Pi does not match the pinned official release"
-    echo "   Expected: v$PI_VERSION / $PI_SHA256"
-    echo "   Found:    v$pi_version / $pi_hash"
-    exit 1
-  fi
-  echo "✅ Verified arm64 Pi v${PI_VERSION} and third-party notices"
+  echo "✅ Verified arm64-only app binary"
 }
 
 sign_for_distribution() {
-  local pi_binary sparkle_framework sparkle_version item
+  local sparkle_framework sparkle_version item
 
-  pi_binary="$APP_PATH/Contents/Resources/Pi/pi/pi"
   sparkle_framework="$APP_PATH/Contents/Frameworks/Sparkle.framework"
   sparkle_version="$sparkle_framework/Versions/Current"
 
   echo ""
   echo "▶ Signing embedded code with Developer ID..."
-  codesign --force \
-    --options runtime \
-    --timestamp \
-    --entitlements Whale/Pi.entitlements \
-    --sign "$SIGNING_IDENTITY" \
-    "$pi_binary"
-
   for item in \
     "$APP_PATH/Contents/Frameworks/SQLCipher.framework" \
     "$sparkle_version/Autoupdate" \
@@ -201,9 +163,7 @@ sign_for_distribution() {
 }
 
 verify_app_bundle() {
-  local smoke_root smoke_app app_codesign_details app_requirement pi_binary executable_name bundle_id
-
-  pi_binary="$APP_PATH/Contents/Resources/Pi/pi/pi"
+  local smoke_root smoke_app app_codesign_details app_requirement executable_name bundle_id
 
   echo ""
   echo "▶ Verifying app bundle..."
@@ -218,11 +178,6 @@ verify_app_bundle() {
     exit 1
   fi
   codesign --verify --deep --strict --verbose=4 "$APP_PATH"
-  codesign --verify --strict --verbose=4 "$pi_binary"
-  if ! codesign -d --entitlements - "$pi_binary" 2>&1 | grep -q "com.apple.security.cs.allow-jit"; then
-    echo "❌ Bundled Pi is missing its Bun/JIT signing entitlements"
-    exit 1
-  fi
   app_codesign_details=$(codesign -dvvv "$APP_PATH" 2>&1)
   if ! printf "%s\n" "$app_codesign_details" | grep -q "Authority=Developer ID Application:"; then
     echo "❌ App is not signed with a Developer ID Application certificate."
@@ -395,9 +350,8 @@ EOF
 }
 
 sync_version_metadata
-prepare_pi_runtime
 build_app
-verify_embedded_runtime
+verify_app_architecture
 sign_for_distribution
 verify_app_bundle
 create_dmg

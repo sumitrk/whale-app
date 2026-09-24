@@ -2,7 +2,7 @@ import Foundation
 
 struct AIActionRequest: Sendable, Equatable {
     let prompt: String
-    let images: [PiImage]
+    let images: [AIActionImage]
 }
 
 enum AIActionPromptBuilder {

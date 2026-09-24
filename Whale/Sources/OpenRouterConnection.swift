@@ -89,7 +89,6 @@ struct AIConnectionStatus: Equatable {
     static func make(
         hasKey: Bool,
         verification: KeyVerification,
-        runtime: PiRuntimeStatus,
         lastKnownGood: Bool,
         keyRejected: Bool,
         outOfCredit: Bool
@@ -132,15 +131,6 @@ struct AIConnectionStatus: Equatable {
                 showsRetry: false, showsTopUpLink: false
             )
         }
-        // A stopped or starting engine is not a fault — it warms on demand.
-        // Only an engine that failed outright is worth the reader's attention.
-        if case .unavailable(let reason) = runtime {
-            return AIConnectionStatus(
-                indicator: .bad, label: "Unavailable", detail: reason,
-                showsRetry: true, showsTopUpLink: false
-            )
-        }
-
         switch verification {
         case .valid:
             return AIConnectionStatus(
@@ -198,11 +188,10 @@ final class OpenRouterConnection: ObservableObject {
         self.hasKey = Self.storedKey() != nil
     }
 
-    func status(runtime: PiRuntimeStatus) -> AIConnectionStatus {
+    var status: AIConnectionStatus {
         AIConnectionStatus.make(
             hasKey: hasKey,
             verification: verification,
-            runtime: runtime,
             lastKnownGood: settings.openRouterKeyVerified,
             keyRejected: settings.openRouterKeyRejected,
             outOfCredit: settings.openRouterOutOfCredit

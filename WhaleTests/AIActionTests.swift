@@ -19,11 +19,57 @@ final class AIActionTests: XCTestCase {
         XCTAssertFalse(run.historyFinalized)
     }
 
+    // MARK: - OpenRouter client
+
     @MainActor
-    func testActionSetupKeepsTheStartupOpenRouterModel() {
-        let commandTypes = PiRuntime.actionSetupCommands.compactMap { $0["type"] as? String }
-        XCTAssertEqual(commandTypes, ["new_session", "set_thinking_level", "set_auto_retry"])
-        XCTAssertFalse(commandTypes.contains("set_model"))
+    func testRequestBodySendsThePromptAndImagesToTheActionModel() throws {
+        let request = AIActionRequest(
+            prompt: "Rewrite this",
+            images: [AIActionImage(data: Data([1, 2, 3]), mediaType: "image/jpeg")]
+        )
+        let body = OpenRouterClient.requestBody(for: request)
+
+        XCTAssertEqual(body["model"] as? String, "openai/gpt-5.6-luna")
+        XCTAssertEqual(body["stream"] as? Bool, false)
+        XCTAssertEqual((body["reasoning"] as? [String: String])?["effort"], "none")
+        let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0]["role"] as? String, "user")
+        let content = try XCTUnwrap(messages[0]["content"] as? [[String: Any]])
+        XCTAssertEqual(content[0]["text"] as? String, "Rewrite this")
+        let image = try XCTUnwrap(content[1]["image_url"] as? [String: String])
+        XCTAssertEqual(image["url"], "data:image/jpeg;base64,AQID")
+    }
+
+    @MainActor
+    func testResultTextIsTheTrimmedFirstChoice() throws {
+        let data = Data(#"{"choices":[{"message":{"role":"assistant","content":"  Done.\n"}}]}"#.utf8)
+        XCTAssertEqual(try OpenRouterClient.resultText(from: data, statusCode: 200), "Done.")
+    }
+
+    @MainActor
+    func testAnEmptyReplyIsAnError() {
+        let data = Data(#"{"choices":[{"message":{"role":"assistant","content":"  "}}]}"#.utf8)
+        XCTAssertThrowsError(try OpenRouterClient.resultText(from: data, statusCode: 200)) {
+            XCTAssertEqual($0.localizedDescription, AIActionError.emptyResult.localizedDescription)
+        }
+    }
+
+    /// The error text has to carry the status code and provider message, or
+    /// `OpenRouterFailure` cannot tell a bad key from an empty account.
+    @MainActor
+    func testProviderErrorsStayClassifiable() {
+        let rejected = Data(#"{"error":{"code":401,"message":"No auth credentials found"}}"#.utf8)
+        let broke = Data(#"{"error":{"code":402,"message":"Insufficient credits"}}"#.utf8)
+        XCTAssertThrowsError(try OpenRouterClient.resultText(from: rejected, statusCode: 401)) {
+            XCTAssertEqual(OpenRouterFailure.classify($0.localizedDescription), .rejectedKey)
+        }
+        XCTAssertThrowsError(try OpenRouterClient.resultText(from: broke, statusCode: 402)) {
+            XCTAssertEqual(OpenRouterFailure.classify($0.localizedDescription), .outOfCredit)
+        }
+        XCTAssertThrowsError(try OpenRouterClient.resultText(from: Data("<html>".utf8), statusCode: 401)) {
+            XCTAssertEqual(OpenRouterFailure.classify($0.localizedDescription), .rejectedKey)
+        }
     }
 
     // MARK: - OpenRouter connection status
@@ -31,7 +77,6 @@ final class AIActionTests: XCTestCase {
     private func status(
         hasKey: Bool = true,
         verification: KeyVerification = .valid,
-        runtime: PiRuntimeStatus = .ready(startupMilliseconds: 100),
         lastKnownGood: Bool = true,
         keyRejected: Bool = false,
         outOfCredit: Bool = false
@@ -39,7 +84,6 @@ final class AIActionTests: XCTestCase {
         AIConnectionStatus.make(
             hasKey: hasKey,
             verification: verification,
-            runtime: runtime,
             lastKnownGood: lastKnownGood,
             keyRejected: keyRejected,
             outOfCredit: outOfCredit
@@ -53,32 +97,16 @@ final class AIActionTests: XCTestCase {
         XCTAssertFalse(result.showsRetry)
     }
 
-    func testStatusReportsConnectedOnlyWhenTheKeyVerifiedAndTheEngineIsHealthy() {
+    func testStatusReportsConnectedWhenTheKeyVerified() {
         let result = status()
         XCTAssertEqual(result.label, "Connected")
         XCTAssertEqual(result.indicator, .good)
         XCTAssertNil(result.detail)
     }
 
-    /// A stopped or starting engine warms on demand, so it is not a fault worth
-    /// reporting — only an engine that failed outright is.
-    func testStatusStaysConnectedWhileTheEngineIsMerelyColdOrWarming() {
-        XCTAssertEqual(status(runtime: .stopped).label, "Connected")
-        XCTAssertEqual(status(runtime: .starting).label, "Connected")
-    }
-
-    func testStatusSurfacesEngineFailureEvenThoughTheKeyIsFine() {
-        let result = status(runtime: .unavailable("The bundled AI engine is missing"))
-        XCTAssertEqual(result.label, "Unavailable")
-        XCTAssertEqual(result.indicator, .bad)
-        XCTAssertEqual(result.detail, "The bundled AI engine is missing")
-        XCTAssertTrue(result.showsRetry)
-    }
-
     func testAnInvalidKeyOutranksEveryOtherFailure() {
         let result = status(
             verification: .invalid("OpenRouter rejected this key."),
-            runtime: .unavailable("engine down"),
             outOfCredit: true
         )
         XCTAssertEqual(result.label, "Invalid key")
@@ -310,13 +338,6 @@ final class AIActionTests: XCTestCase {
         XCTAssertTrue(request.prompt.contains("clipboard text"))
         XCTAssertTrue(request.prompt.contains("source=\"Clipboard\""))
         XCTAssertFalse(request.prompt.contains("source=\"Selection\""))
-    }
-
-    func testJSONLFramerHandlesFragmentsMultipleLinesAndCRLF() {
-        var framer = JSONLFramer()
-        XCTAssertTrue(framer.append(Data("{\"type\":\"a\"".utf8)).isEmpty)
-        let lines = framer.append(Data("}\n{\"type\":\"b\"}\r\n".utf8))
-        XCTAssertEqual(lines.map { String(decoding: $0, as: UTF8.self) }, ["{\"type\":\"a\"}", "{\"type\":\"b\"}"])
     }
 
     func testImageHashIsStableAndSensitiveToBytes() {

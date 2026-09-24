@@ -56,7 +56,7 @@ final class AIActionCoordinator: ObservableObject {
 
     private let recorder: AudioRecorder
     private let transcriber: LocalTranscriptionService
-    private let runtime: PiRuntime
+    private let client: OpenRouterClient
     private let history: HistoryController
     private let settings: SettingsStore
     private let canStart: () -> Bool
@@ -67,14 +67,14 @@ final class AIActionCoordinator: ObservableObject {
     init(
         recorder: AudioRecorder = AudioRecorder(),
         transcriber: LocalTranscriptionService = .shared,
-        runtime: PiRuntime,
+        client: OpenRouterClient,
         history: HistoryController,
         settings: SettingsStore,
         canStart: @escaping () -> Bool
     ) {
         self.recorder = recorder
         self.transcriber = transcriber
-        self.runtime = runtime
+        self.client = client
         self.history = history
         self.settings = settings
         self.canStart = canStart
@@ -93,15 +93,15 @@ final class AIActionCoordinator: ObservableObject {
         state = .capturingContext
 
         do {
-            guard runtime.hasAPIKey else { throw PiRuntimeError.missingAPIKey }
+            guard client.hasAPIKey else { throw AIActionError.missingAPIKey }
             guard !settings.openRouterKeyRejected else {
-                throw PiRuntimeError.notReady("Replace the rejected OpenRouter API key in Settings > AI Actions")
+                throw AIActionError.notReady("Replace the rejected OpenRouter API key in Settings > AI Actions")
             }
             if FocusedElementInspector.focusedElementContext()?.snapshot.isSecureTextField == true {
                 throw ContextCaptureError.secureField
             }
             guard try await transcriber.isModelInstalled(run.modelID) else {
-                throw PiRuntimeError.notReady(run.modelID.descriptor.installationPrompt)
+                throw AIActionError.notReady(run.modelID.descriptor.installationPrompt)
             }
 
             let store = try await history.requireStore()
@@ -157,7 +157,7 @@ final class AIActionCoordinator: ObservableObject {
         if recorder.isRecording, let recording = try? await recorder.stopRecording() {
             try? FileManager.default.removeItem(at: recording.wavURL)
         }
-        await runtime.abort(runID: run.id)
+        await client.abort(runID: run.id)
         await finalizeHistory(for: run, outcome: .cancelled, errorText: reason)
         state = .cancelled
         if reason != "Replaced by a newer AI Action" {
@@ -197,7 +197,7 @@ final class AIActionCoordinator: ObservableObject {
                 source: .microphone
             ).trimmingCharacters(in: .whitespacesAndNewlines)
             guard isCurrent(runID) else { throw AIActionCoordinatorError.superseded }
-            guard !instruction.isEmpty else { throw PiRuntimeError.emptyResult }
+            guard !instruction.isEmpty else { throw AIActionError.emptyResult }
 
             let store = try await history.requireStore()
             try await store.setInstruction(instruction, for: historyEntryID)
@@ -216,13 +216,13 @@ final class AIActionCoordinator: ObservableObject {
                     try await Task.sleep(for: .seconds(30))
                     guard let self, self.isCurrent(runID) else { return }
                     timedOut = true
-                    await self.runtime.abort(runID: runID)
+                    await self.client.abort(runID: runID)
                 } catch { }
             }
             defer { timeoutTask.cancel() }
             let result: String
             do {
-                result = try await runtime.perform(runID: runID, request: request)
+                result = try await client.perform(runID: runID, request: request)
             } catch is CancellationError where timedOut {
                 throw AIActionCoordinatorError.timedOut
             }
@@ -266,7 +266,7 @@ final class AIActionCoordinator: ObservableObject {
         if recorder.isRecording, let recording = try? await recorder.stopRecording() {
             try? FileManager.default.removeItem(at: recording.wavURL)
         }
-        await runtime.abort(runID: run.id)
+        await client.abort(runID: run.id)
         let message = error.localizedDescription
         switch OpenRouterFailure.classify(message) {
         case .rejectedKey: settings.openRouterKeyRejected = true

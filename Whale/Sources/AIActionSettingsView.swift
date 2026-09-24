@@ -7,8 +7,7 @@ struct AIActionSettingsView: View {
     var body: some View {
         Form {
             OpenRouterSection(
-                connection: appState.openRouterConnection,
-                runtime: appState.piRuntime
+                connection: appState.openRouterConnection
             )
 
             Section {
@@ -35,7 +34,6 @@ struct AIActionSettingsView: View {
 /// appears when there is a key to enter.
 private struct OpenRouterSection: View {
     @ObservedObject var connection: OpenRouterConnection
-    @ObservedObject var runtime: PiRuntime
     /// Observed because the sticky rejected/out-of-credit flags live here and
     /// feed the status row.
     @ObservedObject private var settings = SettingsStore.shared
@@ -121,7 +119,7 @@ private struct OpenRouterSection: View {
     }
 
     private var status: AIConnectionStatus {
-        connection.status(runtime: runtime.status)
+        connection.status
     }
 
     private var indicatorColor: Color {
@@ -165,7 +163,6 @@ private struct OpenRouterSection: View {
             case .saved:
                 apiKey = ""
                 isEditing = false
-                try? await runtime.restart()
             case .failed(let message):
                 // The stored key is untouched, so the old one still works.
                 keyError = message
@@ -179,7 +176,6 @@ private struct OpenRouterSection: View {
             keyError = message
             return
         }
-        runtime.stop()
         apiKey = ""
         keyError = nil
         isEditing = false
@@ -187,8 +183,5 @@ private struct OpenRouterSection: View {
 
     private func retry() {
         connection.verifyNow(force: true)
-        if case .unavailable = runtime.status {
-            Task { try? await runtime.restart() }
-        }
     }
 }

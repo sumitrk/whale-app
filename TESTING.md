@@ -33,7 +33,7 @@ Before a release, run the `Whale Dev` test action and manually exercise:
 6. Insertion into an editable field and copy fallback into a non-editable destination.
 7. History search, image detail, deletion, clear-all, app restart, and locked-database reset.
 
-The release package script also verifies the pinned Pi version/hash, the arm64-only app and Pi architectures, bundled notices, and nested code signatures.
+The release package script also verifies the arm64-only app architecture and nested code signatures.
 
 ## If Accessibility disappears
 

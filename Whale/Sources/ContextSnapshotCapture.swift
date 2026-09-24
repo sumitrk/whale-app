@@ -109,8 +109,8 @@ enum ContextSnapshotCapture {
         )
     }
 
-    static func requestImages(from snapshot: ContextSnapshot, maxTotalBytes: Int = 20 * 1_024 * 1_024) throws -> [PiImage] {
-        var result: [PiImage] = []
+    static func requestImages(from snapshot: ContextSnapshot, maxTotalBytes: Int = 20 * 1_024 * 1_024) throws -> [AIActionImage] {
+        var result: [AIActionImage] = []
         var totalBytes = snapshot.inputs.reduce(0) { count, input in
             guard case .text(let text) = input.content else { return count }
             return count + text.utf8.count
@@ -179,7 +179,7 @@ enum ContextSnapshotCapture {
         }
     }
 
-    private static func optimizedImage(_ image: ContextImage) -> PiImage? {
+    private static func optimizedImage(_ image: ContextImage) -> AIActionImage? {
         guard let source = NSImage(data: image.data) else { return nil }
         let longest = max(source.size.width, source.size.height)
         let scale = longest > 2_048 ? 2_048 / longest : 1
@@ -191,7 +191,7 @@ enum ContextSnapshotCapture {
         guard let tiff = resized.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiff),
               let data = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.86]) else { return nil }
-        return PiImage(data: data, mediaType: "image/jpeg")
+        return AIActionImage(data: data, mediaType: "image/jpeg")
     }
 
     private static func simulateCopy() {

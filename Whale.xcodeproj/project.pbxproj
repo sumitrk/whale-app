@@ -48,10 +48,9 @@
 		AIA000000000000000000006 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000106 /* HistoryStore.swift */; };
 		AIA000000000000000000007 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000107 /* HistoryView.swift */; };
 		AIA000000000000000000008 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000108 /* KeychainStore.swift */; };
-		AIA000000000000000000009 /* PiRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000109 /* PiRuntime.swift */; };
+		AIA000000000000000000009 /* OpenRouterClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000109 /* OpenRouterClient.swift */; };
 		AIA000000000000000000010 /* AIActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000110 /* AIActionTests.swift */; };
 		AAPP00000000000000000001 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAPP00000000000000000002 /* AppStateTests.swift */; };
-		AIA000000000000000000011 /* Pi in Resources */ = {isa = PBXBuildFile; fileRef = AIA000000000000000000111 /* Pi */; };
 		AIA000000000000000000012 /* SQLCipher in Frameworks */ = {isa = PBXBuildFile; productRef = AIA000000000000000000302 /* SQLCipher */; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */; };
 		A5F1E893C1214A87B9A5BDFC /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D46A1ED1172B492709C538FC /* AudioToolbox.framework */; };
@@ -132,10 +131,9 @@
 		AIA000000000000000000106 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
 		AIA000000000000000000107 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		AIA000000000000000000108 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
-		AIA000000000000000000109 /* PiRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiRuntime.swift; sourceTree = "<group>"; };
+		AIA000000000000000000109 /* OpenRouterClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRouterClient.swift; sourceTree = "<group>"; };
 		AIA000000000000000000110 /* AIActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionTests.swift; sourceTree = "<group>"; };
 		AAPP00000000000000000002 /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
-		AIA000000000000000000111 /* Pi */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Pi; sourceTree = "<group>"; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
 		B7A1C001D44E4C7287B43002 /* AppRuntimeInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeInfo.swift; sourceTree = "<group>"; };
@@ -248,7 +246,7 @@
 				4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */,
 				S1C000000000000000000201 /* Cleanup */,
 				PP0000000000000000000001 /* Pipeline */,
-				AIA000000000000000000109 /* PiRuntime.swift */,
+				AIA000000000000000000109 /* OpenRouterClient.swift */,
 				8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */,
 				1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */,
 				D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */,
@@ -295,7 +293,6 @@
 			isa = PBXGroup;
 			children = (
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* Assets.xcassets */,
-				AIA000000000000000000111 /* Pi */,
 			);
 			name = Resources;
 			path = Whale/Resources;
@@ -332,7 +329,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 735A3DEFC8ED556C33117934 /* Build configuration list for PBXNativeTarget "Whale" */;
 			buildPhases = (
-				AIA000000000000000000401 /* Prepare Pi Runtime */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* Resources */,
 				C9421B68B0297431CB7B7584 /* Sources */,
 				BBEDF9B9D3FBB5E122CFB20D /* Frameworks */,
@@ -434,34 +430,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* Assets.xcassets in Resources */,
-				AIA000000000000000000011 /* Pi in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		AIA000000000000000000401 /* Prepare Pi Runtime */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/scripts/prepare_pi_runtime.sh",
-			);
-			name = "Prepare Pi Runtime";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Whale/Resources/Pi/pi/pi",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/bash;
-			shellScript = "\"$SRCROOT/scripts/prepare_pi_runtime.sh\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		AA0000000000000000000032 /* Sources */ = {
@@ -511,7 +484,7 @@
 				99A09F84D12D5E5B2A3D164D /* OnboardingView.swift in Sources */,
 				EA62496C0185BEEC105B2E85 /* PTTRecorderView.swift in Sources */,
 				225A0771E3382915CC101010 /* PermissionsSettingsView.swift in Sources */,
-				AIA000000000000000000009 /* PiRuntime.swift in Sources */,
+				AIA000000000000000000009 /* OpenRouterClient.swift in Sources */,
 				0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */,
 				D4E5F60718293A4B5C6D7E8F /* SettingsCoordinator.swift in Sources */,
 				EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */,
