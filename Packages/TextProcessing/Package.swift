@@ -9,22 +9,19 @@ let package = Package(
     products: [
         .library(name: "TextProcessing", targets: ["TextProcessing"])
     ],
+    dependencies: [
+        // Must match the version the Whale project pins.
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.1")
+    ],
     targets: [
-        // Prebuilt NeMo text-processing engine (FST grammars, 7 languages) from
-        // FluidInference/text-processing-rs, the same xcframework FluidAudio links
-        // on main. Whale is pinned to FluidAudio 0.15.5, which still looks the
-        // engine up at runtime and silently passes text through when it is absent,
-        // so we link it ourselves. Once FluidAudio ships a release that bundles the
-        // engine, this package can be dropped in favour of its `TextNormalizer`.
-        .binaryTarget(
-            name: "NemoTextProcessing",
-            url:
-                "https://github.com/FluidInference/text-processing-rs/releases/download/v0.3.0/NemoTextProcessing.xcframework.zip",
-            checksum: "76d0ee9a32b1ee2193231299180ca9bc4fc7e98794e771b3d55d66498352d85f"
-        ),
+        // The prebuilt NeMo text-processing engine (`CNemoTextProcessing`) comes
+        // from FluidAudio, which bundles the text-processing-rs xcframework from
+        // 0.15.6 onward. We call its C API directly rather than FluidAudio's
+        // `TextNormalizer` so we keep control of the options (`keepBareSecond`)
+        // and the hyphenated-number retry below.
         .target(
             name: "TextProcessing",
-            dependencies: ["NemoTextProcessing"]
+            dependencies: [.product(name: "FluidAudio", package: "FluidAudio")]
         ),
     ]
 )
