@@ -318,6 +318,18 @@ private struct ModelRow: View {
                         .buttonStyle(.bordered)
                 }
 
+                // Only a model that is not in use, and only files the app downloaded itself:
+                // the active model would leave dictation with nothing to run, and a folder
+                // the user supplied is never erased. Both keep their context-menu entry.
+                if row.status == .inactive, model.ownsModelFiles, let title = row.resetActionTitle {
+                    Button { modelStore.reset(model.id) } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .help(title)
+                    .accessibilityLabel("\(title) \(model.title)")
+                }
+
                 if let control = languageControl(for: row) {
                     ModelLanguageControlView(control: control) { option in
                         settings.setLanguageCode(option.decodingLanguageCode, for: model.id)
