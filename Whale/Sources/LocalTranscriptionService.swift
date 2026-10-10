@@ -6,6 +6,7 @@ import WhisperKit
 enum BuiltInModelGroup: String, CaseIterable, Codable, Identifiable, Sendable {
     case parakeet
     case whisper
+    case apple
 
     var id: String { rawValue }
 
@@ -15,6 +16,8 @@ enum BuiltInModelGroup: String, CaseIterable, Codable, Identifiable, Sendable {
             return "Parakeet"
         case .whisper:
             return "Whisper"
+        case .apple:
+            return "Apple"
         }
     }
 }
@@ -22,12 +25,15 @@ enum BuiltInModelGroup: String, CaseIterable, Codable, Identifiable, Sendable {
 enum BuiltInModelProvisioning: String, Codable, Sendable {
     case download
     case localFolder
+    /// A model macOS downloads, shares between apps, and evicts on its own schedule.
+    case systemAsset
 }
 
 enum BuiltInModelID: String, CaseIterable, Codable, Identifiable, Sendable {
     case parakeetEnglishV2
     case whisperLargeV3Turbo
     case whisperLocalFolder
+    case appleSpeech
 
     var id: String { rawValue }
 
@@ -62,7 +68,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
 
     var installationPrompt: String {
         switch provisioning {
-        case .download:
+        case .download, .systemAsset:
             return "\(title) is not downloaded. Open Settings > Models and download it."
         case .localFolder:
             return "\(title) is not configured yet. Open Settings > Models, choose a WhisperKit/Core ML folder, and try again."
@@ -71,7 +77,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
 
     var actionTitle: String {
         switch provisioning {
-        case .download:
+        case .download, .systemAsset:
             return "Download"
         case .localFolder:
             return "Choose Folder"
@@ -80,7 +86,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
 
     var retryActionTitle: String {
         switch provisioning {
-        case .download:
+        case .download, .systemAsset:
             return "Retry"
         case .localFolder:
             return "Choose Another Folder"
@@ -89,7 +95,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
 
     var changeActionTitle: String? {
         switch provisioning {
-        case .download:
+        case .download, .systemAsset:
             return nil
         case .localFolder:
             return "Change Folder"
@@ -105,6 +111,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
         switch provisioning {
         case .download:    return true
         case .localFolder: return false
+        case .systemAsset: return false
         }
     }
 
@@ -114,7 +121,12 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
     /// A folder the user converted themselves is only forgotten, never erased, and the wording
     /// has to say so; the two come from one property so they cannot drift apart.
     var resetActionTitle: String? {
-        ownsModelFiles ? "Delete" : "Disconnect"
+        switch provisioning {
+        case .download:    return "Delete"
+        case .localFolder: return "Disconnect"
+        // The system owns the asset and the app holds no pointer to it: nothing to reset.
+        case .systemAsset: return nil
+        }
     }
 }
 
@@ -141,6 +153,17 @@ enum BuiltInModelCatalog {
             declaredLanguageCapability: .multilingual,
             detail: "WhisperKit • OpenAI Whisper large-v3-turbo • Runs locally on-device",
             markdownLabel: "Whisper Large V3 Turbo"
+        ),
+        BuiltInModelDescriptor(
+            id: .appleSpeech,
+            group: .apple,
+            source: .bundled,
+            provisioning: .systemAsset,
+            title: "Apple Speech",
+            capabilityLabel: "English only",
+            declaredLanguageCapability: .single(code: "en"),
+            detail: "SpeechAnalyzer • Built into macOS 26 • Runs locally on-device",
+            markdownLabel: "Apple Speech"
         ),
         BuiltInModelDescriptor(
             id: .whisperLocalFolder,
@@ -170,8 +193,20 @@ enum BuiltInModelCatalog {
         allModels.filter { $0.group == group }
     }
 
+    /// What the Models pane lists. Apple Speech is left out before macOS 26, where the
+    /// system has no such model to offer.
     static func models(from source: BuiltInModelSource) -> [BuiltInModelDescriptor] {
-        allModels.filter { $0.source == source }
+        allModels.filter { $0.source == source && isAvailable($0.group) }
+    }
+
+    private static func isAvailable(_ group: BuiltInModelGroup) -> Bool {
+        switch group {
+        case .parakeet, .whisper:
+            return true
+        case .apple:
+            if #available(macOS 26.0, *) { return true }
+            return false
+        }
     }
 }
 
@@ -657,6 +692,7 @@ actor LocalTranscriptionService {
     init(backends: [BuiltInModelGroup: any BuiltInTranscriptionBackend] = [
         .parakeet: ParakeetTranscriptionBackend(),
         .whisper: WhisperTranscriptionBackend(),
+        .apple: AppleSpeechTranscriptionBackend(),
     ]) {
         self.backends = backends
     }
@@ -1422,6 +1458,7 @@ enum LocalTranscriptionError: LocalizedError {
     case modelNotInstalled(BuiltInModelDescriptor)
     case notInitialized(BuiltInModelDescriptor)
     case unsupportedModel(BuiltInModelID)
+    case appleSpeechUnavailable(String)
     case parakeetSetupFailed(
         step: ParakeetInstallStep,
         modelDirectory: String,
@@ -1441,6 +1478,8 @@ enum LocalTranscriptionError: LocalizedError {
             return "\(descriptor.title) is not ready yet."
         case .unsupportedModel(let modelID):
             return "Unsupported transcription model: \(modelID.rawValue)"
+        case .appleSpeechUnavailable(let reason):
+            return reason
         case .parakeetSetupFailed(let step, let modelDirectory, let reason):
             return """
             FluidAudio English could not be prepared.

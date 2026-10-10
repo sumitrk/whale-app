@@ -66,7 +66,8 @@ final class TranscriptionModelTests: XCTestCase {
     }
 
     func testCatalogGroupsContainExpectedBuiltInModels() {
-        XCTAssertEqual(BuiltInModelGroup.allCases, [.parakeet, .whisper])
+        XCTAssertEqual(BuiltInModelGroup.allCases, [.parakeet, .whisper, .apple])
+        XCTAssertEqual(BuiltInModelCatalog.models(in: .apple).map(\.id), [.appleSpeech])
         XCTAssertEqual(BuiltInModelCatalog.models(in: .parakeet).map(\.id), [.parakeetEnglishV2])
         XCTAssertEqual(
             BuiltInModelCatalog.models(in: .whisper).map(\.id),
@@ -77,7 +78,7 @@ final class TranscriptionModelTests: XCTestCase {
     func testCatalogSplitsBundledModelsFromCustomFolder() {
         XCTAssertEqual(
             BuiltInModelCatalog.models(from: .bundled).map(\.id),
-            [.parakeetEnglishV2, .whisperLargeV3Turbo]
+            [.parakeetEnglishV2, .whisperLargeV3Turbo, .appleSpeech]
         )
         XCTAssertEqual(
             BuiltInModelCatalog.models(from: .custom).map(\.id),
@@ -85,7 +86,7 @@ final class TranscriptionModelTests: XCTestCase {
         )
         XCTAssertEqual(
             BuiltInModelCatalog.allModels.map(\.capabilityLabel),
-            ["English only", "Multilingual", "Auto-detect"]
+            ["English only", "Multilingual", "English only", "Auto-detect"]
         )
     }
 
@@ -185,6 +186,7 @@ final class TranscriptionModelTests: XCTestCase {
         let service = LocalTranscriptionService(backends: [
             .parakeet: RecordingBackend(),
             .whisper: RecordingBackend(isInstalled: false),
+            .apple: RecordingBackend(),
         ])
         let store = TranscriptionModelStore(service: service)
 
@@ -1113,6 +1115,9 @@ final class ModelInstallFeedbackTests: XCTestCase {
                     "\(model.id) points at the user's folder and must never delete it"
                 )
                 XCTAssertEqual(model.resetActionTitle, "Disconnect")
+            case .systemAsset:
+                XCTAssertFalse(model.ownsModelFiles, "\(model.id) belongs to macOS")
+                XCTAssertNil(model.resetActionTitle)
             }
         }
     }

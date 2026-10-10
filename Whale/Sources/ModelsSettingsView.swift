@@ -318,6 +318,18 @@ private struct ModelRow: View {
                         .buttonStyle(.bordered)
                 }
 
+                // Only a model that is not in use, and only files the app downloaded itself:
+                // the active model would leave dictation with nothing to run, and a folder
+                // the user supplied is never erased. Both keep their context-menu entry.
+                if row.status == .inactive, model.ownsModelFiles, let title = row.resetActionTitle {
+                    Button { modelStore.reset(model.id) } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .help(title)
+                    .accessibilityLabel("\(title) \(model.title)")
+                }
+
                 if let control = languageControl(for: row) {
                     ModelLanguageControlView(control: control) { option in
                         settings.setLanguageCode(option.decodingLanguageCode, for: model.id)
@@ -374,12 +386,14 @@ private struct ModelRow: View {
             return AppRuntimeInfo.current.parakeetEnglishV2DirectoryURL.path
         case .whisperLargeV3Turbo, .whisperLocalFolder:
             return settings.localModelPath(for: model.id)
+        case .appleSpeech:
+            return nil
         }
     }
 
     private func triggerPrimaryAction() {
         switch model.provisioning {
-        case .download:
+        case .download, .systemAsset:
             modelStore.install(model.id)
         case .localFolder:
             chooseLocalFolder()
@@ -542,6 +556,7 @@ private struct ModelIcon: View {
         switch model.group {
         case .parakeet: return (.blue, "waveform")
         case .whisper:  return (.purple, "text.bubble.fill")
+        case .apple:    return (.gray, "apple.logo")
         }
     }
 
