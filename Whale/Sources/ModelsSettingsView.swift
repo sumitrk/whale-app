@@ -374,12 +374,14 @@ private struct ModelRow: View {
             return AppRuntimeInfo.current.parakeetEnglishV2DirectoryURL.path
         case .whisperLargeV3Turbo, .whisperLocalFolder:
             return settings.localModelPath(for: model.id)
+        case .appleSpeech:
+            return nil
         }
     }
 
     private func triggerPrimaryAction() {
         switch model.provisioning {
-        case .download:
+        case .download, .systemAsset:
             modelStore.install(model.id)
         case .localFolder:
             chooseLocalFolder()
@@ -542,6 +544,7 @@ private struct ModelIcon: View {
         switch model.group {
         case .parakeet: return (.blue, "waveform")
         case .whisper:  return (.purple, "text.bubble.fill")
+        case .apple:    return (.gray, "apple.logo")
         }
     }
 
