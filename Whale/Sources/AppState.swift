@@ -559,7 +559,7 @@ class AppState: ObservableObject {
         let modelID = settings.selectedBuiltInModelID
         if modelStore.isReady(for: modelID) {
             do {
-                try await transcriber.prepareModel(modelID)
+                try await modelStore.prepare(modelID)
             } catch {
                 DiagnosticLog.log("[Startup] Failed to prepare \(modelID.rawValue): \(error.localizedDescription)")
                 status = .error(error.localizedDescription)

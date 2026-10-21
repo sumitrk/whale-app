@@ -39,6 +39,8 @@ struct SettingsSection<Content: View>: View {
                     _VariadicView.Tree(SeparatedRows(separator: separator)) { content }
                 }
             }
+            // Clipped so a row that fills its own background (the model in use) keeps the corners.
+            .clipShape(.rect(cornerRadius: 18, style: .continuous))
             .background(Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: 18, style: .continuous))
             .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.separator.opacity(0.5)) }
             if let footer {

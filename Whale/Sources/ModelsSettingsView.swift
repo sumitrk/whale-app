@@ -37,12 +37,13 @@ struct ModelListSections: View {
     }
 }
 
-/// One model in the list. The row *is* the picker: clicking an installed row makes it the
-/// active model, which is why there is no separate "Active Model" dropdown above the list.
+/// One model in the list. Every row has one action in the same place — Download, Use, Retry
+/// or Choose folder — and the model in use says "In use" there instead, on a tinted row, so
+/// which one dictation runs on is never in doubt. Everything else that acts on the files
+/// (delete, show in Finder, change folder) is in the row's "⋯" menu.
 private struct ModelRow: View {
     @ObservedObject private var modelStore = TranscriptionModelStore.shared
     @ObservedObject private var settings = SettingsStore.shared
-    @State private var isHovering = false
     @State private var pendingDelete: PendingModelDelete?
 
     let model: BuiltInModelDescriptor
@@ -55,6 +56,14 @@ private struct ModelRow: View {
         )
     }
 
+    private var isInUse: Bool {
+        settings.selectedBuiltInModelID == model.id && rowModel.isReady
+    }
+
+    private var isPreparing: Bool {
+        modelStore.preparingModelID == model.id
+    }
+
     var body: some View {
         let row = rowModel
 
@@ -65,42 +74,73 @@ private struct ModelRow: View {
                 Text(model.title)
                     .fontWeight(.medium)
 
-                HStack(spacing: 5) {
-                    if row.status.showsDot {
-                        Circle()
-                            .fill(dotColor(for: row.status))
-                            .frame(width: 7, height: 7)
-                    }
-
-                    // The load phase explains a multi-minute wait, so let it wrap onto a
-                    // second line rather than truncating the explanation away.
-                    Text(statusLine(for: row))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // The load phase explains a multi-minute wait, so let it wrap onto a second
+                // line rather than truncating the explanation away.
+                Text(subtitle(for: row))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let errorText = row.errorText {
                     Text(errorText)
-                        .font(.subheadline)
+                        .font(.callout)
                         .foregroundStyle(.red)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 12)
 
-            accessory(for: row)
+            HStack(spacing: 8) {
+                if row.isBusy || isPreparing {
+                    ProgressView()
+                        .controlSize(.small)
+                    if row.isCancellable {
+                        Button("Cancel") { modelStore.cancel(model.id) }
+                    }
+                } else {
+                    if let control = languageControl(for: row) {
+                        ModelLanguageControlView(control: control) { option in
+                            settings.setLanguageCode(option.decodingLanguageCode, for: model.id)
+                        }
+                    }
+                    if isInUse {
+                        Label("In use", systemImage: "checkmark.circle.fill")
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(Color.accentColor)
+                    } else if row.isReady {
+                        Button("Use") { modelStore.use(model.id) }
+                    } else if let title = row.primaryActionTitle {
+                        Button(title, action: triggerPrimaryAction)
+                    }
+                }
+
+                if hasMenuItems(for: row) {
+                    Menu {
+                        menuItems(for: row)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 16, height: 16)
+                    }
+                    .menuStyle(.button)
+                    .menuIndicator(.hidden)
+                    .buttonBorderShape(.circle)
+                    .accessibilityLabel("More actions for \(model.title)")
+                }
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            // Without this the title takes the space it wants and a long language name
+            // squeezes the button beside it down to a sliver.
+            .fixedSize()
+            .layoutPriority(1)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(minHeight: 44)
-        .background(Color.primary.opacity(isHovering && row.isReady ? 0.04 : 0))
-        .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
-        .onTapGesture { activate(row) }
-        .contextMenu { contextMenu(for: row) }
+        .background(isInUse ? Color.accentColor.opacity(0.07) : .clear)
+        .contextMenu { menuItems(for: row) }
         .confirmationDialog(
             "Delete \(model.title)?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -112,101 +152,46 @@ private struct ModelRow: View {
         }
     }
 
-    private func statusLine(for row: TranscriptionModelRowModel) -> String {
-        row.statusLine(
-            capabilityLabel: model.capabilityLabel,
-            hasLanguageControl: languageControl(for: row) != nil
-        )
-    }
-
-    private func dotColor(for status: TranscriptionModelStatus) -> Color {
-        switch status {
-        case .active:                   return .green
-        case .needsAttention:           return .red
-        case .inactive, .notInstalled:  return .secondary.opacity(0.5)
-        case .working:                  return .clear
+    private func subtitle(for row: TranscriptionModelRowModel) -> String {
+        if isPreparing {
+            return "Preparing for first use… this takes a few seconds"
         }
+        return row.statusLine(capabilityLabel: model.capabilityLabel, downloadSize: model.downloadSize)
     }
 
-    /// The language control lands where the Download button was, so the right-hand column
-    /// reads the same all the way down the list. The local folder is the one row that keeps a
-    /// button as well — it still has to be repointed — and that button sits to the left so the
-    /// language stays in the column the eye is scanning.
-    @ViewBuilder
-    private func accessory(for row: TranscriptionModelRowModel) -> some View {
-        if row.isBusy {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-
-                // Cancel sits on the right, where Download and the language selector sit, so
-                // the column the eye follows down the list holds the action in every state.
-                if row.isCancellable {
-                    Button("Cancel") { modelStore.cancel(model.id) }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.capsule)
-                }
-            }
-            .fixedSize()
-            .layoutPriority(1)
-        } else {
-            HStack(spacing: 8) {
-                if let title = row.primaryActionTitle {
-                    // Deliberately not `.borderedProminent`: nothing on this pane is the one
-                    // thing the user came here to do, so no row gets to claim the screen's
-                    // default action.
-                    Button(title) { triggerPrimaryAction() }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.capsule)
-                }
-
-                // Any model whose files the app downloaded itself, the active one included:
-                // the confirmation says so when dictation would be left without a model. A
-                // folder the user supplied is never erased; it keeps its context-menu entry.
-                if row.isReady, model.ownsModelFiles, let title = row.resetActionTitle {
-                    Button { requestDelete(row) } label: {
-                        Image(systemName: "trash")
-                    }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .help(title)
-                    .accessibilityLabel("\(title) \(model.title)")
-                }
-
-                if let control = languageControl(for: row) {
-                    ModelLanguageControlView(control: control) { option in
-                        settings.setLanguageCode(option.decodingLanguageCode, for: model.id)
-                    }
-                }
-            }
-            // Without this the title takes the space it wants and a long language name
-            // squeezes the button beside it down to a sliver.
-            .fixedSize()
-            .layoutPriority(1)
-        }
-    }
-
-    /// Only an installed model gets a language control — including one that is installed but
-    /// inactive, so a language can be set before switching to it rather than after.
+    /// Only an installed model with a real choice gets a language control — including one
+    /// that isn't in use, so a language can be set before switching to it. A model that knows
+    /// one language says so in its subtitle instead of showing a disabled button.
     private func languageControl(for row: TranscriptionModelRowModel) -> ModelLanguageControl? {
         guard row.isReady else { return nil }
 
-        return ModelLanguageResolver.control(
+        let control = ModelLanguageResolver.control(
             for: model,
             detected: settings.detectedLanguageCapability(for: model.id),
             storedCode: settings.languageCode(for: model.id)
         )
+        return control?.allowsSelection == true ? control : nil
     }
 
+    private func hasMenuItems(for row: TranscriptionModelRowModel) -> Bool {
+        let fileActions = row.isReady && (model.changeActionTitle != nil || localModelPath != nil)
+        return fileActions || row.resetActionTitle != nil
+    }
+
+    /// The "⋯" menu and the row's right-click menu: everything that acts on the model's files.
     @ViewBuilder
-    private func contextMenu(for row: TranscriptionModelRowModel) -> some View {
-        if let path = localModelPath {
+    private func menuItems(for row: TranscriptionModelRowModel) -> some View {
+        if row.isReady, let title = model.changeActionTitle {
+            Button("\(title)…", action: chooseLocalFolder)
+        }
+
+        if row.isReady, let path = localModelPath {
             Button("Show in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
             }
             .disabled(!FileManager.default.fileExists(atPath: path))
 
-            Button("Copy Path") {
+            Button("Copy path") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(path, forType: .string)
             }
@@ -214,12 +199,10 @@ private struct ModelRow: View {
 
         if let resetActionTitle = row.resetActionTitle {
             Divider()
-            Button(resetActionTitle) {
-                if model.ownsModelFiles {
-                    requestDelete(row)
-                } else {
-                    modelStore.reset(model.id)
-                }
+            if model.ownsModelFiles {
+                Button("\(resetActionTitle)…", role: .destructive) { requestDelete(row) }
+            } else {
+                Button(resetActionTitle, role: .destructive) { modelStore.reset(model.id) }
             }
         }
     }
@@ -245,17 +228,6 @@ private struct ModelRow: View {
             total += Int64((try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0)
         }
         return total > 0 ? total : nil
-    }
-
-    private func activate(_ row: TranscriptionModelRowModel) {
-        guard row.isReady, settings.selectedBuiltInModelID != model.id else { return }
-        settings.selectedBuiltInModelID = model.id
-        // Load it now, while the user is still in Settings, so the first dictation after a
-        // switch doesn't wait for it. A first load can take 10+ seconds on the Neural Engine.
-        let modelID = model.id
-        Task.detached(priority: .utility) {
-            try? await LocalTranscriptionService.shared.prepareModel(modelID)
-        }
     }
 
     private var localModelPath: String? {
@@ -286,7 +258,7 @@ private struct ModelRow: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.prompt = "Choose Folder"
+        panel.prompt = "Choose folder"
         panel.message = "Select a WhisperKit/Core ML folder that contains MelSpectrogram, AudioEncoder, and TextDecoder."
 
         guard panel.runModal() == .OK, let folderURL = panel.url else { return }

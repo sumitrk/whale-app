@@ -334,6 +334,26 @@ final class HUDDismissalTests: XCTestCase {
         return !hud.hasContent
     }
 
+    /// Each presentation has its own size. Switching between them must leave the new pill
+    /// exactly filling the window — autoresizing it by the old size used to clip it.
+    @MainActor
+    func testPillFillsTheWindowAfterSwitchingSizes() throws {
+        let hud = RecordingIndicatorWindow.shared
+        hud.showHint(reason: .manualPasteOnly)
+        let hintSize = try XCTUnwrap(hud.contentView).bounds.size
+        hud.showProcessing()
+
+        let container = try XCTUnwrap(hud.contentView)
+        let pill = try XCTUnwrap(container.subviews.first)
+        XCTAssertNotEqual(container.bounds.size, hintSize)
+        XCTAssertEqual(pill.frame, container.bounds)
+
+        hud.showHint(reason: .manualPasteOnly)
+        let hint = try XCTUnwrap(container.subviews.first)
+        XCTAssertEqual(hint.frame, container.bounds)
+        hud.hide()
+    }
+
     @MainActor
     func testPasteHintReplacesAnInFlightHideAnimation() {
         let hud = RecordingIndicatorWindow.shared

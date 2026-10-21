@@ -108,7 +108,7 @@ final class TranscriptionModelTests: XCTestCase {
             isSelected: false
         )
         XCTAssertEqual(notInstalled.status, .notInstalled)
-        XCTAssertEqual(notInstalled.statusText, "Not Installed")
+        XCTAssertEqual(notInstalled.statusText, "Not installed")
         XCTAssertEqual(notInstalled.primaryActionTitle, "Download")
         XCTAssertFalse(notInstalled.isBusy)
 
@@ -137,7 +137,7 @@ final class TranscriptionModelTests: XCTestCase {
         )
         XCTAssertTrue(active.isReady)
         XCTAssertEqual(active.status, .active)
-        XCTAssertEqual(active.statusText, "Active")
+        XCTAssertEqual(active.statusText, "In use")
         XCTAssertEqual(active.resetActionTitle, "Delete")
 
         let inactive = TranscriptionModelRowModel(
@@ -146,7 +146,7 @@ final class TranscriptionModelTests: XCTestCase {
             isSelected: false
         )
         XCTAssertEqual(inactive.status, .inactive)
-        XCTAssertEqual(inactive.statusText, "Inactive")
+        XCTAssertEqual(inactive.statusText, "Downloaded")
 
         let failed = TranscriptionModelRowModel(
             model: model,
@@ -1513,13 +1513,13 @@ final class TranscriptionLanguageTests: XCTestCase {
 
     // MARK: - The subtitle rule
 
-    func testLanguageAppearsInExactlyOnePlacePerRow() {
+    func testStatusLineSaysWhatTheModelDoesThenWhatItNeeds() {
         let ready = TranscriptionModelRowModel(
             model: BuiltInModelID.whisperLargeV3Turbo.descriptor,
             installState: .ready,
             isSelected: true
         )
-        XCTAssertEqual(ready.statusLine(capabilityLabel: "Multilingual", hasLanguageControl: true), "Active")
+        XCTAssertEqual(ready.statusLine(capabilityLabel: "Multilingual", downloadSize: "3.2 GB"), "Multilingual")
 
         let notInstalled = TranscriptionModelRowModel(
             model: BuiltInModelID.whisperLargeV3Turbo.descriptor,
@@ -1527,8 +1527,12 @@ final class TranscriptionLanguageTests: XCTestCase {
             isSelected: false
         )
         XCTAssertEqual(
-            notInstalled.statusLine(capabilityLabel: "Multilingual", hasLanguageControl: false),
-            "Not Installed · Multilingual"
+            notInstalled.statusLine(capabilityLabel: "Multilingual", downloadSize: "3.2 GB"),
+            "Multilingual · 3.2 GB download"
+        )
+        XCTAssertEqual(
+            notInstalled.statusLine(capabilityLabel: "Auto-detect", downloadSize: nil),
+            "Auto-detect · Not installed"
         )
 
         let failed = TranscriptionModelRowModel(
@@ -1537,8 +1541,8 @@ final class TranscriptionLanguageTests: XCTestCase {
             isSelected: false
         )
         XCTAssertEqual(
-            failed.statusLine(capabilityLabel: "Auto-detect", hasLanguageControl: false),
-            "Needs Attention · Auto-detect"
+            failed.statusLine(capabilityLabel: "Auto-detect", downloadSize: nil),
+            "Needs attention · Auto-detect"
         )
 
         let downloading = TranscriptionModelRowModel(
@@ -1547,7 +1551,7 @@ final class TranscriptionLanguageTests: XCTestCase {
             isSelected: false
         )
         XCTAssertEqual(
-            downloading.statusLine(capabilityLabel: "Multilingual", hasLanguageControl: false),
+            downloading.statusLine(capabilityLabel: "Multilingual", downloadSize: "3.2 GB"),
             "Downloading · 50%"
         )
     }
@@ -1596,5 +1600,47 @@ final class TranscriptionLanguageTests: XCTestCase {
 
         store.setDetectedLanguageCapability(.single(code: "en"), for: .whisperLocalFolder)
         XCTAssertEqual(publishes, 2)
+    }
+}
+
+/// A backend whose model load takes a set time, for the "preparing" indicator.
+private actor SlowPrepareBackend: BuiltInTranscriptionBackend {
+    let delayNanoseconds: UInt64
+
+    init(delayNanoseconds: UInt64) {
+        self.delayNanoseconds = delayNanoseconds
+    }
+
+    func isInstalled(modelID _: BuiltInModelID) async throws -> Bool { true }
+    func prepare(modelID _: BuiltInModelID) async throws {
+        try await Task.sleep(nanoseconds: delayNanoseconds)
+    }
+    func install(modelID _: BuiltInModelID, progressHandler _: ModelInstallProgressHandler?) async throws {}
+    func transcribe(modelID _: BuiltInModelID, wavURL _: URL, source _: AudioSource) async throws -> String { "" }
+}
+
+@MainActor
+final class ModelPreparingIndicatorTests: XCTestCase {
+    /// A slow first load shows as preparing, then clears.
+    func testSlowLoadShowsPreparingUntilItFinishes() async throws {
+        let service = LocalTranscriptionService(backends: [.parakeet: SlowPrepareBackend(delayNanoseconds: 800_000_000)])
+        let store = TranscriptionModelStore(service: service)
+
+        let load = Task { try await store.prepare(.barkCleanEnglish) }
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertEqual(store.preparingModelID, .barkCleanEnglish)
+
+        try await load.value
+        XCTAssertNil(store.preparingModelID)
+    }
+
+    /// A warm load is over before the indicator would appear, so nothing flashes.
+    func testFastLoadNeverShowsPreparing() async throws {
+        let service = LocalTranscriptionService(backends: [.parakeet: SlowPrepareBackend(delayNanoseconds: 50_000_000)])
+        let store = TranscriptionModelStore(service: service)
+
+        try await store.prepare(.barkCleanEnglish)
+        try await Task.sleep(nanoseconds: 400_000_000)
+        XCTAssertNil(store.preparingModelID)
     }
 }

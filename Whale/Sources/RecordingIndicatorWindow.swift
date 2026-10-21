@@ -190,12 +190,12 @@ final class RecordingIndicatorWindow: NSPanel {
     /// Show a brief paste/accessibility nudge.
     func showHint(reason: PasteHintReason) {
         let host = NSHostingView(rootView: HUDShadowContainer { PasteHintView(reason: reason) })
-        present(host, size: host.fittingSize, feedbackDuration: 2)
+        present(host, size: host.fittingSize.roundedUp, feedbackDuration: 2)
     }
 
     func showMessage(_ message: String, isError: Bool, duration: TimeInterval) {
         let host = NSHostingView(rootView: HUDShadowContainer { StatusMessageView(message: message, isError: isError) })
-        present(host, size: host.fittingSize, feedbackDuration: duration)
+        present(host, size: host.fittingSize.roundedUp, feedbackDuration: duration)
     }
 
     // MARK: Presentation
@@ -205,13 +205,16 @@ final class RecordingIndicatorWindow: NSPanel {
         let id = presentationID
         stopPresentationObservers()
 
+        // Window first, then the pill: added before the resize, autoresizing would stretch or
+        // squash the pill by the difference between this presentation's size and the last one's
+        // — which is what clipped the recording pill after a wider paste hint, and the reverse.
+        setContentSize(size)
         if host.superview !== container {
             container.subviews.forEach { $0.removeFromSuperview() }
-            host.frame = NSRect(origin: .zero, size: size)
-            host.autoresizingMask = [.width, .height]
             container.addSubview(host)
         }
-        setContentSize(size)
+        host.autoresizingMask = []
+        host.frame = container.bounds
         // From the moment it's asked for, so a click during the anchor lookup still dismisses it.
         if let feedbackDuration {
             scheduleFeedbackDismissal(after: feedbackDuration, presentationID: id)
@@ -494,4 +497,9 @@ private struct StatusMessageView: View {
         .frame(maxWidth: 360)
         .background(Capsule().fill(.black.opacity(0.78)))
     }
+}
+
+private extension NSSize {
+    /// Whole points, so fractional text widths don't clip a pill's last character.
+    var roundedUp: NSSize { NSSize(width: width.rounded(.up), height: height.rounded(.up)) }
 }
