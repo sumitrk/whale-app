@@ -64,6 +64,11 @@ struct AppRuntimeInfo: Equatable, Sendable {
         whaleSupportDirectoryURL.appendingPathComponent("Transcripts", isDirectory: true)
     }
 
+    /// Whale fills this one itself, so its name is ours rather than FluidAudio's.
+    var barkCleanDirectoryURL: URL {
+        modelsDirectoryURL.appendingPathComponent(BarkCleanModelCatalog.directoryName, isDirectory: true)
+    }
+
     /// Must stay equal to FluidAudio's `Repo.parakeetV2.folderName`. `AsrModels` resolves
     /// every path as `<parent of what we pass>/<folderName>`, so a name that disagrees
     /// means we check, reset, and report on one directory while the model lives in another.
