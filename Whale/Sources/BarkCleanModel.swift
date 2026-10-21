@@ -14,6 +14,8 @@ import Foundation
 /// `Whale/Resources/Licenses/Bark-3.0-Clean/`.
 enum BarkCleanModelCatalog {
     static let displayName = "Bark 3.0 Clean"
+    /// Credits Underdog, links CC BY 4.0 and describes the original model.
+    static let modelCardURL = URL(string: "https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Clean")!
 
     /// Bump the `v1` in both the folder and the URL together when a new conversion ships, so
     /// an old install is never mistaken for the new one.

@@ -19,11 +19,7 @@ struct ModelsSettingsView: View {
 /// bring-your-own folder under its own header.
 struct ModelListSections: View {
     var body: some View {
-        // CC-BY's credit, licence link and note of changes. See
-        // Resources/Licenses/Bark-3.0-Clean before rewording.
-        SettingsSection(
-            footer: "\(BarkCleanModelCatalog.displayName) is [Underdog Bark 3.0 Clean](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Clean), converted to Core ML, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)."
-        ) {
+        SettingsSection {
             ForEach(BuiltInModelCatalog.models(from: .bundled)) { model in
                 ModelRow(model: model)
             }
@@ -175,12 +171,21 @@ private struct ModelRow: View {
 
     private func hasMenuItems(for row: TranscriptionModelRowModel) -> Bool {
         let fileActions = row.isReady && (model.changeActionTitle != nil || localModelPath != nil)
-        return fileActions || row.resetActionTitle != nil
+        return fileActions || row.resetActionTitle != nil || model.id == .barkCleanEnglish
     }
 
     /// The "⋯" menu and the row's right-click menu: everything that acts on the model's files.
     @ViewBuilder
     private func menuItems(for row: TranscriptionModelRowModel) -> some View {
+        // CC BY's credit, as a link to the model card, which names the authors, the licence and
+        // what was changed. See Resources/Licenses/Bark-3.0-Clean before removing it.
+        if model.id == .barkCleanEnglish {
+            Button("About \(model.title) (CC BY 4.0)…") {
+                NSWorkspace.shared.open(BarkCleanModelCatalog.modelCardURL)
+            }
+            Divider()
+        }
+
         if row.isReady, let title = model.changeActionTitle {
             Button("\(title)…", action: chooseLocalFolder)
         }
