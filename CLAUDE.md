@@ -4,13 +4,16 @@
 - The app no longer depends on a bundled Python server.
 - The app targets Apple Silicon Macs only.
 - Transcription runs through the `FluidAudio` Swift package and Core ML.
-- The optional dictation Cleanup stage runs S1-mini by Superwhisper through `mlx-swift` /
-  `mlx-swift-lm`. See `Whale/Resources/Licenses/S1-mini/README.md` before touching how the
-  model is named in the UI — the name is a licence term.
+- Bark 3.0 Clean (Underdog, CC BY 4.0) is a Core ML conversion Whale hosts on R2. It removes
+  fillers while transcribing, which replaced the separate S1-mini Cleanup stage. See
+  `Whale/Resources/Licenses/Bark-3.0-Clean/README.md` before changing its credit in the UI.
 - Build and package the app with Xcode and the checked-in `Whale.xcodeproj`.
-- Building requires Xcode's Metal Toolchain component, which MLX's shaders need and Xcode 26
-  no longer installs by default. On a fresh machine or CI runner:
-  `xcodebuild -downloadComponent MetalToolchain` (~690 MB, one time).
+
+## SwiftUI
+- Use the `swiftui-pro` skill (`.agents/skills/swiftui-pro`) for every Swift or SwiftUI change.
+- Settings pages are built from the components in `Whale/Sources/Settings`, copied from the
+  Spark app (`~/Downloads/Projects/spark/Spark/Settings`): `SettingsPageLayout`, `SettingsSection`
+  cards and the `Settings*Row` types. Use them rather than `Form`, so pages keep Spark's look.
 
 ## Git Workflow
 - **Never commit directly to `main`**

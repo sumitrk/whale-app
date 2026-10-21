@@ -16,35 +16,27 @@ struct GeneralSettingsView: View {
     }
 
     var body: some View {
-        Form {
-            Section("System") {
-                Toggle(isOn: $store.launchAtLogin) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Launch at Login")
-                        Text("Start Whale automatically when you sign in.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.switch)
+        SettingsPageLayout(title: "General") {
+            SettingsSection("System") {
+                SettingsToggleRow(
+                    "Launch at login",
+                    subtitle: "Start Whale automatically when you sign in.",
+                    icon: SettingsRowIcon("power", .settingsGreen),
+                    isOn: $store.launchAtLogin
+                )
             }
 
-            Section("Updates") {
-                LabeledContent("Version", value: appVersion)
-
+            SettingsSection("Updates") {
+                SettingsValueRow("Version", value: appVersion)
                 if let updater = updaterState.updater {
-                    LabeledContent("Updates") {
-                        Button("Check for Updates…") {
-                            UpdateCheckAction.checkForUpdates(using: updater)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!updaterState.canCheckForUpdates)
+                    SettingsRow("Updates", icon: SettingsRowIcon("arrow.down.circle.fill", .settingsBlue)) {
+                        Button("Check for updates…") { UpdateCheckAction.checkForUpdates(using: updater) }
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.capsule)
+                            .disabled(!updaterState.canCheckForUpdates)
                     }
                 }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, 8, for: .scrollContent)
     }
 }

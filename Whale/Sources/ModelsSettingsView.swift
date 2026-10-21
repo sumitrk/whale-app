@@ -5,219 +5,41 @@ struct ModelsSettingsView: View {
     @ObservedObject private var modelStore = TranscriptionModelStore.shared
 
     var body: some View {
-        Form {
+        SettingsPageLayout(title: "Models") {
             ModelListSections()
-            TranscriptCleanupSection()
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, 8, for: .scrollContent)
         .task { await modelStore.refreshNow() }
     }
 }
 
-/// The model list itself, without a `Form` around it, so the settings pane and the
-/// onboarding step present exactly the same rows.
+/// The model list itself, without a page around it, so the settings pane and the onboarding
+/// step present exactly the same rows.
 ///
 /// Two boxes rather than one: the models Whale ships and installs itself, then the
 /// bring-your-own folder under its own header.
 struct ModelListSections: View {
     var body: some View {
-        Section {
+        SettingsSection {
             ForEach(BuiltInModelCatalog.models(from: .bundled)) { model in
                 ModelRow(model: model)
             }
-        } footer: {
-            // CC-BY's credit, licence link and note of changes. See
-            // Resources/Licenses/Bark-3.0-Clean before rewording.
-            Text("\(BarkCleanModelCatalog.displayName) is [Underdog Bark 3.0 Clean](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Clean), converted to Core ML, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
 
-        Section {
+        SettingsSection("Custom", footer: "All models run locally on your Mac. Audio never leaves the device.") {
             ForEach(BuiltInModelCatalog.models(from: .custom)) { model in
                 ModelRow(model: model)
             }
-        } header: {
-            Text("Custom")
-        } footer: {
-            Text("All models run locally on your Mac. Audio never leaves the device.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
     }
 }
 
-/// S1-mini: the switch, the download it starts, and the three axes it steers on.
-///
-/// The switch comes first and is never disabled — flipping it on is how the download
-/// begins, so gating it on a model that is not there yet would leave no way to get one.
-/// The model row appears beneath it, and the steering controls only once there is a model
-/// to steer.
-struct TranscriptCleanupSection: View {
-    @ObservedObject private var settings = SettingsStore.shared
-    @ObservedObject private var store = CleanupModelStore.shared
-
-    var body: some View {
-        Section {
-            Toggle(isOn: $settings.transcriptCleanupEnabled) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Clean Up Dictation")
-                    Text("Remove “um” and “uh”, resolve “no, make that…” to what you landed on, and punctuate — all on this Mac.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-
-            // One rule: the row exists if the model exists, or if Cleanup is on. Tying it
-            // to the toggle alone would leave 633 MB on disk with no row to delete it
-            // from, reachable only by switching a feature on to turn it off again.
-            if settings.transcriptCleanupEnabled || store.isInstalled {
-                CleanupModelRow()
-            }
-
-            if settings.transcriptCleanupEnabled, store.isReady {
-                Picker("Style", selection: $settings.cleanupStyling) {
-                    ForEach(TranscriptCleanupStyling.allCases) { styling in
-                        Text(styling.title).tag(styling)
-                    }
-                }
-
-                Picker("Structure", selection: $settings.cleanupStructure) {
-                    ForEach(TranscriptCleanupStructure.allCases) { structure in
-                        Text(structure.title).tag(structure)
-                    }
-                }
-
-                Picker("Destination", selection: $settings.cleanupContext) {
-                    ForEach(TranscriptCleanupContext.allCases) { context in
-                        Text(context.title).tag(context)
-                    }
-                }
-
-                Text(optionSummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        } header: {
-            Text("Formatting")
-        }
-        .onChange(of: settings.transcriptCleanupEnabled) { _, isEnabled in
-            // Switching off keeps the weights: the next dictation stops being cleaned, and
-            // switching back on costs nothing. Only Delete reclaims the disk.
-            guard isEnabled else { return }
-            Task { await store.installIfNeeded() }
-        }
-    }
-
-    private var optionSummary: String {
-        let options = settings.cleanupOptions
-        return "\(options.styling.detail.capitalizedFirst); \(options.structure.detail); \(options.context.detail)."
-    }
-}
-
-private extension String {
-    var capitalizedFirst: String {
-        guard let first else { return self }
-        return first.uppercased() + dropFirst()
-    }
-}
-
-/// The S1-mini download, drawn to match the transcription-model rows above it without
-/// borrowing their machinery — there is nothing to select here, and no language to pick.
-private struct CleanupModelRow: View {
-    @ObservedObject private var store = CleanupModelStore.shared
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(.purple)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    Image(systemName: "wand.and.sparkles")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                )
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(S1ModelCatalog.displayName)
-
-                Text(statusLine)
-                    .font(.subheadline)
-                    .foregroundStyle(isFailed ? .red : .secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-            }
-
-            Spacer(minLength: 8)
-
-            accessory
-        }
-        .padding(.vertical, 4)
-        .task { await store.installIfNeeded() }
-    }
-
-    @ViewBuilder
-    private var accessory: some View {
-        switch store.installState {
-        case .checking:
-            ProgressView().controlSize(.small)
-
-        case .downloading:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Button("Cancel") { store.cancel() }
-                    .buttonStyle(.bordered)
-            }
-            .fixedSize()
-
-        case .notInstalled:
-            Button("Download") { store.install() }
-                .buttonStyle(.bordered)
-
-        case .failed:
-            Button("Retry") { store.install() }
-                .buttonStyle(.bordered)
-
-        case .ready:
-            Button("Delete") { store.remove() }
-                .buttonStyle(.bordered)
-        }
-    }
-
-    private var statusLine: String {
-        switch store.installState {
-        case .checking:
-            return "Checking…"
-        case .notInstalled:
-            return "Not Installed · \(S1ModelCatalog.approximateDownloadSize) download"
-        case .downloading(let fraction, let phase):
-            let percent = fraction.map { " · \(Int(($0 * 100).rounded()))%" } ?? ""
-            return phase + percent
-        case .ready:
-            return "Installed · Runs locally on-device"
-        case .failed(let message):
-            return message
-        }
-    }
-
-    private var isFailed: Bool {
-        if case .failed = store.installState { return true }
-        return false
-    }
-}
-
-/// One model in the list. The row *is* the picker: clicking an installed row makes it the
-/// active model, which is why there is no separate "Active Model" dropdown above the list.
+/// One model in the list. Every row has one action in the same place — Download, Use, Retry
+/// or Choose folder — and the model in use says "In use" there instead, on a tinted row, so
+/// which one dictation runs on is never in doubt. Everything else that acts on the files
+/// (delete, show in Finder, change folder) is in the row's "⋯" menu.
 private struct ModelRow: View {
     @ObservedObject private var modelStore = TranscriptionModelStore.shared
     @ObservedObject private var settings = SettingsStore.shared
-    @State private var isHovering = false
     @State private var pendingDelete: PendingModelDelete?
 
     let model: BuiltInModelDescriptor
@@ -230,53 +52,91 @@ private struct ModelRow: View {
         )
     }
 
+    private var isInUse: Bool {
+        settings.selectedBuiltInModelID == model.id && rowModel.isReady
+    }
+
+    private var isPreparing: Bool {
+        modelStore.preparingModelID == model.id
+    }
+
     var body: some View {
         let row = rowModel
 
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             ModelIcon(model: model)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.title)
+                    .fontWeight(.medium)
 
-                HStack(spacing: 5) {
-                    if row.status.showsDot {
-                        Circle()
-                            .fill(dotColor(for: row.status))
-                            .frame(width: 7, height: 7)
-                    }
-
-                    // The load phase explains a multi-minute wait, so let it wrap onto a
-                    // second line rather than truncating the explanation away.
-                    Text(statusLine(for: row))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // The load phase explains a multi-minute wait, so let it wrap onto a second
+                // line rather than truncating the explanation away.
+                Text(subtitle(for: row))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let errorText = row.errorText {
                     Text(errorText)
-                        .font(.subheadline)
+                        .font(.callout)
                         .foregroundStyle(.red)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 12)
 
-            accessory(for: row)
+            HStack(spacing: 8) {
+                if row.isBusy || isPreparing {
+                    ProgressView()
+                        .controlSize(.small)
+                    if row.isCancellable {
+                        Button("Cancel") { modelStore.cancel(model.id) }
+                    }
+                } else {
+                    if let control = languageControl(for: row) {
+                        ModelLanguageControlView(control: control) { option in
+                            settings.setLanguageCode(option.decodingLanguageCode, for: model.id)
+                        }
+                    }
+                    if isInUse {
+                        Label("In use", systemImage: "checkmark.circle.fill")
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(Color.accentColor)
+                    } else if row.isReady {
+                        Button("Use") { modelStore.use(model.id) }
+                    } else if let title = row.primaryActionTitle {
+                        Button(title, action: triggerPrimaryAction)
+                    }
+                }
+
+                if hasMenuItems(for: row) {
+                    Menu {
+                        menuItems(for: row)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 16, height: 16)
+                    }
+                    .menuStyle(.button)
+                    .menuIndicator(.hidden)
+                    .buttonBorderShape(.circle)
+                    .accessibilityLabel("More actions for \(model.title)")
+                }
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            // Without this the title takes the space it wants and a long language name
+            // squeezes the button beside it down to a sliver.
+            .fixedSize()
+            .layoutPriority(1)
         }
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.primary.opacity(isHovering && row.isReady ? 0.06 : 0))
-                .padding(.horizontal, -6)
-        )
-        .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
-        .onTapGesture { activate(row) }
-        .contextMenu { contextMenu(for: row) }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(minHeight: 44)
+        .background(isInUse ? Color.accentColor.opacity(0.07) : .clear)
+        .contextMenu { menuItems(for: row) }
         .confirmationDialog(
             "Delete \(model.title)?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -288,98 +148,55 @@ private struct ModelRow: View {
         }
     }
 
-    private func statusLine(for row: TranscriptionModelRowModel) -> String {
-        row.statusLine(
-            capabilityLabel: model.capabilityLabel,
-            hasLanguageControl: languageControl(for: row) != nil
-        )
-    }
-
-    private func dotColor(for status: TranscriptionModelStatus) -> Color {
-        switch status {
-        case .active:                   return .green
-        case .needsAttention:           return .red
-        case .inactive, .notInstalled:  return .secondary.opacity(0.5)
-        case .working:                  return .clear
+    private func subtitle(for row: TranscriptionModelRowModel) -> String {
+        if isPreparing {
+            return "Preparing for first use… this takes a few seconds"
         }
+        return row.statusLine(capabilityLabel: model.capabilityLabel, downloadSize: model.downloadSize)
     }
 
-    /// The language control lands where the Download button was, so the right-hand column
-    /// reads the same all the way down the list. The local folder is the one row that keeps a
-    /// button as well — it still has to be repointed — and that button sits to the left so the
-    /// language stays in the column the eye is scanning.
-    @ViewBuilder
-    private func accessory(for row: TranscriptionModelRowModel) -> some View {
-        if row.isBusy {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-
-                // Cancel sits on the right, where Download and the language selector sit, so
-                // the column the eye follows down the list holds the action in every state.
-                if row.isCancellable {
-                    Button("Cancel") { modelStore.cancel(model.id) }
-                        .buttonStyle(.bordered)
-                }
-            }
-            .fixedSize()
-            .layoutPriority(1)
-        } else {
-            HStack(spacing: 8) {
-                if let title = row.primaryActionTitle {
-                    // Deliberately not `.borderedProminent`: nothing on this pane is the one
-                    // thing the user came here to do, so no row gets to claim the screen's
-                    // default action.
-                    Button(title) { triggerPrimaryAction() }
-                        .buttonStyle(.bordered)
-                }
-
-                // Any model whose files the app downloaded itself, the active one included:
-                // the confirmation says so when dictation would be left without a model. A
-                // folder the user supplied is never erased; it keeps its context-menu entry.
-                if row.isReady, model.ownsModelFiles, let title = row.resetActionTitle {
-                    Button { requestDelete(row) } label: {
-                        Image(systemName: "trash")
-                    }
-                    .buttonStyle(.bordered)
-                    .help(title)
-                    .accessibilityLabel("\(title) \(model.title)")
-                }
-
-                if let control = languageControl(for: row) {
-                    ModelLanguageControlView(control: control) { option in
-                        settings.setLanguageCode(option.decodingLanguageCode, for: model.id)
-                    }
-                }
-            }
-            // Without this the title takes the space it wants and a long language name
-            // squeezes the button beside it down to a sliver.
-            .fixedSize()
-            .layoutPriority(1)
-        }
-    }
-
-    /// Only an installed model gets a language control — including one that is installed but
-    /// inactive, so a language can be set before switching to it rather than after.
+    /// Only an installed model with a real choice gets a language control — including one
+    /// that isn't in use, so a language can be set before switching to it. A model that knows
+    /// one language says so in its subtitle instead of showing a disabled button.
     private func languageControl(for row: TranscriptionModelRowModel) -> ModelLanguageControl? {
         guard row.isReady else { return nil }
 
-        return ModelLanguageResolver.control(
+        let control = ModelLanguageResolver.control(
             for: model,
             detected: settings.detectedLanguageCapability(for: model.id),
             storedCode: settings.languageCode(for: model.id)
         )
+        return control?.allowsSelection == true ? control : nil
     }
 
+    private func hasMenuItems(for row: TranscriptionModelRowModel) -> Bool {
+        let fileActions = row.isReady && (model.changeActionTitle != nil || localModelPath != nil)
+        return fileActions || row.resetActionTitle != nil || model.id == .barkCleanEnglish
+    }
+
+    /// The "⋯" menu and the row's right-click menu: everything that acts on the model's files.
     @ViewBuilder
-    private func contextMenu(for row: TranscriptionModelRowModel) -> some View {
-        if let path = localModelPath {
+    private func menuItems(for row: TranscriptionModelRowModel) -> some View {
+        // CC BY's credit, as a link to the model card, which names the authors, the licence and
+        // what was changed. See Resources/Licenses/Bark-3.0-Clean before removing it.
+        if model.id == .barkCleanEnglish {
+            Button("About \(model.title) (CC BY 4.0)…") {
+                NSWorkspace.shared.open(BarkCleanModelCatalog.modelCardURL)
+            }
+            Divider()
+        }
+
+        if row.isReady, let title = model.changeActionTitle {
+            Button("\(title)…", action: chooseLocalFolder)
+        }
+
+        if row.isReady, let path = localModelPath {
             Button("Show in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
             }
             .disabled(!FileManager.default.fileExists(atPath: path))
 
-            Button("Copy Path") {
+            Button("Copy path") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(path, forType: .string)
             }
@@ -387,12 +204,10 @@ private struct ModelRow: View {
 
         if let resetActionTitle = row.resetActionTitle {
             Divider()
-            Button(resetActionTitle) {
-                if model.ownsModelFiles {
-                    requestDelete(row)
-                } else {
-                    modelStore.reset(model.id)
-                }
+            if model.ownsModelFiles {
+                Button("\(resetActionTitle)…", role: .destructive) { requestDelete(row) }
+            } else {
+                Button(resetActionTitle, role: .destructive) { modelStore.reset(model.id) }
             }
         }
     }
@@ -418,11 +233,6 @@ private struct ModelRow: View {
             total += Int64((try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0)
         }
         return total > 0 ? total : nil
-    }
-
-    private func activate(_ row: TranscriptionModelRowModel) {
-        guard row.isReady else { return }
-        settings.selectedBuiltInModelID = model.id
     }
 
     private var localModelPath: String? {
@@ -453,7 +263,7 @@ private struct ModelRow: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.prompt = "Choose Folder"
+        panel.prompt = "Choose folder"
         panel.message = "Select a WhisperKit/Core ML folder that contains MelSpectrogram, AudioEncoder, and TextDecoder."
 
         guard panel.runModal() == .OK, let folderURL = panel.url else { return }
@@ -508,6 +318,7 @@ private struct ModelLanguageControlView: View {
                 }
             }
             .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
             .background(LanguageMenuAnchorView(anchor: anchor))
             .fixedSize()
         } else {
@@ -516,6 +327,7 @@ private struct ModelLanguageControlView: View {
             // underneath rather than leaving a dead patch in the middle of a clickable row.
             Button(control.selection.title) {}
                 .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
                 .disabled(true)
                 .allowsHitTesting(false)
                 .accessibilityRemoveTraits(.isButton)
@@ -613,25 +425,18 @@ private struct ModelIcon: View {
         // A folder the user pointed at is identified by that fact, not by the engine that
         // happens to read it — otherwise it would be indistinguishable from bundled Whisper.
         guard model.source != .custom else {
-            return (.orange, "folder.fill")
+            return (.settingsOrange, "folder.fill")
         }
 
         switch model.group {
-        case .parakeet: return (.blue, "waveform")
-        case .whisper:  return (.purple, "text.bubble.fill")
-        case .apple:    return (.gray, "apple.logo")
+        case .parakeet: return (.settingsBlue, "waveform")
+        case .whisper:  return (.settingsPurple, "text.bubble.fill")
+        case .apple:    return (.settingsGray, "apple.logo")
         }
     }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(appearance.color)
-            .frame(width: 28, height: 28)
-            .overlay(
-                Image(systemName: appearance.symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-            )
+        SettingsIconTile(symbol: appearance.symbol, tint: appearance.color, cornerRadius: 10)
             .accessibilityHidden(true)
     }
 }

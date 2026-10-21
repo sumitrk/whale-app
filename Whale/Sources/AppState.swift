@@ -108,30 +108,11 @@ class AppState: ObservableObject {
         self.accessibility = accessibility
         self.pipelineFactory = pipelineFactory ?? {
             // Rebuilt per recording, so a settings change applies to the next one.
-            var stages: [PipelineStage] = [
+            TranscriptionPipeline(stages: [
                 // VoiceActivityDetectionStage(),
                 TranscriptionStage(transcriber: LocalTranscriptionService.shared),
-            ]
-            // Switched on is not the same as ready to run: the download starts the moment
-            // the toggle flips, and a dictation fired before it lands must go through
-            // untouched rather than wait on it. Checked here rather than inside the stage
-            // so a half-downloaded model costs nothing — no load attempt, no 20-second
-            // budget spent failing — and Smart Formatting takes the slot in the meantime.
-            let cleanupIsRunning = SettingsStore.shared.transcriptCleanupEnabled
-                && S1ModelCatalog.isInstalled(.current)
-
-            if cleanupIsRunning {
-                stages.append(
-                    TranscriptCleanupStage(
-                        engine: S1CleanupEngine.shared,
-                        options: SettingsStore.shared.cleanupOptions
-                    )
-                )
-            }
-            if SettingsStore.shared.usesSmartFormattingStage(cleanupIsRunning: cleanupIsRunning) {
-                stages.append(SmartFormattingStage())
-            }
-            return TranscriptionPipeline(stages: stages)
+                SmartFormattingStage(),
+            ])
         }
         self.aiActionCoordinator = AIActionCoordinator(
             client: openRouterClient,
@@ -144,11 +125,7 @@ class AppState: ObservableObject {
         }
 
         Task { await prepareApp() }
-
-        // Cleanup ships on, so the weights have to arrive without anyone going looking for
-        // them. Not hung off the Models pane, which most launches never open, nor off the
-        // menu bar content, which SwiftUI only builds when the menu is actually clicked.
-        Task { @MainActor in await CleanupModelStore.shared.installIfNeeded() }
+        Task.detached(priority: .utility) { RemovedCleanupModel.deleteIfPresent(.current) }
 
         Publishers.CombineLatest4(
             settings.$toggleKeyCode,
@@ -347,11 +324,16 @@ class AppState: ObservableObject {
             }
 
             currentModelID = modelID
-            // The rewrite runs after the recording stops, so the load can overlap with
-            // the user still talking. Left until then, a cold model would add seconds to
-            // the gap between releasing the key and seeing text.
-            if settings.transcriptCleanupEnabled {
-                CleanupModelStore.shared.warmIfReady()
+            // Usually already loaded at launch. When it isn't — the model was just switched,
+            // or the first load after an update is still compiling for the Neural Engine —
+            // starting now lets the load overlap with the user talking instead of adding
+            // seconds after they stop. The transcription waits on the same load.
+            let transcriber = self.transcriber
+            Task.detached(priority: .userInitiated) { try? await transcriber.prepareModel(modelID) }
+            // Before the history write and the capture start, so the HUD answers the key press
+            // immediately rather than after the database and the audio engine.
+            if mode == .paste {
+                RecordingIndicatorWindow.shared.show(recorder: recorder)
             }
             if mode == .paste {
                 let store = try await history.requireStore()
@@ -364,9 +346,6 @@ class AppState: ObservableObject {
                 history.changed()
             }
             DiagnosticLog.log("[Recording] Starting \(mode == .paste ? "paste" : "markdown") capture with model \(modelID.rawValue).")
-            if mode == .paste {
-                RecordingIndicatorWindow.shared.show(recorder: recorder)
-            }
             try await recorder.startRecording(captureSystemAudio: mode == .markdown)
             if mode == .markdown {
                 activity = .recording(mode: .markdown, startedAt: Date())
@@ -580,7 +559,7 @@ class AppState: ObservableObject {
         let modelID = settings.selectedBuiltInModelID
         if modelStore.isReady(for: modelID) {
             do {
-                try await transcriber.prepareModel(modelID)
+                try await modelStore.prepare(modelID)
             } catch {
                 DiagnosticLog.log("[Startup] Failed to prepare \(modelID.rawValue): \(error.localizedDescription)")
                 status = .error(error.localizedDescription)

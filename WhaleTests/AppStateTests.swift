@@ -294,7 +294,7 @@ final class HUDDismissalTests: XCTestCase {
         NSApplication.shared.sendEvent(event)
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
 
-        XCTAssertNil(hud.contentView)
+        XCTAssertFalse(hud.hasContent)
     }
 
     /// The HUD is a shared singleton and the host app is still finishing launch when the first
@@ -312,7 +312,7 @@ final class HUDDismissalTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))
 
         hud.showHint(reason: .manualPasteOnly)
-        XCTAssertNotNil(hud.contentView, "hint should be on screen as soon as it is shown")
+        XCTAssertTrue(hud.hasContent, "hint should be on screen as soon as it is shown")
 
         XCTAssertTrue(
             waitForHUDToClear(hud, within: 4.0),
@@ -328,10 +328,30 @@ final class HUDDismissalTests: XCTestCase {
     ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if hud.contentView == nil { return true }
+            if !hud.hasContent { return true }
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
-        return hud.contentView == nil
+        return !hud.hasContent
+    }
+
+    /// Each presentation has its own size. Switching between them must leave the new pill
+    /// exactly filling the window — autoresizing it by the old size used to clip it.
+    @MainActor
+    func testPillFillsTheWindowAfterSwitchingSizes() throws {
+        let hud = RecordingIndicatorWindow.shared
+        hud.showHint(reason: .manualPasteOnly)
+        let hintSize = try XCTUnwrap(hud.contentView).bounds.size
+        hud.showProcessing()
+
+        let container = try XCTUnwrap(hud.contentView)
+        let pill = try XCTUnwrap(container.subviews.first)
+        XCTAssertNotEqual(container.bounds.size, hintSize)
+        XCTAssertEqual(pill.frame, container.bounds)
+
+        hud.showHint(reason: .manualPasteOnly)
+        let hint = try XCTUnwrap(container.subviews.first)
+        XCTAssertEqual(hint.frame, container.bounds)
+        hud.hide()
     }
 
     @MainActor
@@ -343,7 +363,7 @@ final class HUDDismissalTests: XCTestCase {
 
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
 
-        XCTAssertNotNil(hud.contentView)
+        XCTAssertTrue(hud.hasContent)
         XCTAssertGreaterThan(hud.alphaValue, 0.9)
     }
 }

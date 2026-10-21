@@ -66,6 +66,8 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
     let declaredLanguageCapability: ModelLanguageCapability
     let detail: String
     let markdownLabel: String
+    /// What the download weighs, shown before it's installed. Nil for models macOS provides.
+    var downloadSize: String? = nil
 
     var installationPrompt: String {
         switch provisioning {
@@ -81,7 +83,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
         case .download, .systemAsset:
             return "Download"
         case .localFolder:
-            return "Choose Folder"
+            return "Choose folder"
         }
     }
 
@@ -90,7 +92,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
         case .download, .systemAsset:
             return "Retry"
         case .localFolder:
-            return "Choose Another Folder"
+            return "Choose another folder"
         }
     }
 
@@ -99,7 +101,7 @@ struct BuiltInModelDescriptor: Identifiable, Equatable, Sendable {
         case .download, .systemAsset:
             return nil
         case .localFolder:
-            return "Change Folder"
+            return "Change folder"
         }
     }
 
@@ -142,7 +144,8 @@ enum BuiltInModelCatalog {
             capabilityLabel: "English only",
             declaredLanguageCapability: .single(code: "en"),
             detail: "Parakeet TDT v2 • English only • Runs locally on-device",
-            markdownLabel: "FluidAudio Parakeet v2"
+            markdownLabel: "FluidAudio Parakeet v2",
+            downloadSize: "445 MB"
         ),
         // Underdog's name for it, credited as CC-BY asks. Runs on the Parakeet backend because
         // it is a Parakeet v3 fine-tune.
@@ -155,7 +158,8 @@ enum BuiltInModelCatalog {
             capabilityLabel: "English only · Leaves out “um” and false starts",
             declaredLanguageCapability: .single(code: "en"),
             detail: "Underdog Bark 3.0 Clean (CC BY 4.0) • English only • Runs locally on-device",
-            markdownLabel: "Underdog Bark 3.0 Clean"
+            markdownLabel: "Underdog Bark 3.0 Clean",
+            downloadSize: "281 MB"
         ),
         BuiltInModelDescriptor(
             id: .whisperLargeV3Turbo,
@@ -166,7 +170,8 @@ enum BuiltInModelCatalog {
             capabilityLabel: "Multilingual",
             declaredLanguageCapability: .multilingual,
             detail: "WhisperKit • OpenAI Whisper large-v3-turbo • Runs locally on-device",
-            markdownLabel: "Whisper Large V3 Turbo"
+            markdownLabel: "Whisper Large V3 Turbo",
+            downloadSize: "3.2 GB"
         ),
         BuiltInModelDescriptor(
             id: .appleSpeech,
@@ -239,11 +244,11 @@ enum TranscriptionModelStatus: Equatable {
 
     var text: String {
         switch self {
-        case .active:              return "Active"
-        case .inactive:            return "Inactive"
-        case .notInstalled:        return "Not Installed"
+        case .active:              return "In use"
+        case .inactive:            return "Downloaded"
+        case .notInstalled:        return "Not installed"
         case .working(let phase):  return phase
-        case .needsAttention:      return "Needs Attention"
+        case .needsAttention:      return "Needs attention"
         }
     }
 
@@ -270,20 +275,18 @@ struct TranscriptionModelRowModel: Equatable {
 
     var statusText: String { status.text }
 
-    /// The language belongs in exactly one place per row. A row showing a language control
-    /// says it there, precisely, so repeating the capability blurb beside the status would
-    /// only be redundant — and, next to a control reading "Auto-detect", faintly contradictory.
-    /// A row without one keeps the blurb, because before install it is the only way to learn
-    /// that Whisper is worth its download.
-    ///
-    /// While a download or check is running the phase text is the whole story.
-    func statusLine(capabilityLabel: String, hasLanguageControl: Bool) -> String {
-        if case .working = status {
+    /// The line under a model's name: what it can do, then what you'd need to do to use it.
+    /// Whether it's in use isn't repeated here — the row's trailing badge or button says that.
+    func statusLine(capabilityLabel: String, downloadSize: String?) -> String {
+        switch status {
+        case .working:
             return statusText
+        case .needsAttention:
+            return "\(statusText) · \(capabilityLabel)"
+        case .active, .inactive, .notInstalled:
+            guard !isReady else { return capabilityLabel }
+            return "\(capabilityLabel) · " + (downloadSize.map { "\($0) download" } ?? statusText)
         }
-
-        guard !hasLanguageControl else { return statusText }
-        return "\(statusText) · \(capabilityLabel)"
     }
 
     init(
@@ -442,6 +445,11 @@ final class TranscriptionModelStore: ObservableObject {
     static let shared = TranscriptionModelStore(service: .shared)
 
     @Published private(set) var installStates: [BuiltInModelID: NativeModelInstallState]
+    /// The model being loaded into memory, once that has taken long enough to be worth showing.
+    /// A warm load takes a tenth of a second; the first one after an install or an update
+    /// compiles for the Neural Engine and can take 10+ seconds.
+    @Published private(set) var preparingModelID: BuiltInModelID?
+    private var prepareToken: UUID?
 
     private let service: LocalTranscriptionService
     private var activeOperations: [BuiltInModelID: ModelOperationContext] = [:]
@@ -500,6 +508,33 @@ final class TranscriptionModelStore: ObservableObject {
         } catch {
             setInstallState(.failed(error.localizedDescription), for: modelID)
         }
+    }
+
+    /// Makes `modelID` the one dictation uses and starts loading it, so the next dictation
+    /// doesn't wait for it.
+    func use(_ modelID: BuiltInModelID) {
+        guard SettingsStore.shared.selectedBuiltInModelID != modelID else { return }
+        SettingsStore.shared.selectedBuiltInModelID = modelID
+        Task { try? await prepare(modelID) }
+    }
+
+    /// Loads the model into memory, showing it as preparing if that takes more than a moment.
+    func prepare(_ modelID: BuiltInModelID) async throws {
+        let token = UUID()
+        prepareToken = token
+        let reveal = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled, let self, self.prepareToken == token else { return }
+            self.preparingModelID = modelID
+        }
+        defer {
+            reveal.cancel()
+            if prepareToken == token {
+                prepareToken = nil
+                preparingModelID = nil
+            }
+        }
+        try await service.prepareModel(modelID)
     }
 
     func install(_ modelID: BuiltInModelID) {
@@ -889,6 +924,11 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
     private let runtimeInfoProvider: @Sendable () -> AppRuntimeInfo
     private var manager: (any ParakeetManaging)?
     private var loadedModelDirectory: URL?
+    /// The load in flight, so callers arriving while it runs wait for it instead of starting
+    /// their own. The actor yields at every `await`, and a first load can spend 10+ seconds
+    /// compiling for the Neural Engine — without this, launch, a model switch and a dictation
+    /// each began a separate compile of the same model.
+    private var pendingLoad: (directory: URL, task: Task<any ParakeetManaging, Error>)?
     private var hasCheckedLegacyModelDirectory = false
 
     init(
@@ -1035,6 +1075,10 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
             manager = nil
             loadedModelDirectory = nil
         }
+        if pendingLoad?.directory == context.modelDirectory {
+            pendingLoad?.task.cancel()
+            pendingLoad = nil
+        }
 
         do {
             if FileManager.default.fileExists(atPath: context.modelDirectory.path) {
@@ -1057,15 +1101,36 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
             return
         }
 
+        if let pendingLoad, pendingLoad.directory == context.modelDirectory {
+            Self.log("Waiting for the model load already running at \(context.modelDirectory.path)")
+            manager = try await pendingLoad.task.value
+            loadedModelDirectory = context.modelDirectory
+            return
+        }
+
         Self.log("Ensuring model runtime is ready at \(context.modelDirectory.path)")
 
-        guard await context.runtime.modelsExist(at: context.modelDirectory) else {
-            throw LocalTranscriptionError.modelNotInstalled(modelID.descriptor)
+        // Registered before anything else awaits, so a caller arriving during the file check
+        // joins this load rather than starting a second one.
+        let runtime = context.runtime
+        let directory = context.modelDirectory
+        let descriptor = modelID.descriptor
+        let load = Task {
+            guard await runtime.modelsExist(at: directory) else {
+                throw LocalTranscriptionError.modelNotInstalled(descriptor)
+            }
+            return try await runtime.prepareManager(at: directory)
+        }
+        pendingLoad = (directory, load)
+        defer {
+            if pendingLoad?.directory == directory { pendingLoad = nil }
         }
 
         do {
-            manager = try await context.runtime.prepareManager(at: context.modelDirectory)
-            loadedModelDirectory = context.modelDirectory
+            let started = Date()
+            manager = try await load.value
+            loadedModelDirectory = directory
+            Self.log("Model runtime ready in \(String(format: "%.1f", Date().timeIntervalSince(started)))s at \(directory.path)")
         } catch {
             Self.log("Runtime preparation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
             throw Self.wrapError(

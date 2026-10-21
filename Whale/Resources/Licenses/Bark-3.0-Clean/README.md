@@ -19,6 +19,7 @@ Core ML conversion we host ourselves (R2 bucket `whale-models`,
 
 CC-BY asks for credit, a link to the licence, and a note that changes were made. The archive
 carries `NOTICE` (this folder's copy is Underdog's, verbatim) and a README saying what
-changed. In the app, the footer under the Models list credits Underdog Bark 3.0 Clean, says
-it was converted, and links the model card and the licence (`ModelListSections`). Keep that
-footer if the list is ever redesigned.
+changed. In the app, the credit is the first item of Bark's "⋯" menu on the Models page,
+"About Bark 3.0 Clean (CC BY 4.0)…", which opens the model card (authors, licence, base
+models). CC BY allows credit by link to a page that carries it. Keep that item if the row is
+redesigned.

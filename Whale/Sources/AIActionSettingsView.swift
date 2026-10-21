@@ -5,27 +5,26 @@ struct AIActionSettingsView: View {
     @ObservedObject private var settings = SettingsStore.shared
 
     var body: some View {
-        Form {
-            OpenRouterSection(
-                connection: appState.openRouterConnection
-            )
+        SettingsPageLayout(title: "AI Actions") {
+            OpenRouterSection(connection: appState.openRouterConnection)
 
-            Section {
+            SettingsSection(
+                "Master prompt",
+                footer: "This prompt is appended inside Whale's protected insertion and context-safety instructions."
+            ) {
                 TextEditor(text: $settings.aiActionMasterPrompt)
                     .font(.body)
+                    .scrollContentBackground(.hidden)
                     .frame(minHeight: 150)
-                Button("Reset to Default") {
-                    settings.aiActionMasterPrompt = SettingsStore.defaultAIActionMasterPrompt
-                }
-            } header: {
-                Text("Master Prompt")
-            } footer: {
-                Text("This prompt is appended inside Whale's protected insertion and context-safety instructions.")
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+                SettingsButtonRow("Default prompt", action: "Reset to default", perform: resetPrompt)
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, 8, for: .scrollContent)
+    }
+
+    private func resetPrompt() {
+        settings.aiActionMasterPrompt = SettingsStore.defaultAIActionMasterPrompt
     }
 }
 
@@ -46,72 +45,85 @@ private struct OpenRouterSection: View {
     @FocusState private var keyFieldFocused: Bool
 
     var body: some View {
-        Section("OpenRouter") {
-            LabeledContent("Status") {
+        SettingsSection("OpenRouter") {
+            SettingsRow("Status", icon: SettingsRowIcon("key.fill", .settingsPurple)) {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(indicatorColor)
                         .frame(width: 8, height: 8)
                     Text(status.label)
+                        .foregroundStyle(.secondary)
                 }
             }
             if let detail = status.detail {
-                Text(detail)
-                    .font(.caption)
+                Text(verbatim: detail)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
             }
 
             if isEntering {
-                SecureField("OpenRouter API key", text: $apiKey)
-                    .focused($keyFieldFocused)
-                    .onSubmit(submit)
-                    .disabled(isSaving)
-                if let keyError {
-                    Text(keyError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                VStack(alignment: .leading, spacing: 8) {
+                    SecureField("OpenRouter API key", text: $apiKey)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($keyFieldFocused)
+                        .onSubmit(submit)
+                        .disabled(isSaving)
+                    if let keyError {
+                        Text(keyError)
+                            .font(.callout)
+                            .foregroundStyle(.red)
+                    }
+                    HStack {
+                        Button(connection.hasKey ? "Done" : "Save key", action: submit)
+                            .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(trimmedKey.isEmpty || isSaving)
+                        if connection.hasKey {
+                            Button("Cancel", action: cancelEditing)
+                                .keyboardShortcut(.cancelAction)
+                                .disabled(isSaving)
+                        }
+                        if isSaving {
+                            ProgressView().controlSize(.small)
+                        }
+                        Spacer()
+                        if !connection.hasKey {
+                            Link("Get a key ↗", destination: OpenRouterKeyVerifier.keysPage)
+                                .font(.callout)
+                        }
+                    }
                 }
-                HStack {
-                    Button(connection.hasKey ? "Done" : "Save Key", action: submit)
-                        .buttonStyle(.borderedProminent)
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(trimmedKey.isEmpty || isSaving)
-                    if connection.hasKey {
-                        Button("Cancel", action: cancelEditing)
-                            .keyboardShortcut(.cancelAction)
-                            .disabled(isSaving)
-                    }
-                    if isSaving {
-                        ProgressView().controlSize(.small)
-                    }
-                    Spacer()
-                    if !connection.hasKey {
-                        Link("Get a key ↗", destination: OpenRouterKeyVerifier.keysPage)
-                            .font(.caption)
-                    }
-                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             } else {
                 HStack {
-                    Button("Replace Key", action: beginEditing)
-                        .buttonStyle(.borderedProminent)
-                    Button("Remove Key", role: .destructive) { confirmingRemoval = true }
+                    Button("Replace key", action: beginEditing)
+                    Button("Remove key", role: .destructive) { confirmingRemoval = true }
                     if status.showsRetry {
                         Button("Retry", action: retry)
                     }
                     Spacer()
                     if status.showsTopUpLink {
                         Link("Top up ↗", destination: OpenRouterKeyVerifier.creditsPage)
-                            .font(.caption)
+                            .font(.callout)
                     }
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
         }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
         .onAppear { connection.verifyNow() }
         .confirmationDialog(
-            "Remove OpenRouter key?",
+            "Remove the OpenRouter key?",
             isPresented: $confirmingRemoval
         ) {
-            Button("Remove Key", role: .destructive, action: removeKey)
+            Button("Remove key", role: .destructive, action: removeKey)
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("AI Actions will stop working until you add a new one.")

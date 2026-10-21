@@ -7,19 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		S1C000000000000000000001 /* TranscriptCleanupOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000101 /* TranscriptCleanupOptions.swift */; };
-		S1C000000000000000000002 /* S1Prompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000102 /* S1Prompt.swift */; };
-		S1C000000000000000000003 /* TranscriptCleanupEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000103 /* TranscriptCleanupEngine.swift */; };
-		S1C000000000000000000004 /* S1ModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000104 /* S1ModelCatalog.swift */; };
-		S1C000000000000000000005 /* S1CleanupEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000105 /* S1CleanupEngine.swift */; };
-		S1C000000000000000000006 /* CleanupModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000106 /* CleanupModelStore.swift */; };
-		S1C000000000000000000007 /* TranscriptCleanupStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000107 /* TranscriptCleanupStage.swift */; };
-		S1C000000000000000000008 /* TranscriptCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = S1C000000000000000000108 /* TranscriptCleanupTests.swift */; };
-		S1B000000000000000000011 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000011 /* MLX */; };
-		S1B000000000000000000012 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000012 /* MLXLLM */; };
-		S1B000000000000000000013 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000013 /* MLXLMCommon */; };
-		S1B000000000000000000014 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000014 /* Tokenizers */; };
-		S1B000000000000000000015 /* Hub in Frameworks */ = {isa = PBXBuildFile; productRef = S1A000000000000000000015 /* Hub */; };
 		0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */; };
 		173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */; };
 		1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */; };
@@ -83,6 +70,26 @@
 		VAD000000000000000000011 /* VoiceActivityEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000001 /* VoiceActivityEditor.swift */; };
 		VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */; };
 		VAD000000000000000000013 /* VoiceActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000003 /* VoiceActivityTests.swift */; };
+		57CEE872EEAE12BAFC9F7D4C /* LevelEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */; };
+		70BB9F8472D5AE8D04FB24B1 /* RecordingBarsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */; };
+		C0746934B2975886BECF4FC2 /* HUDShadowContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */; };
+		B8A8C9A8633045C95677E274 /* RecordingPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8407F2542D3FD7B882AF819A /* RecordingPillView.swift */; };
+		94A50AEBD9019C91154844B2 /* CapsuleLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA6DB012BB46A484768CC8A /* CapsuleLabel.swift */; };
+		AD53F925E31A673936516F34 /* CapsulePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F51B089ECB4600AF9B71E46 /* CapsulePicker.swift */; };
+		BF8B7B12EE476289B8246552 /* SettingsAppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6A0224669B7D4883D33CC6 /* SettingsAppVersion.swift */; };
+		7C3C6C11E4C0566A088B0C88 /* SettingsCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C78B892C88A7644157D12C /* SettingsCompat.swift */; };
+		7E44142496C6B207B0055BD4 /* SettingsIconTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F334DF982A1C7E9F1636F5F /* SettingsIconTile.swift */; };
+		5CF0EFFE9B05B0DF21CDF835 /* SettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF877CF38F1B9A8320EC44E9 /* SettingsPage.swift */; };
+		A51ECE8A51A3DDAE747D5CBF /* SettingsPageLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F4552A384921BC8DB97295 /* SettingsPageLayout.swift */; };
+		969BE328FFB6A0CD715AF38D /* SettingsPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D012C8C00494F48E2E2F8F94 /* SettingsPageView.swift */; };
+		C501B5168C96BD207BA52972 /* SettingsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA19BD5D1284FB55D491A1CE /* SettingsRow.swift */; };
+		17E3B5B50AA112F82FA45598 /* SettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6C77E0F456D2BB8374A27B /* SettingsSection.swift */; };
+		D4C32EFBCE5D4B42F90E6079 /* SettingsSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0077EA8440CD7E7D98AC2A89 /* SettingsSidebar.swift */; };
+		D6FD9916AE874DF03B77D297 /* SettingsSidebarButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADC54A238D3FCDEF2281901 /* SettingsSidebarButtonStyle.swift */; };
+		7128105EF7C16DF6DD47C34D /* SettingsSidebarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69591C6CE4DB53DA317821CC /* SettingsSidebarRow.swift */; };
+		7E6EFD8A98BE21A46715F936 /* SettingsTint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 641F88FF1577EDA699BFDED4 /* SettingsTint.swift */; };
+		EEEF30D57B637BB607F77C39 /* SettingsWindowConfigurator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEB891FA861453A48C47B27A /* SettingsWindowConfigurator.swift */; };
+		00D5C39241E136CF947EF57E /* SidebarBlur.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECBAFE805D7EC418BED1AEAD /* SidebarBlur.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -96,14 +103,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		S1C000000000000000000101 /* TranscriptCleanupOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptCleanupOptions.swift; sourceTree = "<group>"; };
-		S1C000000000000000000102 /* S1Prompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = S1Prompt.swift; sourceTree = "<group>"; };
-		S1C000000000000000000103 /* TranscriptCleanupEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptCleanupEngine.swift; sourceTree = "<group>"; };
-		S1C000000000000000000104 /* S1ModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = S1ModelCatalog.swift; sourceTree = "<group>"; };
-		S1C000000000000000000105 /* S1CleanupEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = S1CleanupEngine.swift; sourceTree = "<group>"; };
-		S1C000000000000000000106 /* CleanupModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanupModelStore.swift; sourceTree = "<group>"; };
-		S1C000000000000000000107 /* TranscriptCleanupStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptCleanupStage.swift; sourceTree = "<group>"; };
-		S1C000000000000000000108 /* TranscriptCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptCleanupTests.swift; sourceTree = "<group>"; };
 		173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityController.swift; sourceTree = "<group>"; };
 		1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicatorWindow.swift; sourceTree = "<group>"; };
 		1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionService.swift; sourceTree = "<group>"; };
@@ -162,6 +161,26 @@
 		VAD000000000000000000001 /* VoiceActivityEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityEditor.swift; sourceTree = "<group>"; };
 		VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityDetectionStage.swift; sourceTree = "<group>"; };
 		VAD000000000000000000003 /* VoiceActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityTests.swift; sourceTree = "<group>"; };
+		8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelEnvelope.swift; sourceTree = "<group>"; };
+		AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingBarsView.swift; sourceTree = "<group>"; };
+		5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDShadowContainer.swift; sourceTree = "<group>"; };
+		8407F2542D3FD7B882AF819A /* RecordingPillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPillView.swift; sourceTree = "<group>"; };
+		0BA6DB012BB46A484768CC8A /* CapsuleLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsuleLabel.swift; sourceTree = "<group>"; };
+		4F51B089ECB4600AF9B71E46 /* CapsulePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsulePicker.swift; sourceTree = "<group>"; };
+		FF6A0224669B7D4883D33CC6 /* SettingsAppVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAppVersion.swift; sourceTree = "<group>"; };
+		48C78B892C88A7644157D12C /* SettingsCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCompat.swift; sourceTree = "<group>"; };
+		3F334DF982A1C7E9F1636F5F /* SettingsIconTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsIconTile.swift; sourceTree = "<group>"; };
+		AF877CF38F1B9A8320EC44E9 /* SettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPage.swift; sourceTree = "<group>"; };
+		C5F4552A384921BC8DB97295 /* SettingsPageLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageLayout.swift; sourceTree = "<group>"; };
+		D012C8C00494F48E2E2F8F94 /* SettingsPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageView.swift; sourceTree = "<group>"; };
+		FA19BD5D1284FB55D491A1CE /* SettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRow.swift; sourceTree = "<group>"; };
+		5F6C77E0F456D2BB8374A27B /* SettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSection.swift; sourceTree = "<group>"; };
+		0077EA8440CD7E7D98AC2A89 /* SettingsSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebar.swift; sourceTree = "<group>"; };
+		1ADC54A238D3FCDEF2281901 /* SettingsSidebarButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebarButtonStyle.swift; sourceTree = "<group>"; };
+		69591C6CE4DB53DA317821CC /* SettingsSidebarRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebarRow.swift; sourceTree = "<group>"; };
+		641F88FF1577EDA699BFDED4 /* SettingsTint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTint.swift; sourceTree = "<group>"; };
+		EEB891FA861453A48C47B27A /* SettingsWindowConfigurator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowConfigurator.swift; sourceTree = "<group>"; };
+		ECBAFE805D7EC418BED1AEAD /* SidebarBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarBlur.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,30 +206,12 @@
 				C6A3D56B2F7023BB00A16DA0 /* Sparkle in Frameworks */,
 				A5F1E893C1214A87B9A5BDFC /* AudioToolbox.framework in Frameworks */,
 				49AE7A1CFDC69357DD4B865D /* AVFoundation.framework in Frameworks */,
-				S1B000000000000000000011 /* MLX in Frameworks */,
-				S1B000000000000000000012 /* MLXLLM in Frameworks */,
-				S1B000000000000000000013 /* MLXLMCommon in Frameworks */,
-				S1B000000000000000000014 /* Tokenizers in Frameworks */,
-				S1B000000000000000000015 /* Hub in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		S1C000000000000000000201 /* Cleanup */ = {
-			isa = PBXGroup;
-			children = (
-				S1C000000000000000000101 /* TranscriptCleanupOptions.swift */,
-				S1C000000000000000000102 /* S1Prompt.swift */,
-				S1C000000000000000000103 /* TranscriptCleanupEngine.swift */,
-				S1C000000000000000000104 /* S1ModelCatalog.swift */,
-				S1C000000000000000000105 /* S1CleanupEngine.swift */,
-				S1C000000000000000000106 /* CleanupModelStore.swift */,
-			);
-			path = Cleanup;
-			sourceTree = "<group>";
-		};
 		1DB310FC63230A872DF63309 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -223,6 +224,8 @@
 		1FF43984F054E7654B1EEA37 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				D5315D4D3455F012BCA802AE /* Settings */,
+				5C4B84D889611007CE6B4C8F /* HUD */,
 				173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */,
 				AIA000000000000000000101 /* AIActionCoordinator.swift */,
 				AIA000000000000000000102 /* AIActionModels.swift */,
@@ -250,7 +253,6 @@
 				F9355D4C305CC2A5F0A0E16D /* ModelsSettingsView.swift */,
 				EC32008B10AB2F3A32901A8F /* OnboardingView.swift */,
 				4AE0500063A1CAAA7DF39D50 /* PermissionsSettingsView.swift */,
-				S1C000000000000000000201 /* Cleanup */,
 				PP0000000000000000000001 /* Pipeline */,
 				AIA000000000000000000109 /* OpenRouterClient.swift */,
 				8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */,
@@ -290,7 +292,6 @@
 				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
 				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
 				VAD000000000000000000003 /* VoiceActivityTests.swift */,
-				S1C000000000000000000108 /* TranscriptCleanupTests.swift */,
 			);
 			path = WhaleTests;
 			sourceTree = "<group>";
@@ -323,9 +324,42 @@
 				VAD000000000000000000001 /* VoiceActivityEditor.swift */,
 				TP0000000000000000000002 /* SmartFormattingStage.swift */,
 				VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */,
-				S1C000000000000000000107 /* TranscriptCleanupStage.swift */,
 			);
 			path = Pipeline;
+			sourceTree = "<group>";
+		};
+		5C4B84D889611007CE6B4C8F /* HUD */ = {
+			isa = PBXGroup;
+			children = (
+				8407F2542D3FD7B882AF819A /* RecordingPillView.swift */,
+				5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */,
+				AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */,
+				8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */,
+			);
+			path = HUD;
+			sourceTree = "<group>";
+		};
+		D5315D4D3455F012BCA802AE /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				ECBAFE805D7EC418BED1AEAD /* SidebarBlur.swift */,
+				EEB891FA861453A48C47B27A /* SettingsWindowConfigurator.swift */,
+				641F88FF1577EDA699BFDED4 /* SettingsTint.swift */,
+				69591C6CE4DB53DA317821CC /* SettingsSidebarRow.swift */,
+				1ADC54A238D3FCDEF2281901 /* SettingsSidebarButtonStyle.swift */,
+				0077EA8440CD7E7D98AC2A89 /* SettingsSidebar.swift */,
+				5F6C77E0F456D2BB8374A27B /* SettingsSection.swift */,
+				FA19BD5D1284FB55D491A1CE /* SettingsRow.swift */,
+				D012C8C00494F48E2E2F8F94 /* SettingsPageView.swift */,
+				C5F4552A384921BC8DB97295 /* SettingsPageLayout.swift */,
+				AF877CF38F1B9A8320EC44E9 /* SettingsPage.swift */,
+				3F334DF982A1C7E9F1636F5F /* SettingsIconTile.swift */,
+				48C78B892C88A7644157D12C /* SettingsCompat.swift */,
+				FF6A0224669B7D4883D33CC6 /* SettingsAppVersion.swift */,
+				4F51B089ECB4600AF9B71E46 /* CapsulePicker.swift */,
+				0BA6DB012BB46A484768CC8A /* CapsuleLabel.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -350,11 +384,6 @@
 				AA0000000000000000000072 /* WhisperKit */,
 				C6A3D56A2F7023BB00A16DA0 /* Sparkle */,
 				TP0000000000000000000005 /* TextProcessing */,
-				S1A000000000000000000011 /* MLX */,
-				S1A000000000000000000012 /* MLXLLM */,
-				S1A000000000000000000013 /* MLXLMCommon */,
-				S1A000000000000000000014 /* Tokenizers */,
-				S1A000000000000000000015 /* Hub */,
 			);
 			productName = TranscribeMeeting;
 			productReference = E30A00EEB7141B3BFD0B065B /* Whale Dev.app */;
@@ -415,9 +444,6 @@
 				AIA000000000000000000301 /* XCRemoteSwiftPackageReference "SQLCipher.swift" */,
 				AA0000000000000000000071 /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				C6A3D5692F7023BB00A16DA0 /* XCRemoteSwiftPackageReference "Sparkle" */,
-				S1A000000000000000000001 /* XCRemoteSwiftPackageReference "mlx-swift" */,
-				S1A000000000000000000002 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
-				S1A000000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1DB310FC63230A872DF63309 /* Products */;
@@ -456,7 +482,6 @@
 				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
 				PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */,
 				VAD000000000000000000013 /* VoiceActivityTests.swift in Sources */,
-				S1C000000000000000000008 /* TranscriptCleanupTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -464,6 +489,26 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				00D5C39241E136CF947EF57E /* SidebarBlur.swift in Sources */,
+				EEEF30D57B637BB607F77C39 /* SettingsWindowConfigurator.swift in Sources */,
+				7E6EFD8A98BE21A46715F936 /* SettingsTint.swift in Sources */,
+				7128105EF7C16DF6DD47C34D /* SettingsSidebarRow.swift in Sources */,
+				D6FD9916AE874DF03B77D297 /* SettingsSidebarButtonStyle.swift in Sources */,
+				D4C32EFBCE5D4B42F90E6079 /* SettingsSidebar.swift in Sources */,
+				17E3B5B50AA112F82FA45598 /* SettingsSection.swift in Sources */,
+				C501B5168C96BD207BA52972 /* SettingsRow.swift in Sources */,
+				969BE328FFB6A0CD715AF38D /* SettingsPageView.swift in Sources */,
+				A51ECE8A51A3DDAE747D5CBF /* SettingsPageLayout.swift in Sources */,
+				5CF0EFFE9B05B0DF21CDF835 /* SettingsPage.swift in Sources */,
+				7E44142496C6B207B0055BD4 /* SettingsIconTile.swift in Sources */,
+				7C3C6C11E4C0566A088B0C88 /* SettingsCompat.swift in Sources */,
+				BF8B7B12EE476289B8246552 /* SettingsAppVersion.swift in Sources */,
+				AD53F925E31A673936516F34 /* CapsulePicker.swift in Sources */,
+				94A50AEBD9019C91154844B2 /* CapsuleLabel.swift in Sources */,
+				B8A8C9A8633045C95677E274 /* RecordingPillView.swift in Sources */,
+				C0746934B2975886BECF4FC2 /* HUDShadowContainer.swift in Sources */,
+				70BB9F8472D5AE8D04FB24B1 /* RecordingBarsView.swift in Sources */,
+				57CEE872EEAE12BAFC9F7D4C /* LevelEnvelope.swift in Sources */,
 				173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */,
 				AIA000000000000000000001 /* AIActionCoordinator.swift in Sources */,
 				AIA000000000000000000002 /* AIActionModels.swift in Sources */,
@@ -506,13 +551,6 @@
 				PP0000000000000000000013 /* TranscriptionStage.swift in Sources */,
 				VAD000000000000000000011 /* VoiceActivityEditor.swift in Sources */,
 				VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */,
-				S1C000000000000000000001 /* TranscriptCleanupOptions.swift in Sources */,
-				S1C000000000000000000002 /* S1Prompt.swift in Sources */,
-				S1C000000000000000000003 /* TranscriptCleanupEngine.swift in Sources */,
-				S1C000000000000000000004 /* S1ModelCatalog.swift in Sources */,
-				S1C000000000000000000005 /* S1CleanupEngine.swift in Sources */,
-				S1C000000000000000000006 /* CleanupModelStore.swift in Sources */,
-				S1C000000000000000000007 /* TranscriptCleanupStage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -793,30 +831,6 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		S1A000000000000000000001 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift.git";
-			requirement = {
-				kind = exactVersion;
-				version = 0.31.4;
-			};
-		};
-		S1A000000000000000000002 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm.git";
-			requirement = {
-				kind = exactVersion;
-				version = 3.31.4;
-			};
-		};
-		S1A000000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/huggingface/swift-transformers.git";
-			requirement = {
-				kind = exactVersion;
-				version = 1.3.4;
-			};
-		};
 		1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
@@ -852,31 +866,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		S1A000000000000000000011 /* MLX */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = S1A000000000000000000001 /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLX;
-		};
-		S1A000000000000000000012 /* MLXLLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = S1A000000000000000000002 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
-			productName = MLXLLM;
-		};
-		S1A000000000000000000013 /* MLXLMCommon */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = S1A000000000000000000002 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
-			productName = MLXLMCommon;
-		};
-		S1A000000000000000000014 /* Tokenizers */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = S1A000000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */;
-			productName = Tokenizers;
-		};
-		S1A000000000000000000015 /* Hub */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = S1A000000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */;
-			productName = Hub;
-		};
 		1C91A4D72C0C4A0B9F20A111 /* FluidAudio */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1C91A4D82C0C4A0B9F20A111 /* XCRemoteSwiftPackageReference "FluidAudio" */;

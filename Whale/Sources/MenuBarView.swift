@@ -22,26 +22,26 @@ struct MenuBarView: View {
                 Button {
                     Task { await appState.stopRecording() }
                 } label: {
-                    Label("Stop Dictation", systemImage: "stop.fill")
+                    Label("Stop dictation", systemImage: "stop.fill")
                 }
             } else {
                 Button {
                     appState.startClipboardOnlyDictation()
                 } label: {
-                    Label("Start Dictation (Clipboard Only)", systemImage: "mic.fill")
+                    Label("Start dictation (clipboard only)", systemImage: "mic.fill")
                 }
             }
 
             Button {
                 openSettingsWindow(section: .permissions)
             } label: {
-                Label("Open Permissions", systemImage: "hand.raised.fill")
+                Label("Open permissions", systemImage: "hand.raised.fill")
             }
 
             Button {
                 accessibility.refresh()
             } label: {
-                Label("Re-check Permission", systemImage: "arrow.clockwise")
+                Label("Re-check permission", systemImage: "arrow.clockwise")
             }
 
             Divider()
@@ -50,21 +50,21 @@ struct MenuBarView: View {
         Button {
             openSettingsWindow(section: settingsCoordinator.selection)
         } label: {
-            Label("Settings…", systemImage: "gearshape")
+            Label("Settings", systemImage: "gearshape")
         }
         .keyboardShortcut(",", modifiers: .command)
 
         Button {
             openSettingsWindow(section: .history)
         } label: {
-            Label("History…", systemImage: "clock.arrow.circlepath")
+            Label("History", systemImage: "clock.arrow.circlepath")
         }
 
         if let updater = updaterState.updater {
             Button {
                 UpdateCheckAction.checkForUpdates(using: updater)
             } label: {
-                Label("Check for Updates…", systemImage: "arrow.down.circle")
+                Label("Check for updates", systemImage: "arrow.down.circle")
             }
             .disabled(!updaterState.canCheckForUpdates)
         }
@@ -83,7 +83,7 @@ struct MenuBarView: View {
             }
     }
 
-    private func openSettingsWindow(section: SettingsSection) {
+    private func openSettingsWindow(section: SettingsPage) {
         if !settingsCoordinator.focus(section: section) {
             openSettings()
         }

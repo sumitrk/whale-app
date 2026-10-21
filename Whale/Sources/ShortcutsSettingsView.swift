@@ -49,59 +49,46 @@ struct ShortcutsSettingsView: View {
         return PTTPreset.allCases.first { $0.keyCode == store.aiActionKeyCode } ?? .custom
     }
 
-    var body: some View {
-        Form {
-            // MARK: Push-to-Talk
-            Section {
-                Picker("Key", selection: $pttPreset) {
-                    ForEach(PTTPreset.allCases) { preset in
-                        Text(preset.rawValue).tag(preset)
-                    }
-                }
-                .pickerStyle(.menu)
-                .onChange(of: pttPreset) { _, preset in
-                    if let kc = preset.keyCode {
-                        store.pttKeyCode = kc
-                        store.pttModifiers = 0
-                    } else {
-                        // Custom selected — auto-start the recorder
-                        pttRecorderAutoStart = true
-                    }
-                }
+    private var keyChoices: [CapsuleChoice<PTTPreset>] {
+        PTTPreset.allCases.map { .option($0.rawValue, $0) }
+    }
 
+    var body: some View {
+        SettingsPageLayout(title: "Shortcuts") {
+            SettingsSection(
+                "Push to talk",
+                footer: "Hold \(store.pttKeyLabel) to record. Release to transcribe and paste."
+            ) {
+                SettingsPickerRow(
+                    "Key",
+                    icon: SettingsRowIcon("mic.fill", .settingsBlue),
+                    selection: $pttPreset,
+                    choices: keyChoices
+                )
                 if pttPreset == .custom {
-                    LabeledContent("Custom key") {
+                    SettingsRow("Custom key") {
                         PTTRecorderView(
-                            keyCode:        $store.pttKeyCode,
-                            modifiers:      $store.pttModifiers,
+                            keyCode: $store.pttKeyCode,
+                            modifiers: $store.pttModifiers,
                             startImmediately: pttRecorderAutoStart
                         )
                         .onAppear { pttRecorderAutoStart = false }
                     }
                 }
-            } header: {
-                Text("Push-to-Talk")
-            } footer: {
-                Text("Hold \(store.pttKeyLabel) to record. Release to transcribe and paste.")
             }
 
-            Section {
-                Picker("Key", selection: $actionPreset) {
-                    ForEach(PTTPreset.allCases) { preset in
-                        Text(preset.rawValue).tag(preset)
-                    }
-                }
-                .pickerStyle(.menu)
-                .onChange(of: actionPreset) { _, preset in
-                    if let keyCode = preset.keyCode {
-                        store.aiActionKeyCode = keyCode
-                        store.aiActionModifiers = 0
-                    } else {
-                        actionRecorderAutoStart = true
-                    }
-                }
+            SettingsSection(
+                "AI action",
+                footer: "Hold \(store.aiActionKeyLabel) to speak an instruction. Press another key or mouse button while holding a modifier-only shortcut to cancel it."
+            ) {
+                SettingsPickerRow(
+                    "Key",
+                    icon: SettingsRowIcon("sparkles", .settingsPurple),
+                    selection: $actionPreset,
+                    choices: keyChoices
+                )
                 if actionPreset == .custom {
-                    LabeledContent("Custom key") {
+                    SettingsRow("Custom key") {
                         PTTRecorderView(
                             keyCode: $store.aiActionKeyCode,
                             modifiers: $store.aiActionModifiers,
@@ -110,46 +97,48 @@ struct ShortcutsSettingsView: View {
                         .onAppear { actionRecorderAutoStart = false }
                     }
                 }
-            } header: {
-                Text("AI Action")
-            } footer: {
-                Text("Hold \(store.aiActionKeyLabel) to speak an instruction. Press another key or mouse button while holding a modifier-only shortcut to cancel it.")
             }
 
-            // MARK: Transcript Mode
-            Section {
-                LabeledContent("Key") {
-                    KeyRecorderView(
-                        keyCode:   $store.toggleKeyCode,
-                        modifiers: $store.toggleModifiers
-                    )
+            SettingsSection(
+                "Transcript mode",
+                footer: "Press \(store.toggleKeyLabel) to start, press again to stop and save the transcript as Markdown."
+            ) {
+                SettingsRow("Key", icon: SettingsRowIcon("doc.text.fill", .settingsOrange)) {
+                    KeyRecorderView(keyCode: $store.toggleKeyCode, modifiers: $store.toggleModifiers)
                 }
-
-                LabeledContent("Save transcripts to") {
-                    HStack(spacing: 6) {
-                        Text(store.transcriptFolder.abbreviatedPath)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Button { pickFolder() } label: {
-                            Image(systemName: "folder")
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel("Choose transcript folder")
-                    }
+                SettingsRow("Save transcripts to", icon: SettingsRowIcon("folder.fill", .settingsCyan)) {
+                    // Verbatim: a folder name is not Markdown.
+                    Text(verbatim: store.transcriptFolder.abbreviatedPath)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: 220, alignment: .trailing)
+                    Button("Choose…", action: pickFolder)
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
                 }
-            } header: {
-                Text("Transcript Mode")
-            } footer: {
-                Text("Press \(store.toggleKeyLabel) to start, press again to stop and save the transcript as Markdown.")
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, 8, for: .scrollContent)
         .onAppear {
             pttPreset = derivedPreset()
             actionPreset = derivedActionPreset()
+        }
+        .onChange(of: pttPreset) { _, preset in
+            if let keyCode = preset.keyCode {
+                store.pttKeyCode = keyCode
+                store.pttModifiers = 0
+            } else {
+                // Custom selected — auto-start the recorder
+                pttRecorderAutoStart = true
+            }
+        }
+        .onChange(of: actionPreset) { _, preset in
+            if let keyCode = preset.keyCode {
+                store.aiActionKeyCode = keyCode
+                store.aiActionModifiers = 0
+            } else {
+                actionRecorderAutoStart = true
+            }
         }
     }
 
