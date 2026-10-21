@@ -28,24 +28,43 @@ struct HistoryView: View {
                 } description: {
                     Text(error)
                 } actions: {
-                    Button("Reset History", role: .destructive) { Task { await resetHistory() } }
+                    Button("Reset history", role: .destructive) { Task { await resetHistory() } }
                 }
             } else {
-                GeometryReader { geometry in
-                    let listWidth = geometry.size.width * HistoryLayoutMetrics.listFraction
-                    let detailWidth = max(0, geometry.size.width - listWidth - 1)
+                // Laid out like the other Settings pages: the large title where theirs sits,
+                // then content in rounded cards — a card per entry, and the chosen one's
+                // details in a card beside them.
+                VStack(alignment: .leading, spacing: 20) {
+                    HistoryHeader(
+                        query: $query,
+                        canClear: !entries.isEmpty,
+                        onClear: { showingClearConfirmation = true }
+                    )
 
-                    HStack(spacing: 0) {
-                        historyList
-                            .frame(width: listWidth, height: geometry.size.height)
+                    GeometryReader { geometry in
+                        HStack(alignment: .top, spacing: 16) {
+                            HistoryCardList(
+                                entries: entries,
+                                selectedID: $selectedID,
+                                isLoadingMore: isLoadingMore,
+                                relativeTo: relativeTimeReference,
+                                onReachEnd: { Task { await loadMore() } },
+                                onDelete: { id in Task { await delete(id) } }
+                            )
+                            .frame(width: geometry.size.width * HistoryLayoutMetrics.listFraction)
 
-                        Divider()
-
-                        historyDetail
-                            .frame(width: detailWidth, height: geometry.size.height)
+                            HistoryDetailCard(
+                                entry: selectedEntry,
+                                isEmpty: hasLoaded && entries.isEmpty,
+                                isSearching: !query.isEmpty,
+                                relativeTo: relativeTimeReference
+                            )
+                        }
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 32)
+                .padding(.top, 20)
+                .padding(.bottom, 24)
             }
         }
         .task(id: "\(query)|\(controller.revision)") { await load() }
@@ -65,55 +84,10 @@ struct HistoryView: View {
         .onChange(of: selectedEntry) { _, entry in
             controller.lastSelectedEntry = entry
         }
-        .confirmationDialog("Clear all History?", isPresented: $showingClearConfirmation) {
-            Button("Clear History", role: .destructive) { Task { await clear() } }
+        .confirmationDialog("Clear all history?", isPresented: $showingClearConfirmation) {
+            Button("Clear history", role: .destructive) { Task { await clear() } }
         } message: {
-            Text("This permanently removes every Dictation, AI Action, and stored context image.")
-        }
-    }
-
-    private var historyList: some View {
-        VStack(spacing: 0) {
-            HistorySearchField(query: $query)
-
-            List(entries, selection: $selectedID) { entry in
-                HistoryEntryRow(entry: entry, relativeTo: relativeTimeReference)
-                    .tag(entry.id)
-                    .onAppear {
-                        guard entry.id == entries.last?.id else { return }
-                        Task { await loadMore() }
-                    }
-                    .contextMenu {
-                        Button("Delete", role: .destructive) { Task { await delete(entry.id) } }
-                    }
-            }
-
-            HStack {
-                if isLoadingMore {
-                    ProgressView("Loading more…")
-                        .controlSize(.small)
-                }
-                Spacer()
-                Button("Clear History…", role: .destructive) { showingClearConfirmation = true }
-                    .disabled(entries.isEmpty)
-            }
-            .font(.caption)
-            .padding(10)
-        }
-    }
-
-    @ViewBuilder
-    private var historyDetail: some View {
-        if let selectedEntry {
-            HistoryEntryDetail(entry: selectedEntry, relativeTo: relativeTimeReference)
-        } else if hasLoaded && entries.isEmpty {
-            ContentUnavailableView {
-                Label(query.isEmpty ? "No History" : "No matching History", systemImage: "clock.arrow.circlepath")
-            } description: {
-                Text(query.isEmpty ? "Dictations and AI Actions will appear here." : "Try a different search.")
-            }
-        } else {
-            Color.clear
+            Text("This permanently removes every dictation, AI action, and stored context image.")
         }
     }
 
@@ -214,15 +188,50 @@ struct HistoryView: View {
     }
 }
 
+/// The page title, with search and the page's one menu beside it. Clearing everything is
+/// rare and destructive, so it sits in that menu rather than as a button on the page.
+private struct HistoryHeader: View {
+    @Binding var query: String
+    let canClear: Bool
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text("History")
+                .font(.largeTitle.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+
+            Spacer(minLength: 16)
+
+            HistorySearchField(query: $query)
+                .frame(maxWidth: 240)
+
+            Menu {
+                Button("Clear history…", role: .destructive, action: onClear)
+                    .disabled(!canClear)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .frame(width: 16, height: 16)
+            }
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.circle)
+            .fixedSize()
+            .accessibilityLabel("More history actions")
+        }
+    }
+}
+
 private struct HistorySearchField: View {
     @Binding var query: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Search History", text: $query)
+            TextField("Search history", text: $query)
                 .textFieldStyle(.plain)
 
             if !query.isEmpty {
@@ -234,16 +243,74 @@ private struct HistorySearchField: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 32)
-        .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 8))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .frame(height: 30)
+        .background(Color.primary.opacity(0.06), in: .capsule)
     }
 }
 
-private struct HistoryEntryRow: View {
+/// One card per entry. The arrow keys move the selection, like the list they replace.
+private struct HistoryCardList: View {
+    let entries: [HistoryEntry]
+    @Binding var selectedID: UUID?
+    let isLoadingMore: Bool
+    let relativeTo: Date
+    let onReachEnd: () -> Void
+    let onDelete: (UUID) -> Void
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(entries) { entry in
+                        Button { selectedID = entry.id } label: {
+                            HistoryEntryCard(
+                                entry: entry,
+                                isSelected: entry.id == selectedID,
+                                relativeTo: relativeTo
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .id(entry.id)
+                        .contextMenu {
+                            Button("Delete", role: .destructive) { onDelete(entry.id) }
+                        }
+                        .onAppear {
+                            if entry.id == entries.last?.id { onReachEnd() }
+                        }
+                    }
+                    if isLoadingMore {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.vertical, 8)
+                    }
+                }
+                .padding(.bottom, 8)
+            }
+            .scrollIndicators(.automatic)
+            .focusable()
+            .focusEffectDisabled()
+            .onKeyPress(.upArrow) { move(by: -1, proxy: proxy) }
+            .onKeyPress(.downArrow) { move(by: 1, proxy: proxy) }
+        }
+    }
+
+    private func move(by offset: Int, proxy: ScrollViewProxy) -> KeyPress.Result {
+        guard let index = entries.firstIndex(where: { $0.id == selectedID }) else {
+            selectedID = entries.first?.id
+            return .handled
+        }
+        let next = index + offset
+        guard entries.indices.contains(next) else { return .handled }
+        selectedID = entries[next].id
+        proxy.scrollTo(entries[next].id)
+        return .handled
+    }
+}
+
+private struct HistoryEntryCard: View {
     let entry: HistoryEntry
+    let isSelected: Bool
     let relativeTo: Date
 
     var body: some View {
@@ -251,7 +318,7 @@ private struct HistoryEntryRow: View {
             HStack(spacing: 8) {
                 SourceAppIconView(name: entry.sourceAppName, bundleID: entry.sourceAppBundleID)
                 Text(entry.listTitle)
-                    .font(.body)
+                    .fontWeight(.medium)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 Text(relativeTime)
@@ -260,19 +327,63 @@ private struct HistoryEntryRow: View {
             }
             if !entry.listPreview.isEmpty {
                 Text(entry.listPreview)
-                    .font(.subheadline)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            isSelected ? Color.accentColor.opacity(0.1) : Color(nsColor: .controlBackgroundColor),
+            in: .rect(cornerRadius: 14, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.6) : Color(nsColor: .separatorColor).opacity(0.5))
+        }
+        .contentShape(.rect(cornerRadius: 14, style: .continuous))
         .opacity(entry.isDimmedInList ? 0.55 : 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     private var relativeTime: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: entry.createdAt, relativeTo: relativeTo)
+    }
+}
+
+/// The selected entry, in the same rounded card the Settings sections use.
+private struct HistoryDetailCard: View {
+    let entry: HistoryEntry?
+    let isEmpty: Bool
+    let isSearching: Bool
+    let relativeTo: Date
+
+    var body: some View {
+        Group {
+            if let entry {
+                HistoryEntryDetail(entry: entry, relativeTo: relativeTo)
+            } else if isEmpty {
+                ContentUnavailableView {
+                    Label(isSearching ? "No matching history" : "No history", systemImage: "clock.arrow.circlepath")
+                } description: {
+                    Text(isSearching ? "Try a different search." : "Dictations and AI actions will appear here.")
+                }
+            } else {
+                Color.clear
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.separator.opacity(0.5))
+        }
+        .clipShape(.rect(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -320,7 +431,7 @@ private struct HistoryEntryDetail: View {
                         Text(entry.listTitle).font(.title2.bold())
                     }
                     HStack(spacing: 3) {
-                        Text(entry.kind == .dictation ? "Dictation" : "AI Action")
+                        Text(entry.kind == .dictation ? "Dictation" : "AI action")
                         Text("·")
                         Text(relativeTime)
                     }
@@ -353,7 +464,7 @@ private struct HistoryEntryDetail: View {
                 }
                 if let error = entry.errorText { detailSection(entry.outcome == .cancelled ? "Cancellation" : "Failure", error) }
             }
-            .padding(22)
+            .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
