@@ -1,3 +1,4 @@
+import CoreML
 import Darwin
 import FluidAudio
 import Foundation
@@ -11,6 +12,11 @@ import Foundation
 // v2 and v3 go through AsrModels.load(from:), which ignores the folder's own name and resolves
 // <parent>/<FluidAudio's folder for that version>, downloading the stock model if it's not
 // there. v3-local uses AsrModels.loadLocal(from:), which reads exactly the given folder.
+//
+// For memory measurements: ASR_CPU_ONLY=1 runs every component on the CPU, so the weights
+// live in this process's footprint instead of with the Neural Engine. ASR_HOLD=<seconds>
+// prints LOADED / DONE and sleeps after loading and after transcribing, so another tool can
+// sample this process and the system in each state.
 
 func footprintMB() -> (now: Double, peak: Double) {
     var info = task_vm_info_data_t()
@@ -35,14 +41,31 @@ let local = args[2] == "v3-local"
 let audioDir = URL(fileURLWithPath: args[3], isDirectory: true)
 let outURL = URL(fileURLWithPath: args[4])
 
+let environment = ProcessInfo.processInfo.environment
+let hold = Double(environment["ASR_HOLD"] ?? "0") ?? 0
+var configuration: MLModelConfiguration?
+if environment["ASR_CPU_ONLY"] == "1" {
+    let cpu = MLModelConfiguration()
+    cpu.computeUnits = .cpuOnly
+    configuration = cpu
+}
+
+func holdPoint(_ marker: String) async {
+    guard hold > 0 else { return }
+    print(marker, ProcessInfo.processInfo.processIdentifier)
+    fflush(stdout)
+    try? await Task.sleep(nanoseconds: UInt64(hold * 1_000_000_000))
+}
+
 let t0 = Date()
 let models = local
-    ? try AsrModels.loadLocal(from: modelDir, version: version)
-    : try await AsrModels.load(from: modelDir, version: version)
+    ? try AsrModels.loadLocal(from: modelDir, version: version, configuration: configuration)
+    : try await AsrModels.load(from: modelDir, configuration: configuration, version: version)
 let manager = AsrManager(config: .default)
 try await manager.loadModels(models)
 let loadSeconds = Date().timeIntervalSince(t0)
 let afterLoad = footprintMB()
+await holdPoint("LOADED")
 
 let files = try FileManager.default.contentsOfDirectory(at: audioDir, includingPropertiesForKeys: nil)
     .filter { $0.pathExtension == "wav" }
@@ -67,6 +90,7 @@ for file in files {
 try out.close()
 
 let end = footprintMB()
+await holdPoint("DONE")
 let summary: [String: Any] = [
     "files": files.count,
     "load_s": (loadSeconds * 100).rounded() / 100,

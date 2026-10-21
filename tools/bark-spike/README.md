@@ -31,13 +31,31 @@ Decoder, joint and preprocessor add 35 MB to every Bark folder.
 is the bigger part of that gap (8,192-token vocabulary, top-K joint), not Bark. v2 left 6
 "um"/"uh" in; Bark left none.
 
-Memory: Core ML keeps the weights with the Neural Engine, outside the process, so the
-harness's own footprint stays under 90 MB for every model and doesn't tell them apart. The
-one measurable difference is S1-mini: about 1 GB resident while it cleans up, which Bark
-makes unnecessary for removing fillers.
+Memory (`mem_bench.py`, 40 clips, median of 5 runs, Neural Engine as in the app):
+
+| | Footprint after load | After transcribing | Peak | System-wide while loaded |
+|---|--:|--:|--:|--:|
+| Parakeet v2 (today) | 32 MB | 60 MB | 62 MB | 430-810 MB |
+| Bark 3.0 Clean (shipped 6-bit) | 30 MB | 43 MB | 47 MB | 360-630 MB |
+
+Core ML hands the weights to the Neural Engine, so they don't appear in the process
+footprint. The system-wide delta (wired + anonymous + compressed) catches them, but swings by
+hundreds of MB with whatever else the Mac is doing, so it can't separate the two models. It
+only says both cost a few hundred MB while loaded. With `ASR_CPU_ONLY=1` the weights are
+memory-mapped from disk and don't count as anonymous memory either, so that mode isn't a
+better measure. Whale Dev itself sits at 51 MB with Bark loaded. S1-mini, which Bark makes
+unnecessary for removing fillers, peaks at about 1 GB resident while it cleans up.
 
 First load compiles for the Neural Engine once per model file: 10-14 s for the int8 and 6-bit
 encoders, 30-70 s for the per-row LUT ones. After that, loading takes about 0.1 s.
+
+## In Whale (branch feat/bark-clean-model)
+
+Shipped encoder: `lut6-tensor`, rebuilt for the macOS 14 opset (same 3.93% / 12.6 s). Hosted
+on R2 bucket `whale-models` (public r2.dev) as one 281 MB `.tar.xz`: xz is 20% smaller than
+zip and keeps it under Wrangler's 300 MiB single-upload limit (`cf r2 objects put` fails
+earlier, with HTTP 413). Whale's download, checksum, unpack and load took 35 s in the dev
+build, and `testBarkLiveDownloadLoadsAndTranscribes` covers the same path.
 
 ## Things to know
 
