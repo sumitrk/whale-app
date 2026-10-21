@@ -5,45 +5,34 @@ struct ModelsSettingsView: View {
     @ObservedObject private var modelStore = TranscriptionModelStore.shared
 
     var body: some View {
-        Form {
+        SettingsPageLayout(title: "Models") {
             ModelListSections()
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, 8, for: .scrollContent)
         .task { await modelStore.refreshNow() }
     }
 }
 
-/// The model list itself, without a `Form` around it, so the settings pane and the
-/// onboarding step present exactly the same rows.
+/// The model list itself, without a page around it, so the settings pane and the onboarding
+/// step present exactly the same rows.
 ///
 /// Two boxes rather than one: the models Whale ships and installs itself, then the
 /// bring-your-own folder under its own header.
 struct ModelListSections: View {
     var body: some View {
-        Section {
+        // CC-BY's credit, licence link and note of changes. See
+        // Resources/Licenses/Bark-3.0-Clean before rewording.
+        SettingsSection(
+            footer: "\(BarkCleanModelCatalog.displayName) is [Underdog Bark 3.0 Clean](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Clean), converted to Core ML, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)."
+        ) {
             ForEach(BuiltInModelCatalog.models(from: .bundled)) { model in
                 ModelRow(model: model)
             }
-        } footer: {
-            // CC-BY's credit, licence link and note of changes. See
-            // Resources/Licenses/Bark-3.0-Clean before rewording.
-            Text("\(BarkCleanModelCatalog.displayName) is [Underdog Bark 3.0 Clean](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Clean), converted to Core ML, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
 
-        Section {
+        SettingsSection("Custom", footer: "All models run locally on your Mac. Audio never leaves the device.") {
             ForEach(BuiltInModelCatalog.models(from: .custom)) { model in
                 ModelRow(model: model)
             }
-        } header: {
-            Text("Custom")
-        } footer: {
-            Text("All models run locally on your Mac. Audio never leaves the device.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
     }
 }
@@ -69,11 +58,12 @@ private struct ModelRow: View {
     var body: some View {
         let row = rowModel
 
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             ModelIcon(model: model)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.title)
+                    .fontWeight(.medium)
 
                 HStack(spacing: 5) {
                     if row.status.showsDot {
@@ -103,12 +93,10 @@ private struct ModelRow: View {
 
             accessory(for: row)
         }
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.primary.opacity(isHovering && row.isReady ? 0.06 : 0))
-                .padding(.horizontal, -6)
-        )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(minHeight: 44)
+        .background(Color.primary.opacity(isHovering && row.isReady ? 0.04 : 0))
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
         .onTapGesture { activate(row) }
@@ -156,6 +144,7 @@ private struct ModelRow: View {
                 if row.isCancellable {
                     Button("Cancel") { modelStore.cancel(model.id) }
                         .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
                 }
             }
             .fixedSize()
@@ -168,6 +157,7 @@ private struct ModelRow: View {
                     // default action.
                     Button(title) { triggerPrimaryAction() }
                         .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
                 }
 
                 // Any model whose files the app downloaded itself, the active one included:
@@ -178,6 +168,7 @@ private struct ModelRow: View {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
                     .help(title)
                     .accessibilityLabel("\(title) \(model.title)")
                 }
@@ -350,6 +341,7 @@ private struct ModelLanguageControlView: View {
                 }
             }
             .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
             .background(LanguageMenuAnchorView(anchor: anchor))
             .fixedSize()
         } else {
@@ -358,6 +350,7 @@ private struct ModelLanguageControlView: View {
             // underneath rather than leaving a dead patch in the middle of a clickable row.
             Button(control.selection.title) {}
                 .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
                 .disabled(true)
                 .allowsHitTesting(false)
                 .accessibilityRemoveTraits(.isButton)
@@ -455,25 +448,18 @@ private struct ModelIcon: View {
         // A folder the user pointed at is identified by that fact, not by the engine that
         // happens to read it — otherwise it would be indistinguishable from bundled Whisper.
         guard model.source != .custom else {
-            return (.orange, "folder.fill")
+            return (.settingsOrange, "folder.fill")
         }
 
         switch model.group {
-        case .parakeet: return (.blue, "waveform")
-        case .whisper:  return (.purple, "text.bubble.fill")
-        case .apple:    return (.gray, "apple.logo")
+        case .parakeet: return (.settingsBlue, "waveform")
+        case .whisper:  return (.settingsPurple, "text.bubble.fill")
+        case .apple:    return (.settingsGray, "apple.logo")
         }
     }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(appearance.color)
-            .frame(width: 28, height: 28)
-            .overlay(
-                Image(systemName: appearance.symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-            )
+        SettingsIconTile(symbol: appearance.symbol, tint: appearance.color, cornerRadius: 10)
             .accessibilityHidden(true)
     }
 }

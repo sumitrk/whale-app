@@ -83,7 +83,7 @@ struct MenuBarView: View {
             }
     }
 
-    private func openSettingsWindow(section: SettingsSection) {
+    private func openSettingsWindow(section: SettingsPage) {
         if !settingsCoordinator.focus(section: section) {
             openSettings()
         }

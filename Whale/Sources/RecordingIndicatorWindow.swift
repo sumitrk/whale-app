@@ -137,6 +137,10 @@ final class RecordingIndicatorWindow: NSPanel {
         contentView        = container
     }
 
+    /// Whether a presentation is on screen or on its way: true from `show…` until the fade out
+    /// finishes.
+    var hasContent: Bool { !container.subviews.isEmpty }
+
     func show(recorder: AudioRecorder) {
         let meter = recorder.levelMeter
         if recordingHost == nil || recordingMeter !== meter {
@@ -156,7 +160,10 @@ final class RecordingIndicatorWindow: NSPanel {
         presentationID &+= 1
         let hiddenPresentationID = presentationID
         stopPresentationObservers()
-        guard isShowing else { return }
+        guard isShowing else {
+            finishHiding()
+            return
+        }
         isShowing = false
 
         guard let layer = container.layer else {
@@ -205,15 +212,16 @@ final class RecordingIndicatorWindow: NSPanel {
             container.addSubview(host)
         }
         setContentSize(size)
+        // From the moment it's asked for, so a click during the anchor lookup still dismisses it.
+        if let feedbackDuration {
+            scheduleFeedbackDismissal(after: feedbackDuration, presentationID: id)
+        }
 
         resolveAnchor(timeout: Self.anchorTimeout) { [weak self] anchor in
             guard let self, self.presentationID == id else { return }
             self.currentAnchor = anchor
             self.updatePosition()
             self.startTracking()
-            if let feedbackDuration {
-                self.scheduleFeedbackDismissal(after: feedbackDuration, presentationID: id)
-            }
             self.animateIn()
         }
     }

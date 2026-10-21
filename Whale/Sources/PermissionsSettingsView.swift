@@ -7,7 +7,7 @@ struct PermissionsSettingsView: View {
     @State private var micGranted: Bool = false
 
     var body: some View {
-        Form {
+        SettingsPageLayout(title: "Permissions") {
             PermissionListSections(
                 style: .settings,
                 micGranted: micGranted,
@@ -18,14 +18,11 @@ struct PermissionsSettingsView: View {
                 onRevealInFinder: accessibility.revealAppInFinder
             )
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, 8, for: .scrollContent)
         .onAppear {
             checkMic()
             accessibility.refresh()
         }
-        // "Grant Access" hands the user off to System Settings, so the only reliable moment
+        // "Grant access" hands the user off to System Settings, so the only reliable moment
         // to re-read the microphone status is when they come back — there is no notification
         // for the switch itself. Without this the red dot outlives the fix.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -75,7 +72,11 @@ struct PermissionListSections: View {
     var onRevealInFinder: (() -> Void)? = nil
 
     var body: some View {
-        Section {
+        SettingsSection(
+            footer: style == .settings
+                ? "System audio capture shares the Microphone permission. Permissions are managed in System Settings → Privacy & Security."
+                : nil
+        ) {
             PermissionRow(
                 descriptor: .microphone,
                 style: style,
@@ -90,17 +91,11 @@ struct PermissionListSections: View {
                 actions: accessibilityActions,
                 revealInFinder: onRevealInFinder
             )
-        } footer: {
-            if style == .settings {
-                Text("System audio capture shares the Microphone permission. Permissions are managed in System Settings → Privacy & Security.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
     private var micActionTitle: String {
-        style == .onboarding ? "Grant" : "Grant Access"
+        style == .onboarding ? "Grant" : "Grant access"
     }
 
     private var accessibilityActions: [PermissionAction] {
@@ -110,7 +105,7 @@ struct PermissionListSections: View {
 
         // Primary action nearest the content, matching the model rows where the button that
         // changes what the row *is* sits left of the trailing control.
-        var actions = [PermissionAction(title: "Open in System Settings", run: onAccessibilityAction)]
+        var actions = [PermissionAction(title: "Open System Settings", run: onAccessibilityAction)]
         if let recheck = onAccessibilityRecheck {
             actions.append(PermissionAction(title: "Re-check", run: recheck))
         }
@@ -166,12 +161,13 @@ private struct PermissionRow: View {
     @State private var isShowingInfo = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            PermissionIcon(symbol: descriptor.symbol)
+        HStack(alignment: .center, spacing: 12) {
+            SettingsIconTile(symbol: descriptor.symbol, tint: .settingsBlue, cornerRadius: 10)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(descriptor.title)
+                        .fontWeight(.medium)
 
                     // Settings keeps the reason one hover away; onboarding spells it out
                     // below, so a second copy in a tooltip would only be noise.
@@ -233,7 +229,9 @@ private struct PermissionRow: View {
                 .layoutPriority(1)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(minHeight: 44)
         .contextMenu { contextMenu }
     }
 
@@ -244,10 +242,11 @@ private struct PermissionRow: View {
         if style == .onboarding {
             Button(action.title, action: action.run)
                 .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonBorderShape(.capsule)
         } else {
             Button(action.title, action: action.run)
                 .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
         }
     }
 
@@ -263,26 +262,5 @@ private struct PermissionRow: View {
             return descriptor.description
         }
         return "\(descriptor.description)\n\n\(troubleshooting)"
-    }
-}
-
-// MARK: - Icon
-
-/// The same tile the model rows use, and the same one System Settings puts down its sidebar —
-/// but a fixed blue. In the model list the colour identifies a family; a permission has no
-/// family to identify, and it must not encode grant state either, which is the dot's job.
-private struct PermissionIcon: View {
-    let symbol: String
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(Color.blue)
-            .frame(width: 28, height: 28)
-            .overlay(
-                Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-            )
-            .accessibilityHidden(true)
     }
 }

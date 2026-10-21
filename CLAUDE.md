@@ -9,6 +9,12 @@
   `Whale/Resources/Licenses/Bark-3.0-Clean/README.md` before changing its credit in the UI.
 - Build and package the app with Xcode and the checked-in `Whale.xcodeproj`.
 
+## SwiftUI
+- Use the `swiftui-pro` skill (`.agents/skills/swiftui-pro`) for every Swift or SwiftUI change.
+- Settings pages are built from the components in `Whale/Sources/Settings`, copied from the
+  Spark app (`~/Downloads/Projects/spark/Spark/Settings`): `SettingsPageLayout`, `SettingsSection`
+  cards and the `Settings*Row` types. Use them rather than `Form`, so pages keep Spark's look.
+
 ## Git Workflow
 - **Never commit directly to `main`**
 - For every plan step or feature, create a branch first:

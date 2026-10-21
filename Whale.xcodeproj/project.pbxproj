@@ -74,6 +74,22 @@
 		70BB9F8472D5AE8D04FB24B1 /* RecordingBarsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */; };
 		C0746934B2975886BECF4FC2 /* HUDShadowContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */; };
 		B8A8C9A8633045C95677E274 /* RecordingPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8407F2542D3FD7B882AF819A /* RecordingPillView.swift */; };
+		94A50AEBD9019C91154844B2 /* CapsuleLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA6DB012BB46A484768CC8A /* CapsuleLabel.swift */; };
+		AD53F925E31A673936516F34 /* CapsulePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F51B089ECB4600AF9B71E46 /* CapsulePicker.swift */; };
+		BF8B7B12EE476289B8246552 /* SettingsAppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6A0224669B7D4883D33CC6 /* SettingsAppVersion.swift */; };
+		7C3C6C11E4C0566A088B0C88 /* SettingsCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C78B892C88A7644157D12C /* SettingsCompat.swift */; };
+		7E44142496C6B207B0055BD4 /* SettingsIconTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F334DF982A1C7E9F1636F5F /* SettingsIconTile.swift */; };
+		5CF0EFFE9B05B0DF21CDF835 /* SettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF877CF38F1B9A8320EC44E9 /* SettingsPage.swift */; };
+		A51ECE8A51A3DDAE747D5CBF /* SettingsPageLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F4552A384921BC8DB97295 /* SettingsPageLayout.swift */; };
+		969BE328FFB6A0CD715AF38D /* SettingsPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D012C8C00494F48E2E2F8F94 /* SettingsPageView.swift */; };
+		C501B5168C96BD207BA52972 /* SettingsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA19BD5D1284FB55D491A1CE /* SettingsRow.swift */; };
+		17E3B5B50AA112F82FA45598 /* SettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6C77E0F456D2BB8374A27B /* SettingsSection.swift */; };
+		D4C32EFBCE5D4B42F90E6079 /* SettingsSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0077EA8440CD7E7D98AC2A89 /* SettingsSidebar.swift */; };
+		D6FD9916AE874DF03B77D297 /* SettingsSidebarButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADC54A238D3FCDEF2281901 /* SettingsSidebarButtonStyle.swift */; };
+		7128105EF7C16DF6DD47C34D /* SettingsSidebarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69591C6CE4DB53DA317821CC /* SettingsSidebarRow.swift */; };
+		7E6EFD8A98BE21A46715F936 /* SettingsTint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 641F88FF1577EDA699BFDED4 /* SettingsTint.swift */; };
+		EEEF30D57B637BB607F77C39 /* SettingsWindowConfigurator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEB891FA861453A48C47B27A /* SettingsWindowConfigurator.swift */; };
+		00D5C39241E136CF947EF57E /* SidebarBlur.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECBAFE805D7EC418BED1AEAD /* SidebarBlur.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -149,6 +165,22 @@
 		AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingBarsView.swift; sourceTree = "<group>"; };
 		5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDShadowContainer.swift; sourceTree = "<group>"; };
 		8407F2542D3FD7B882AF819A /* RecordingPillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPillView.swift; sourceTree = "<group>"; };
+		0BA6DB012BB46A484768CC8A /* CapsuleLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsuleLabel.swift; sourceTree = "<group>"; };
+		4F51B089ECB4600AF9B71E46 /* CapsulePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsulePicker.swift; sourceTree = "<group>"; };
+		FF6A0224669B7D4883D33CC6 /* SettingsAppVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAppVersion.swift; sourceTree = "<group>"; };
+		48C78B892C88A7644157D12C /* SettingsCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCompat.swift; sourceTree = "<group>"; };
+		3F334DF982A1C7E9F1636F5F /* SettingsIconTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsIconTile.swift; sourceTree = "<group>"; };
+		AF877CF38F1B9A8320EC44E9 /* SettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPage.swift; sourceTree = "<group>"; };
+		C5F4552A384921BC8DB97295 /* SettingsPageLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageLayout.swift; sourceTree = "<group>"; };
+		D012C8C00494F48E2E2F8F94 /* SettingsPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageView.swift; sourceTree = "<group>"; };
+		FA19BD5D1284FB55D491A1CE /* SettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRow.swift; sourceTree = "<group>"; };
+		5F6C77E0F456D2BB8374A27B /* SettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSection.swift; sourceTree = "<group>"; };
+		0077EA8440CD7E7D98AC2A89 /* SettingsSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebar.swift; sourceTree = "<group>"; };
+		1ADC54A238D3FCDEF2281901 /* SettingsSidebarButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebarButtonStyle.swift; sourceTree = "<group>"; };
+		69591C6CE4DB53DA317821CC /* SettingsSidebarRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebarRow.swift; sourceTree = "<group>"; };
+		641F88FF1577EDA699BFDED4 /* SettingsTint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTint.swift; sourceTree = "<group>"; };
+		EEB891FA861453A48C47B27A /* SettingsWindowConfigurator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowConfigurator.swift; sourceTree = "<group>"; };
+		ECBAFE805D7EC418BED1AEAD /* SidebarBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarBlur.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -192,6 +224,7 @@
 		1FF43984F054E7654B1EEA37 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				D5315D4D3455F012BCA802AE /* Settings */,
 				5C4B84D889611007CE6B4C8F /* HUD */,
 				173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */,
 				AIA000000000000000000101 /* AIActionCoordinator.swift */,
@@ -304,6 +337,29 @@
 				8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */,
 			);
 			path = HUD;
+			sourceTree = "<group>";
+		};
+		D5315D4D3455F012BCA802AE /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				ECBAFE805D7EC418BED1AEAD /* SidebarBlur.swift */,
+				EEB891FA861453A48C47B27A /* SettingsWindowConfigurator.swift */,
+				641F88FF1577EDA699BFDED4 /* SettingsTint.swift */,
+				69591C6CE4DB53DA317821CC /* SettingsSidebarRow.swift */,
+				1ADC54A238D3FCDEF2281901 /* SettingsSidebarButtonStyle.swift */,
+				0077EA8440CD7E7D98AC2A89 /* SettingsSidebar.swift */,
+				5F6C77E0F456D2BB8374A27B /* SettingsSection.swift */,
+				FA19BD5D1284FB55D491A1CE /* SettingsRow.swift */,
+				D012C8C00494F48E2E2F8F94 /* SettingsPageView.swift */,
+				C5F4552A384921BC8DB97295 /* SettingsPageLayout.swift */,
+				AF877CF38F1B9A8320EC44E9 /* SettingsPage.swift */,
+				3F334DF982A1C7E9F1636F5F /* SettingsIconTile.swift */,
+				48C78B892C88A7644157D12C /* SettingsCompat.swift */,
+				FF6A0224669B7D4883D33CC6 /* SettingsAppVersion.swift */,
+				4F51B089ECB4600AF9B71E46 /* CapsulePicker.swift */,
+				0BA6DB012BB46A484768CC8A /* CapsuleLabel.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -433,6 +489,22 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				00D5C39241E136CF947EF57E /* SidebarBlur.swift in Sources */,
+				EEEF30D57B637BB607F77C39 /* SettingsWindowConfigurator.swift in Sources */,
+				7E6EFD8A98BE21A46715F936 /* SettingsTint.swift in Sources */,
+				7128105EF7C16DF6DD47C34D /* SettingsSidebarRow.swift in Sources */,
+				D6FD9916AE874DF03B77D297 /* SettingsSidebarButtonStyle.swift in Sources */,
+				D4C32EFBCE5D4B42F90E6079 /* SettingsSidebar.swift in Sources */,
+				17E3B5B50AA112F82FA45598 /* SettingsSection.swift in Sources */,
+				C501B5168C96BD207BA52972 /* SettingsRow.swift in Sources */,
+				969BE328FFB6A0CD715AF38D /* SettingsPageView.swift in Sources */,
+				A51ECE8A51A3DDAE747D5CBF /* SettingsPageLayout.swift in Sources */,
+				5CF0EFFE9B05B0DF21CDF835 /* SettingsPage.swift in Sources */,
+				7E44142496C6B207B0055BD4 /* SettingsIconTile.swift in Sources */,
+				7C3C6C11E4C0566A088B0C88 /* SettingsCompat.swift in Sources */,
+				BF8B7B12EE476289B8246552 /* SettingsAppVersion.swift in Sources */,
+				AD53F925E31A673936516F34 /* CapsulePicker.swift in Sources */,
+				94A50AEBD9019C91154844B2 /* CapsuleLabel.swift in Sources */,
 				B8A8C9A8633045C95677E274 /* RecordingPillView.swift in Sources */,
 				C0746934B2975886BECF4FC2 /* HUDShadowContainer.swift in Sources */,
 				70BB9F8472D5AE8D04FB24B1 /* RecordingBarsView.swift in Sources */,

@@ -134,7 +134,7 @@ private struct PermissionsStep: View {
 
             // The same rows the Permissions settings pane shows, so the two cannot drift
             // apart again. Only the actions differ: on first run the OS still prompts.
-            Form {
+            ScrollView {
                 PermissionListSections(
                     style: .onboarding,
                     micGranted: micStatus == .authorized,
@@ -142,8 +142,9 @@ private struct PermissionsStep: View {
                     onMicAction: requestMic,
                     onAccessibilityAction: requestAccessibility
                 )
+                .padding(.horizontal, 28)
+                .padding(.vertical, 12)
             }
-            .formStyle(.grouped)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
@@ -188,11 +189,11 @@ private struct ModelStep: View {
             .padding(.top, 28)
             .padding(.bottom, 8)
 
-            Form {
-                ModelListSections()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    ModelListSections()
 
-                if modelStore.isReady(for: settings.selectedBuiltInModelID) {
-                    Section {
+                    if modelStore.isReady(for: settings.selectedBuiltInModelID) {
                         Label(
                             "Selected model installed. Continue to configure your shortcut and test dictation.",
                             systemImage: "checkmark.circle.fill"
@@ -200,8 +201,9 @@ private struct ModelStep: View {
                         .foregroundStyle(.secondary)
                     }
                 }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 12)
             }
-            .formStyle(.grouped)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {

@@ -3,7 +3,7 @@ import Combine
 
 @MainActor
 final class SettingsCoordinator: ObservableObject {
-    @Published var selection: SettingsSection = .general
+    @Published var selection: SettingsPage = .general
     private weak var settingsWindow: NSWindow?
 
     func registerSettingsWindow(_ window: NSWindow?) {
@@ -11,7 +11,7 @@ final class SettingsCoordinator: ObservableObject {
     }
 
     @discardableResult
-    func focus(section: SettingsSection) -> Bool {
+    func focus(section: SettingsPage) -> Bool {
         selection = section
         NSApp.activate()
 
