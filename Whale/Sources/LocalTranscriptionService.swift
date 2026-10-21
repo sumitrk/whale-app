@@ -31,6 +31,7 @@ enum BuiltInModelProvisioning: String, Codable, Sendable {
 
 enum BuiltInModelID: String, CaseIterable, Codable, Identifiable, Sendable {
     case parakeetEnglishV2
+    case barkCleanEnglish
     case whisperLargeV3Turbo
     case whisperLocalFolder
     case appleSpeech
@@ -142,6 +143,19 @@ enum BuiltInModelCatalog {
             declaredLanguageCapability: .single(code: "en"),
             detail: "Parakeet TDT v2 • English only • Runs locally on-device",
             markdownLabel: "FluidAudio Parakeet v2"
+        ),
+        // Underdog's name for it, credited as CC-BY asks. Runs on the Parakeet backend because
+        // it is a Parakeet v3 fine-tune.
+        BuiltInModelDescriptor(
+            id: .barkCleanEnglish,
+            group: .parakeet,
+            source: .bundled,
+            provisioning: .download,
+            title: BarkCleanModelCatalog.displayName,
+            capabilityLabel: "English only · Leaves out “um” and false starts",
+            declaredLanguageCapability: .single(code: "en"),
+            detail: "Underdog Bark 3.0 Clean (CC BY 4.0) • English only • Runs locally on-device",
+            markdownLabel: "Underdog Bark 3.0 Clean"
         ),
         BuiltInModelDescriptor(
             id: .whisperLargeV3Turbo,
@@ -755,11 +769,12 @@ protocol ParakeetManaging: Sendable {
     func transcribeDiskBacked(_ wavURL: URL, source: AudioSource) async throws -> String
 }
 
+/// One Parakeet-family checkpoint: where its files come from and how FluidAudio loads them.
 protocol ParakeetModelRuntime: Sendable {
     func modelsExist(at modelDirectory: URL) async -> Bool
     func downloadModels(
         to modelDirectory: URL,
-        progressHandler: ProgressHandler?
+        progressHandler: ModelInstallProgressHandler?
     ) async throws
     func validateModels(at modelDirectory: URL) async throws
     func prepareManager(at modelDirectory: URL) async throws -> any ParakeetManaging
@@ -772,13 +787,31 @@ struct FluidAudioParakeetRuntime: ParakeetModelRuntime {
 
     func downloadModels(
         to modelDirectory: URL,
-        progressHandler: ProgressHandler?
+        progressHandler: ModelInstallProgressHandler?
     ) async throws {
         _ = try await AsrModels.download(
             to: modelDirectory,
             version: .v2,
-            progressHandler: progressHandler
+            progressHandler: { progress in
+                progressHandler?(
+                    ModelInstallProgress(
+                        fractionCompleted: progress.fractionCompleted,
+                        phase: Self.phaseLabel(for: progress.phase)
+                    )
+                )
+            }
         )
+    }
+
+    private static func phaseLabel(for phase: DownloadPhase) -> String {
+        switch phase {
+        case .listing:
+            return "Looking up model files…"
+        case .downloading(let completedFiles, let totalFiles):
+            return "Downloading model files \(completedFiles)/\(totalFiles)"
+        case .compiling(let modelName):
+            return "Compiling \(modelName)…"
+        }
     }
 
     func validateModels(at modelDirectory: URL) async throws {
@@ -804,6 +837,11 @@ struct FluidAudioParakeetRuntime: ParakeetModelRuntime {
             )
         }
 
+        return try await Self.makeManager(models: models, modelDirectory: modelDirectory)
+    }
+
+    /// Shared by every Parakeet-family checkpoint once its models are loaded.
+    static func makeManager(models: AsrModels, modelDirectory: URL) async throws -> any ParakeetManaging {
         let manager = AsrManager(config: .default)
 
         do {
@@ -844,18 +882,23 @@ private final class FluidAudioParakeetManager: @unchecked Sendable, ParakeetMana
     }
 }
 
+/// Every Parakeet-family checkpoint. Only one is held in memory at a time: switching models
+/// drops the loaded one, because the folder it came from no longer matches.
 actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
-    private let runtime: any ParakeetModelRuntime
+    private let runtimes: [BuiltInModelID: any ParakeetModelRuntime]
     private let runtimeInfoProvider: @Sendable () -> AppRuntimeInfo
     private var manager: (any ParakeetManaging)?
     private var loadedModelDirectory: URL?
     private var hasCheckedLegacyModelDirectory = false
 
     init(
-        runtime: any ParakeetModelRuntime = FluidAudioParakeetRuntime(),
+        runtimes: [BuiltInModelID: any ParakeetModelRuntime] = [
+            .parakeetEnglishV2: FluidAudioParakeetRuntime(),
+            .barkCleanEnglish: BarkCleanParakeetRuntime(),
+        ],
         runtimeInfoProvider: @escaping @Sendable () -> AppRuntimeInfo = { AppRuntimeInfo.current }
     ) {
-        self.runtime = runtime
+        self.runtimes = runtimes
         self.runtimeInfoProvider = runtimeInfoProvider
     }
 
@@ -863,7 +906,7 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         let context = try modelContext(for: modelID)
         Self.log("Checking install state at \(context.modelDirectory.path) (\(context.runtimeInfo.storageDescription))")
 
-        guard await runtime.modelsExist(at: context.modelDirectory) else {
+        guard await context.runtime.modelsExist(at: context.modelDirectory) else {
             Self.log("Model files missing at \(context.modelDirectory.path)")
             return false
         }
@@ -896,16 +939,9 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         }
 
         do {
-            try await runtime.downloadModels(
+            try await context.runtime.downloadModels(
                 to: context.modelDirectory,
-                progressHandler: { progress in
-                    progressHandler?(
-                        ModelInstallProgress(
-                            fractionCompleted: progress.fractionCompleted,
-                            phase: Self.phaseLabel(for: progress.phase)
-                        )
-                    )
-                }
+                progressHandler: progressHandler
             )
         } catch {
             Self.log("Download failed at \(context.modelDirectory.path): \(error.localizedDescription)")
@@ -918,7 +954,7 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
 
         progressHandler?(ModelInstallProgress(fractionCompleted: nil, phase: "Validating model files…"))
 
-        guard await runtime.modelsExist(at: context.modelDirectory) else {
+        guard await context.runtime.modelsExist(at: context.modelDirectory) else {
             let reason = "Expected Parakeet model files were not found after download."
             Self.log("Validation failed at \(context.modelDirectory.path): \(reason)")
             throw LocalTranscriptionError.parakeetSetupFailed(
@@ -929,7 +965,7 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         }
 
         do {
-            try await runtime.validateModels(at: context.modelDirectory)
+            try await context.runtime.validateModels(at: context.modelDirectory)
         } catch {
             Self.log("Validation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
             throw Self.wrapError(
@@ -942,7 +978,7 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         progressHandler?(ModelInstallProgress(fractionCompleted: nil, phase: "Preparing model for first use…"))
 
         do {
-            manager = try await runtime.prepareManager(at: context.modelDirectory)
+            manager = try await context.runtime.prepareManager(at: context.modelDirectory)
             loadedModelDirectory = context.modelDirectory
             Self.log("Model runtime prepared at \(context.modelDirectory.path)")
         } catch {
@@ -994,8 +1030,11 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
     func resetModel(modelID: BuiltInModelID) async throws {
         let context = try modelContext(for: modelID)
         Self.log("Resetting model cache at \(context.modelDirectory.path)")
-        manager = nil
-        loadedModelDirectory = nil
+        // Deleting one checkpoint shouldn't unload another that's still in use.
+        if loadedModelDirectory == context.modelDirectory {
+            manager = nil
+            loadedModelDirectory = nil
+        }
 
         do {
             if FileManager.default.fileExists(atPath: context.modelDirectory.path) {
@@ -1020,12 +1059,12 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
 
         Self.log("Ensuring model runtime is ready at \(context.modelDirectory.path)")
 
-        guard await runtime.modelsExist(at: context.modelDirectory) else {
+        guard await context.runtime.modelsExist(at: context.modelDirectory) else {
             throw LocalTranscriptionError.modelNotInstalled(modelID.descriptor)
         }
 
         do {
-            manager = try await runtime.prepareManager(at: context.modelDirectory)
+            manager = try await context.runtime.prepareManager(at: context.modelDirectory)
             loadedModelDirectory = context.modelDirectory
         } catch {
             Self.log("Runtime preparation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
@@ -1037,29 +1076,24 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
         }
     }
 
-    private static func phaseLabel(for phase: DownloadPhase) -> String {
-        switch phase {
-        case .listing:
-            return "Looking up model files…"
-        case .downloading(let completedFiles, let totalFiles):
-            return "Downloading model files \(completedFiles)/\(totalFiles)"
-        case .compiling(let modelName):
-            return "Compiling \(modelName)…"
-        }
-    }
-
-    private func modelContext(for modelID: BuiltInModelID) throws -> (runtimeInfo: AppRuntimeInfo, modelDirectory: URL) {
-        guard case .parakeetEnglishV2 = modelID else {
+    private func modelContext(
+        for modelID: BuiltInModelID
+    ) throws -> (runtimeInfo: AppRuntimeInfo, modelDirectory: URL, runtime: any ParakeetModelRuntime) {
+        guard let runtime = runtimes[modelID] else {
             throw LocalTranscriptionError.unsupportedModel(modelID)
         }
 
         let runtimeInfo = runtimeInfoProvider()
-        adoptLegacyModelDirectoryIfNeeded(for: runtimeInfo)
+        let modelDirectory: URL
+        switch modelID {
+        case .barkCleanEnglish:
+            modelDirectory = runtimeInfo.barkCleanDirectoryURL
+        default:
+            adoptLegacyModelDirectoryIfNeeded(for: runtimeInfo)
+            modelDirectory = runtimeInfo.parakeetEnglishV2DirectoryURL
+        }
 
-        return (
-            runtimeInfo: runtimeInfo,
-            modelDirectory: runtimeInfo.parakeetEnglishV2DirectoryURL
-        )
+        return (runtimeInfo: runtimeInfo, modelDirectory: modelDirectory, runtime: runtime)
     }
 
     /// Move a pre-0.15 install onto the folder name FluidAudio now derives, so upgrading

@@ -8,11 +8,14 @@ Follows FluidInference's own v3 exporter (mobius models/stt/parakeet-tdt-v3-0.6b
 - The encoder is palettized with one lookup table per output row, built from the values each
   row already has. Bark stores every encoder row as a handful of fp16 levels, so this is
   exact, not a k-means approximation: 3-bit tables for the big matrices, 6-bit for the small
-  convs. Per-row tables need Core ML's macOS 15 opset.
+  convs. Per-row tables need Core ML's macOS 15 opset, so that encoder is only built when
+  BARK_TARGET=macOS15. The shipped encoder comes from encoder_variants.py instead.
 
+  BARK_TARGET=macOS14 (default, Whale's deployment target) or macOS15
   python convert_bark.py <parakeet-v3.nemo> <bark-dir> <stock-v3-coreml-dir> <trace.wav> <out-dir>
 """
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -31,7 +34,7 @@ nemo_path, bark_dir, stock_dir, trace_wav, out_dir = sys.argv[1:6]
 stock_dir, out_dir = Path(stock_dir), Path(out_dir)
 pkg_dir = out_dir / "mlpackage"
 pkg_dir.mkdir(parents=True, exist_ok=True)
-TARGET = ct.target.macOS15
+TARGET = {"macOS14": ct.target.macOS14, "macOS15": ct.target.macOS15}[os.environ.get("BARK_TARGET", "macOS14")]
 MAX_SAMPLES = 240_000  # FluidAudio's 15 s window
 
 
@@ -122,7 +125,7 @@ if not encoder_fp16_pkg.exists():
              ct.TensorType(name="mel_length", shape=(1,), dtype=np.int32)],
             [ct.TensorType(name="encoder", dtype=np.float32),
              ct.TensorType(name="encoder_length", dtype=np.int32)], "Encoder").save(str(encoder_fp16_pkg))
-if not encoder_pkg.exists():
+if TARGET == ct.target.macOS15 and not encoder_pkg.exists():
     palettize_per_row(ct.models.MLModel(str(encoder_fp16_pkg), skip_model_load=True)).save(str(encoder_pkg))
 
 layers, hidden = int(asr.decoder.pred_rnn_layers), int(asr.decoder.pred_hidden)
@@ -155,6 +158,8 @@ joint.save(str(pkg_dir / "JointDecisionv3.mlpackage"))
 
 # Compile into the folder layout FluidAudio expects, with the stock v3 Preprocessor and vocab.
 for name in ("Encoder", "Decoder", "JointDecisionv3"):
+    if not (pkg_dir / f"{name}.mlpackage").exists():
+        continue
     target = out_dir / f"{name}.mlmodelc"
     shutil.rmtree(target, ignore_errors=True)
     subprocess.run(["xcrun", "coremlcompiler", "compile", str(pkg_dir / f"{name}.mlpackage"), str(out_dir)],

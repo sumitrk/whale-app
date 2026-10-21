@@ -27,6 +27,12 @@ struct ModelListSections: View {
             ForEach(BuiltInModelCatalog.models(from: .bundled)) { model in
                 ModelRow(model: model)
             }
+        } footer: {
+            // CC-BY's credit, licence link and note of changes. See
+            // Resources/Licenses/Bark-3.0-Clean before rewording.
+            Text("\(BarkCleanModelCatalog.displayName) is [Underdog Bark 3.0 Clean](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Clean), converted to Core ML, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
 
         Section {
@@ -212,6 +218,7 @@ private struct ModelRow: View {
     @ObservedObject private var modelStore = TranscriptionModelStore.shared
     @ObservedObject private var settings = SettingsStore.shared
     @State private var isHovering = false
+    @State private var pendingDelete: PendingModelDelete?
 
     let model: BuiltInModelDescriptor
 
@@ -270,6 +277,15 @@ private struct ModelRow: View {
         .onHover { isHovering = $0 }
         .onTapGesture { activate(row) }
         .contextMenu { contextMenu(for: row) }
+        .confirmationDialog(
+            "Delete \(model.title)?",
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            presenting: pendingDelete
+        ) { _ in
+            Button("Delete", role: .destructive) { modelStore.reset(model.id) }
+        } message: { request in
+            Text(request.message)
+        }
     }
 
     private func statusLine(for row: TranscriptionModelRowModel) -> String {
@@ -318,11 +334,11 @@ private struct ModelRow: View {
                         .buttonStyle(.bordered)
                 }
 
-                // Only a model that is not in use, and only files the app downloaded itself:
-                // the active model would leave dictation with nothing to run, and a folder
-                // the user supplied is never erased. Both keep their context-menu entry.
-                if row.status == .inactive, model.ownsModelFiles, let title = row.resetActionTitle {
-                    Button { modelStore.reset(model.id) } label: {
+                // Any model whose files the app downloaded itself, the active one included:
+                // the confirmation says so when dictation would be left without a model. A
+                // folder the user supplied is never erased; it keeps its context-menu entry.
+                if row.isReady, model.ownsModelFiles, let title = row.resetActionTitle {
+                    Button { requestDelete(row) } label: {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.bordered)
@@ -371,8 +387,37 @@ private struct ModelRow: View {
 
         if let resetActionTitle = row.resetActionTitle {
             Divider()
-            Button(resetActionTitle) { modelStore.reset(model.id) }
+            Button(resetActionTitle) {
+                if model.ownsModelFiles {
+                    requestDelete(row)
+                } else {
+                    modelStore.reset(model.id)
+                }
+            }
         }
+    }
+
+    /// Asks before erasing anything, naming the space it frees and, for the active model,
+    /// that dictation stops working until another model is ready.
+    private func requestDelete(_ row: TranscriptionModelRowModel) {
+        pendingDelete = PendingModelDelete(
+            byteCount: localModelPath.flatMap(Self.allocatedByteCount(at:)),
+            isActive: row.status == .active
+        )
+    }
+
+    private static func allocatedByteCount(at path: String) -> Int64? {
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        guard let files = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.totalFileAllocatedSizeKey]
+        ) else { return nil }
+
+        var total: Int64 = 0
+        for case let file as URL in files {
+            total += Int64((try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0)
+        }
+        return total > 0 ? total : nil
     }
 
     private func activate(_ row: TranscriptionModelRowModel) {
@@ -384,6 +429,8 @@ private struct ModelRow: View {
         switch model.id {
         case .parakeetEnglishV2:
             return AppRuntimeInfo.current.parakeetEnglishV2DirectoryURL.path
+        case .barkCleanEnglish:
+            return AppRuntimeInfo.current.barkCleanDirectoryURL.path
         case .whisperLargeV3Turbo, .whisperLocalFolder:
             return settings.localModelPath(for: model.id)
         case .appleSpeech:
@@ -411,6 +458,22 @@ private struct ModelRow: View {
 
         guard panel.runModal() == .OK, let folderURL = panel.url else { return }
         modelStore.connectLocalModel(model.id, folderURL: folderURL)
+    }
+}
+
+/// What the delete confirmation needs to say.
+private struct PendingModelDelete {
+    let byteCount: Int64?
+    let isActive: Bool
+
+    var message: String {
+        let freed = byteCount.map {
+            "This frees \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)). "
+        } ?? ""
+        let consequence = isActive
+            ? "It's the model dictation uses now, so dictation won't work until you download it again or pick another model."
+            : "You can download it again from here."
+        return freed + consequence
     }
 }
 

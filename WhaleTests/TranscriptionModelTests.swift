@@ -68,7 +68,7 @@ final class TranscriptionModelTests: XCTestCase {
     func testCatalogGroupsContainExpectedBuiltInModels() {
         XCTAssertEqual(BuiltInModelGroup.allCases, [.parakeet, .whisper, .apple])
         XCTAssertEqual(BuiltInModelCatalog.models(in: .apple).map(\.id), [.appleSpeech])
-        XCTAssertEqual(BuiltInModelCatalog.models(in: .parakeet).map(\.id), [.parakeetEnglishV2])
+        XCTAssertEqual(BuiltInModelCatalog.models(in: .parakeet).map(\.id), [.parakeetEnglishV2, .barkCleanEnglish])
         XCTAssertEqual(
             BuiltInModelCatalog.models(in: .whisper).map(\.id),
             [.whisperLargeV3Turbo, .whisperLocalFolder]
@@ -78,7 +78,7 @@ final class TranscriptionModelTests: XCTestCase {
     func testCatalogSplitsBundledModelsFromCustomFolder() {
         XCTAssertEqual(
             BuiltInModelCatalog.models(from: .bundled).map(\.id),
-            [.parakeetEnglishV2, .whisperLargeV3Turbo, .appleSpeech]
+            [.parakeetEnglishV2, .barkCleanEnglish, .whisperLargeV3Turbo, .appleSpeech]
         )
         XCTAssertEqual(
             BuiltInModelCatalog.models(from: .custom).map(\.id),
@@ -86,7 +86,7 @@ final class TranscriptionModelTests: XCTestCase {
         )
         XCTAssertEqual(
             BuiltInModelCatalog.allModels.map(\.capabilityLabel),
-            ["English only", "Multilingual", "English only", "Auto-detect"]
+            ["English only", "English only · Leaves out “um” and false starts", "Multilingual", "English only", "Auto-detect"]
         )
     }
 
@@ -536,7 +536,7 @@ final class TranscriptionModelTests: XCTestCase {
         let runtime = FakeParakeetRuntime()
         let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
         let backend = ParakeetTranscriptionBackend(
-            runtime: runtime,
+            runtimes: [.parakeetEnglishV2: runtime],
             runtimeInfoProvider: { runtimeInfo }
         )
 
@@ -561,7 +561,7 @@ final class TranscriptionModelTests: XCTestCase {
         defer { try? fm.removeItem(at: runtimeInfo.homeDirectoryURL) }
 
         let backend = ParakeetTranscriptionBackend(
-            runtime: FakeParakeetRuntime(),
+            runtimes: [.parakeetEnglishV2: FakeParakeetRuntime()],
             runtimeInfoProvider: { runtimeInfo }
         )
         _ = try await backend.isInstalled(modelID: .parakeetEnglishV2)
@@ -590,7 +590,7 @@ final class TranscriptionModelTests: XCTestCase {
         defer { try? fm.removeItem(at: runtimeInfo.homeDirectoryURL) }
 
         let backend = ParakeetTranscriptionBackend(
-            runtime: FakeParakeetRuntime(),
+            runtimes: [.parakeetEnglishV2: FakeParakeetRuntime()],
             runtimeInfoProvider: { runtimeInfo }
         )
         _ = try await backend.isInstalled(modelID: .parakeetEnglishV2)
@@ -607,7 +607,7 @@ final class TranscriptionModelTests: XCTestCase {
         await runtime.setDownloadError(FakeParakeetRuntimeError.downloadFailed)
         let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
         let backend = ParakeetTranscriptionBackend(
-            runtime: runtime,
+            runtimes: [.parakeetEnglishV2: runtime],
             runtimeInfoProvider: { runtimeInfo }
         )
 
@@ -632,7 +632,7 @@ final class TranscriptionModelTests: XCTestCase {
         await runtime.setValidateError(FakeParakeetRuntimeError.validationFailed)
         let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
         let backend = ParakeetTranscriptionBackend(
-            runtime: runtime,
+            runtimes: [.parakeetEnglishV2: runtime],
             runtimeInfoProvider: { runtimeInfo }
         )
 
@@ -657,7 +657,7 @@ final class TranscriptionModelTests: XCTestCase {
         await runtime.setPrepareError(FakeParakeetRuntimeError.prepareFailed)
         let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
         let backend = ParakeetTranscriptionBackend(
-            runtime: runtime,
+            runtimes: [.parakeetEnglishV2: runtime],
             runtimeInfoProvider: { runtimeInfo }
         )
 
@@ -677,11 +677,96 @@ final class TranscriptionModelTests: XCTestCase {
         }
     }
 
+    func testBarkInstallsIntoItsOwnFolderWithItsOwnRuntime() async throws {
+        let parakeet = FakeParakeetRuntime()
+        let bark = FakeParakeetRuntime()
+        let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
+        let backend = ParakeetTranscriptionBackend(
+            runtimes: [.parakeetEnglishV2: parakeet, .barkCleanEnglish: bark],
+            runtimeInfoProvider: { runtimeInfo }
+        )
+
+        try await backend.install(modelID: .barkCleanEnglish, progressHandler: nil)
+
+        let barkCalls = await bark.snapshot()
+        XCTAssertEqual(barkCalls.downloadedPaths, [runtimeInfo.barkCleanDirectoryURL.path])
+        XCTAssertEqual(barkCalls.preparedPaths, [runtimeInfo.barkCleanDirectoryURL.path])
+        let parakeetCalls = await parakeet.snapshot()
+        XCTAssertTrue(parakeetCalls.downloadedPaths.isEmpty)
+        XCTAssertNotEqual(runtimeInfo.barkCleanDirectoryURL, runtimeInfo.parakeetEnglishV2DirectoryURL)
+    }
+
+    /// Deleting the model that isn't loaded must leave the loaded one alone, or the next
+    /// dictation pays a full model load for nothing.
+    func testDeletingOneParakeetCheckpointKeepsTheOtherLoaded() async throws {
+        let parakeet = FakeParakeetRuntime()
+        let bark = FakeParakeetRuntime()
+        let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
+        let backend = ParakeetTranscriptionBackend(
+            runtimes: [.parakeetEnglishV2: parakeet, .barkCleanEnglish: bark],
+            runtimeInfoProvider: { runtimeInfo }
+        )
+
+        try await backend.install(modelID: .parakeetEnglishV2, progressHandler: nil)
+        try await backend.install(modelID: .barkCleanEnglish, progressHandler: nil)
+        try await backend.prepare(modelID: .parakeetEnglishV2)
+        let preparedBefore = await parakeet.snapshot().preparedPaths.count
+
+        try await backend.resetModel(modelID: .barkCleanEnglish)
+        try await backend.prepare(modelID: .parakeetEnglishV2)
+
+        let preparedAfter = await parakeet.snapshot().preparedPaths.count
+        XCTAssertEqual(preparedAfter, preparedBefore)
+    }
+
+    func testBarkFolderCountsAsInstalledOnlyWithEveryFile() async throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bark-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let runtime = BarkCleanParakeetRuntime()
+
+        for name in BarkCleanModelCatalog.requiredFiles.dropLast() {
+            try Data().write(to: folder.appendingPathComponent(name))
+        }
+        let partial = await runtime.modelsExist(at: folder)
+        XCTAssertFalse(partial)
+
+        try Data().write(to: folder.appendingPathComponent(BarkCleanModelCatalog.requiredFiles.last!))
+        let complete = await runtime.modelsExist(at: folder)
+        XCTAssertTrue(complete)
+    }
+
+    /// The real thing, end to end: download from R2, checksum, unpack, load through FluidAudio
+    /// and transcribe. Off by default because it fetches 281 MB; run it with
+    /// `TEST_RUNNER_WHALE_BARK_LIVE_TEST=1 TEST_RUNNER_WHALE_BARK_LIVE_WAV=<16 kHz wav>`.
+    func testBarkLiveDownloadLoadsAndTranscribes() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        try XCTSkipUnless(environment["WHALE_BARK_LIVE_TEST"] == "1", "Live Bark download test is opt-in")
+        let wav = try XCTUnwrap(environment["WHALE_BARK_LIVE_WAV"].map { URL(fileURLWithPath: $0) })
+
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bark-live-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent(BarkCleanModelCatalog.directoryName, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder.deletingLastPathComponent()) }
+        let runtime = BarkCleanParakeetRuntime()
+
+        try await runtime.downloadModels(to: folder, progressHandler: nil)
+        let installed = await runtime.modelsExist(at: folder)
+        XCTAssertTrue(installed)
+        try await runtime.validateModels(at: folder)
+
+        let manager = try await runtime.prepareManager(at: folder)
+        let text = try await manager.transcribe(wav, source: .microphone)
+        print("[BarkLive] \(text)")
+        XCTAssertFalse(text.isEmpty)
+    }
+
     func testParakeetEnsureReadySucceedsAfterSuccessfulPrewarm() async throws {
         let runtime = FakeParakeetRuntime()
         let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
         let backend = ParakeetTranscriptionBackend(
-            runtime: runtime,
+            runtimes: [.parakeetEnglishV2: runtime],
             runtimeInfoProvider: { runtimeInfo }
         )
 
@@ -916,7 +1001,7 @@ actor FakeParakeetRuntime: ParakeetModelRuntime {
 
     func downloadModels(
         to modelDirectory: URL,
-        progressHandler _: ProgressHandler?
+        progressHandler _: ModelInstallProgressHandler?
     ) async throws {
         downloadedPaths.append(modelDirectory.path)
 
