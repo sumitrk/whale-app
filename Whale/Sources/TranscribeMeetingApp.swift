@@ -137,22 +137,26 @@ struct TranscribeMeetingApp: App {
         }
     }
 
-    private var menuBarIconName: String {
+    @ViewBuilder
+    private var menuBarIcon: some View {
         if appState.isRecording {
-            return "record.circle.fill"
+            Image(systemName: "record.circle.fill")
+        } else if !accessibilityController.isTrusted {
+            Image(systemName: "exclamationmark.triangle.fill")
+        } else {
+            Image("MenuBarIcon")
         }
-        if !accessibilityController.isTrusted {
-            return "exclamationmark.triangle.fill"
-        }
-        return "mic"
     }
 
     var body: some Scene {
-        MenuBarExtra("Whale", systemImage: menuBarIconName) {
+        MenuBarExtra {
             MenuBarView(updater: updaterController?.updater)
                 .environmentObject(appState)
                 .environmentObject(accessibilityController)
                 .environmentObject(settingsCoordinator)
+        } label: {
+            menuBarIcon
+                .accessibilityLabel("Whale")
         }
         .menuBarExtraStyle(.menu)
 
