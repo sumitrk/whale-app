@@ -159,3 +159,34 @@ struct AppRuntimeInfo: Equatable, Sendable {
         }
     }
 }
+
+/// The S1-mini Cleanup model, which Whale no longer uses. Bark 3.0 Clean drops fillers while
+/// transcribing, so the Cleanup stage was removed — and with it the only row that could
+/// delete these 633 MB. Whale deletes them itself instead, once, on the next launch.
+enum RemovedCleanupModel {
+    /// Where swift-transformers' Hub put the snapshot: `<Models>/models/<repo id>`.
+    static func directory(in runtimeInfo: AppRuntimeInfo) -> URL {
+        runtimeInfo.modelsDirectoryURL
+            .appendingPathComponent("models/mlx-community/S1-mini-MLX-8bit", isDirectory: true)
+    }
+
+    static func deleteIfPresent(_ runtimeInfo: AppRuntimeInfo) {
+        let fileManager = FileManager.default
+        let model = directory(in: runtimeInfo)
+        guard fileManager.fileExists(atPath: model.path) else { return }
+
+        do {
+            try fileManager.removeItem(at: model)
+            DiagnosticLog.log("[Models] Deleted the retired S1-mini model at \(model.path)")
+        } catch {
+            DiagnosticLog.log("[Models] Could not delete the retired S1-mini model: \(error.localizedDescription)")
+            return
+        }
+
+        // Its parents held nothing else; remove them only if that's still true.
+        for parent in [model.deletingLastPathComponent(), model.deletingLastPathComponent().deletingLastPathComponent()] {
+            guard (try? fileManager.contentsOfDirectory(atPath: parent.path))?.isEmpty == true else { break }
+            try? fileManager.removeItem(at: parent)
+        }
+    }
+}

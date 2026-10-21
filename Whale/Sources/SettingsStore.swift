@@ -110,53 +110,6 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(builtInModelLanguageCapabilities, forKey: Keys.builtInModelLanguageCapabilities) }
     }
 
-    /// Hand the transcript to S1-mini after transcription: fillers removed,
-    /// self-corrections resolved, punctuation and capitalization applied, and the
-    /// written-form rewrite Smart Formatting does. On by default, which is what makes
-    /// the 633 MB download start on its own — the model is part of what Whale is rather
-    /// than an upsell behind a switch.
-    ///
-    /// A superset of Smart Formatting rather than an addition to it, so the two are
-    /// never both in the pipeline — see `usesSmartFormattingStage(cleanupIsRunning:)`.
-    @Published var transcriptCleanupEnabled: Bool {
-        didSet { ud.set(transcriptCleanupEnabled, forKey: Keys.transcriptCleanupEnabled) }
-    }
-
-    @Published var cleanupStyling: TranscriptCleanupStyling {
-        didSet { ud.set(cleanupStyling.rawValue, forKey: Keys.cleanupStyling) }
-    }
-
-    @Published var cleanupStructure: TranscriptCleanupStructure {
-        didSet { ud.set(cleanupStructure.rawValue, forKey: Keys.cleanupStructure) }
-    }
-
-    @Published var cleanupContext: TranscriptCleanupContext {
-        didSet { ud.set(cleanupContext.rawValue, forKey: Keys.cleanupContext) }
-    }
-
-    var cleanupOptions: TranscriptCleanupOptions {
-        TranscriptCleanupOptions(
-            styling: cleanupStyling,
-            structure: cleanupStructure,
-            context: cleanupContext
-        )
-    }
-
-    /// Smart Formatting's rewrite is a strict subset of what S1-mini does, so running
-    /// both would have the model re-read text a regex engine had already reshaped —
-    /// which is exactly the input it was not trained on. Cleanup wins where they meet.
-    ///
-    /// No longer a preference. It used to be a toggle of its own, which put two switches
-    /// in the pane for one outcome; now it is simply what runs when Cleanup is not — with
-    /// Cleanup switched off, still downloading, or deleted, spoken numbers would otherwise
-    /// go through untouched.
-    ///
-    /// `cleanupIsRunning` rather than `transcriptCleanupEnabled`, because the switch being
-    /// on is not the same as the model being on disk.
-    func usesSmartFormattingStage(cleanupIsRunning: Bool) -> Bool {
-        !cleanupIsRunning
-    }
-
     // MARK: - AI Actions
 
     static let defaultAIActionMasterPrompt = "Follow the spoken instruction using the supplied context. Preserve the user's intended tone, language, and useful formatting."
@@ -215,20 +168,11 @@ class SettingsStore: ObservableObject {
         builtInModelLocalBookmarks = ud.dictionary(forKey: Keys.builtInModelLocalBookmarks) as? [String: String] ?? [:]
         builtInModelLanguages    = ud.dictionary(forKey: Keys.builtInModelLanguages) as? [String: String] ?? [:]
         builtInModelLanguageCapabilities = ud.dictionary(forKey: Keys.builtInModelLanguageCapabilities) as? [String: String] ?? [:]
-        transcriptCleanupEnabled = (ud.object(forKey: Keys.transcriptCleanupEnabled) as? Bool) ?? true
-        cleanupStyling           = TranscriptCleanupStyling(
-            rawValue: ud.string(forKey: Keys.cleanupStyling) ?? ""
-        ) ?? TranscriptCleanupOptions.default.styling
-        cleanupStructure         = TranscriptCleanupStructure(
-            rawValue: ud.string(forKey: Keys.cleanupStructure) ?? ""
-        ) ?? TranscriptCleanupOptions.default.structure
-        cleanupContext           = TranscriptCleanupContext(
-            rawValue: ud.string(forKey: Keys.cleanupContext) ?? ""
-        ) ?? TranscriptCleanupOptions.default.context
         aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
         openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
         openRouterOutOfCredit    = ud.bool(forKey: Keys.openRouterOutOfCredit)
         openRouterKeyVerified    = ud.bool(forKey: Keys.openRouterKeyVerified)
+        Keys.removedCleanupKeys.forEach(ud.removeObject(forKey:))
 
         if didMigrateLegacyDefaults && launchAtLogin {
             try? SMAppService.mainApp.register()
@@ -457,10 +401,9 @@ class SettingsStore: ObservableObject {
         static let builtInModelLocalBookmarks = "builtInModelLocalBookmarks"
         static let builtInModelLanguages = "builtInModelLanguages"
         static let builtInModelLanguageCapabilities = "builtInModelLanguageCapabilities"
-        static let transcriptCleanupEnabled = "transcriptCleanupEnabled"
-        static let cleanupStyling = "cleanupStyling"
-        static let cleanupStructure = "cleanupStructure"
-        static let cleanupContext = "cleanupContext"
+        /// The S1-mini Cleanup stage's settings, removed with it. Bark 3.0 Clean drops fillers
+        /// while transcribing, so a second model is no longer worth its download.
+        static let removedCleanupKeys = ["transcriptCleanupEnabled", "cleanupStyling", "cleanupStructure", "cleanupContext"]
         static let aiActionMasterPrompt = "aiActionMasterPrompt"
         static let openRouterKeyRejected = "openRouterKeyRejected"
         static let openRouterOutOfCredit = "openRouterOutOfCredit"

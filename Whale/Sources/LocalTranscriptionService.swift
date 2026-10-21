@@ -889,6 +889,11 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
     private let runtimeInfoProvider: @Sendable () -> AppRuntimeInfo
     private var manager: (any ParakeetManaging)?
     private var loadedModelDirectory: URL?
+    /// The load in flight, so callers arriving while it runs wait for it instead of starting
+    /// their own. The actor yields at every `await`, and a first load can spend 10+ seconds
+    /// compiling for the Neural Engine — without this, launch, a model switch and a dictation
+    /// each began a separate compile of the same model.
+    private var pendingLoad: (directory: URL, task: Task<any ParakeetManaging, Error>)?
     private var hasCheckedLegacyModelDirectory = false
 
     init(
@@ -1035,6 +1040,10 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
             manager = nil
             loadedModelDirectory = nil
         }
+        if pendingLoad?.directory == context.modelDirectory {
+            pendingLoad?.task.cancel()
+            pendingLoad = nil
+        }
 
         do {
             if FileManager.default.fileExists(atPath: context.modelDirectory.path) {
@@ -1057,15 +1066,36 @@ actor ParakeetTranscriptionBackend: BuiltInTranscriptionBackend {
             return
         }
 
+        if let pendingLoad, pendingLoad.directory == context.modelDirectory {
+            Self.log("Waiting for the model load already running at \(context.modelDirectory.path)")
+            manager = try await pendingLoad.task.value
+            loadedModelDirectory = context.modelDirectory
+            return
+        }
+
         Self.log("Ensuring model runtime is ready at \(context.modelDirectory.path)")
 
-        guard await context.runtime.modelsExist(at: context.modelDirectory) else {
-            throw LocalTranscriptionError.modelNotInstalled(modelID.descriptor)
+        // Registered before anything else awaits, so a caller arriving during the file check
+        // joins this load rather than starting a second one.
+        let runtime = context.runtime
+        let directory = context.modelDirectory
+        let descriptor = modelID.descriptor
+        let load = Task {
+            guard await runtime.modelsExist(at: directory) else {
+                throw LocalTranscriptionError.modelNotInstalled(descriptor)
+            }
+            return try await runtime.prepareManager(at: directory)
+        }
+        pendingLoad = (directory, load)
+        defer {
+            if pendingLoad?.directory == directory { pendingLoad = nil }
         }
 
         do {
-            manager = try await context.runtime.prepareManager(at: context.modelDirectory)
-            loadedModelDirectory = context.modelDirectory
+            let started = Date()
+            manager = try await load.value
+            loadedModelDirectory = directory
+            Self.log("Model runtime ready in \(String(format: "%.1f", Date().timeIntervalSince(started)))s at \(directory.path)")
         } catch {
             Self.log("Runtime preparation failed at \(context.modelDirectory.path): \(error.localizedDescription)")
             throw Self.wrapError(

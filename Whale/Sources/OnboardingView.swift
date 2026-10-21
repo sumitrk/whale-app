@@ -190,7 +190,6 @@ private struct ModelStep: View {
 
             Form {
                 ModelListSections()
-                TranscriptCleanupSection()
 
                 if modelStore.isReady(for: settings.selectedBuiltInModelID) {
                     Section {

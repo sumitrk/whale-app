@@ -762,6 +762,51 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertFalse(text.isEmpty)
     }
 
+    /// Launch, a model switch and a dictation can all ask for the same model while its first
+    /// load is still compiling. They must share that one load, not start one each.
+    func testConcurrentPreparesShareOneModelLoad() async throws {
+        let runtime = FakeParakeetRuntime()
+        let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
+        let backend = ParakeetTranscriptionBackend(
+            runtimes: [.barkCleanEnglish: runtime],
+            runtimeInfoProvider: { runtimeInfo }
+        )
+        try await backend.install(modelID: .barkCleanEnglish, progressHandler: nil)
+        try await backend.resetModel(modelID: .barkCleanEnglish)
+        try await runtime.downloadModels(to: runtimeInfo.barkCleanDirectoryURL, progressHandler: nil)
+        await runtime.setPrepareDelay(nanoseconds: 200_000_000)
+        let preparedBefore = await runtime.snapshot().preparedPaths.count
+
+        async let first: Void = backend.prepare(modelID: .barkCleanEnglish)
+        async let second: Void = backend.prepare(modelID: .barkCleanEnglish)
+        async let third = backend.transcribe(
+            modelID: .barkCleanEnglish,
+            wavURL: URL(fileURLWithPath: "/tmp/none.wav"),
+            source: .microphone
+        )
+        _ = try await (first, second, third)
+
+        let preparedAfter = await runtime.snapshot().preparedPaths.count
+        XCTAssertEqual(preparedAfter - preparedBefore, 1)
+    }
+
+    func testRetiredCleanupModelIsDeletedWithItsEmptyParents() throws {
+        let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
+        let model = RemovedCleanupModel.directory(in: runtimeInfo)
+        try FileManager.default.createDirectory(at: model, withIntermediateDirectories: true)
+        try Data("weights".utf8).write(to: model.appendingPathComponent("model.safetensors"))
+        let keep = runtimeInfo.parakeetEnglishV2DirectoryURL
+        try FileManager.default.createDirectory(at: keep, withIntermediateDirectories: true)
+
+        RemovedCleanupModel.deleteIfPresent(runtimeInfo)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: model.path))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: runtimeInfo.modelsDirectoryURL.appendingPathComponent("models").path
+        ))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: keep.path))
+    }
+
     func testParakeetEnsureReadySucceedsAfterSuccessfulPrewarm() async throws {
         let runtime = FakeParakeetRuntime()
         let runtimeInfo = makeParakeetRuntimeInfo(function: #function)
@@ -977,6 +1022,7 @@ actor FakeParakeetRuntime: ParakeetModelRuntime {
     private var downloadError: Error?
     private var validateError: Error?
     private var prepareError: Error?
+    private var prepareDelayNanoseconds: UInt64 = 0
     private var checkedPaths: [String] = []
     private var downloadedPaths: [String] = []
     private var validatedPaths: [String] = []
@@ -992,6 +1038,10 @@ actor FakeParakeetRuntime: ParakeetModelRuntime {
 
     func setPrepareError(_ error: Error?) {
         prepareError = error
+    }
+
+    func setPrepareDelay(nanoseconds: UInt64) {
+        prepareDelayNanoseconds = nanoseconds
     }
 
     func modelsExist(at modelDirectory: URL) async -> Bool {
@@ -1022,6 +1072,9 @@ actor FakeParakeetRuntime: ParakeetModelRuntime {
 
     func prepareManager(at modelDirectory: URL) async throws -> any ParakeetManaging {
         preparedPaths.append(modelDirectory.path)
+        if prepareDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: prepareDelayNanoseconds)
+        }
 
         if let prepareError {
             throw prepareError
