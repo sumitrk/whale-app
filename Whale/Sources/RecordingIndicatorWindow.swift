@@ -68,7 +68,15 @@ enum HUDPlacementPolicy {
 // MARK: - Floating panel
 
 /// Non-activating HUD that floats above all windows near the cursor.
-/// Shows a live audio waveform driven by the microphone RMS level.
+/// Shows a live audio waveform driven by the microphone level.
+///
+/// Built to stay smooth while the app is busy starting a recording:
+/// - the focused-field lookup that decides where the pill sits runs off the main thread, with a
+///   short timeout, instead of stalling the first frames of the fade;
+/// - the fade and rise are Core Animation animations, which the render server runs even if the
+///   main thread hiccups, rather than an `NSWindow` alpha animation stepped from the main thread;
+/// - the recording view is built once and reused, so pressing the key doesn't build a new
+///   SwiftUI hierarchy at the moment it needs to appear.
 @MainActor
 final class RecordingIndicatorWindow: NSPanel {
     enum PasteHintReason: Equatable {
@@ -90,108 +98,184 @@ final class RecordingIndicatorWindow: NSPanel {
         .leftMouseDown, .rightMouseDown, .otherMouseDown,
     ]
 
+    /// How long to wait for the focused field before placing the pill at the pointer instead.
+    /// Accessibility answers in a few milliseconds for most apps, but a busy app can take far
+    /// longer, and the HUD must never wait on it.
+    private static let anchorTimeout: TimeInterval = 0.12
+    private static var inset: CGFloat { HUDShadowContainer<EmptyView>.inset }
+
+    private let container: NSView
+    private var recordingHost: NSHostingView<HUDShadowContainer<RecordingPillView>>?
+    private weak var recordingMeter: MicLevelMeter?
+
     private var trackingTimer: Timer?
     private var currentAnchor: HUDAnchor = .cursor
     private var ticksUntilAnchorRefresh = 0
+    private var isRefreshingAnchor = false
     private var globalDismissalMonitor: Any?
     private var localDismissalMonitor: Any?
     private var autoHideTask: Task<Void, Never>?
     private var presentationID = 0
+    private var isShowing = false
 
     private init() {
+        container = NSView(frame: NSRect(x: 0, y: 0, width: 64, height: 52))
+        container.wantsLayer = true
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 120, height: 36),
+            contentRect: container.frame,
             styleMask:   [.nonactivatingPanel, .borderless],
             backing:     .buffered,
             defer:       false
         )
         isOpaque           = false
         backgroundColor    = .clear
-        hasShadow          = true
+        hasShadow          = false
         ignoresMouseEvents = true
         level              = .floating
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         animationBehavior  = .none
+        contentView        = container
     }
 
     func show(recorder: AudioRecorder) {
-        // Rebuild the hosting view each show so onAppear fires fresh.
-        let view = RecordingIndicatorView(recorder: recorder)
-        let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: 48, height: 36)
-        contentView = host
-        setContentSize(host.frame.size)
-
-        beginPresentation()
-        fadeIn()
+        let meter = recorder.levelMeter
+        if recordingHost == nil || recordingMeter !== meter {
+            recordingHost = NSHostingView(rootView: HUDShadowContainer { RecordingPillView(meter: meter) })
+            recordingMeter = meter
+        }
+        present(recordingHost!, size: NSSize(width: 64, height: 52))
     }
 
     func showProcessing() {
-        let view = ProcessingIndicatorView()
-        let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: 48, height: 36)
-        contentView = host
-        setContentSize(host.frame.size)
-
-        beginPresentation()
-        fadeIn()
+        present(NSHostingView(rootView: HUDShadowContainer { ProcessingIndicatorView() }), size: NSSize(width: 64, height: 52))
     }
 
     func hide() {
-        guard contentView != nil else { return }
+        // Always invalidate the presentation: a quick tap can call this while the anchor
+        // lookup is still running, and that presentation must not appear afterwards.
         presentationID &+= 1
         let hiddenPresentationID = presentationID
         stopPresentationObservers()
+        guard isShowing else { return }
+        isShowing = false
 
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.2
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            self.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
+        guard let layer = container.layer else {
+            finishHiding()
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
             Task { @MainActor in
                 guard let self, self.presentationID == hiddenPresentationID else { return }
-                self.orderOut(nil)
-                // Clear the hosting view to stop the timer when hidden.
-                self.contentView = nil
-                self.alphaValue = 1
+                self.finishHiding()
             }
-        })
+        }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = layer.presentation()?.opacity ?? 1
+        fade.toValue = 0
+        fade.duration = 0.16
+        fade.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        layer.opacity = 0
+        layer.add(fade, forKey: "fade")
+        CATransaction.commit()
     }
 
     /// Show a brief paste/accessibility nudge.
     func showHint(reason: PasteHintReason) {
-        let view = PasteHintView(reason: reason)
-        let host = NSHostingView(rootView: view)
-        let size = host.fittingSize
-        host.frame = NSRect(origin: .zero, size: size)
-        contentView = host
-        setContentSize(size)
-
-        beginPresentation(feedbackDuration: 2)
-        orderFront(nil)
+        let host = NSHostingView(rootView: HUDShadowContainer { PasteHintView(reason: reason) })
+        present(host, size: host.fittingSize, feedbackDuration: 2)
     }
 
     func showMessage(_ message: String, isError: Bool, duration: TimeInterval) {
-        let view = StatusMessageView(message: message, isError: isError)
-        let host = NSHostingView(rootView: view)
-        let size = host.fittingSize
-        host.frame = NSRect(origin: .zero, size: size)
-        contentView = host
-        setContentSize(size)
-        beginPresentation(feedbackDuration: duration)
-        orderFront(nil)
+        let host = NSHostingView(rootView: HUDShadowContainer { StatusMessageView(message: message, isError: isError) })
+        present(host, size: host.fittingSize, feedbackDuration: duration)
     }
 
-    private func beginPresentation(feedbackDuration: TimeInterval? = nil) {
-        presentationID &+= 1
-        stopPresentationObservers()
-        // A new presentation can replace a HUD that is still fading out.
-        // Restore visibility before ordering the replacement to the front.
-        alphaValue = 1
-        currentAnchor = FocusedElementInspector.hudAnchor()
-        ticksUntilAnchorRefresh = 30
-        updatePosition()
+    // MARK: Presentation
 
+    private func present(_ host: NSView, size: NSSize, feedbackDuration: TimeInterval? = nil) {
+        presentationID &+= 1
+        let id = presentationID
+        stopPresentationObservers()
+
+        if host.superview !== container {
+            container.subviews.forEach { $0.removeFromSuperview() }
+            host.frame = NSRect(origin: .zero, size: size)
+            host.autoresizingMask = [.width, .height]
+            container.addSubview(host)
+        }
+        setContentSize(size)
+
+        resolveAnchor(timeout: Self.anchorTimeout) { [weak self] anchor in
+            guard let self, self.presentationID == id else { return }
+            self.currentAnchor = anchor
+            self.updatePosition()
+            self.startTracking()
+            if let feedbackDuration {
+                self.scheduleFeedbackDismissal(after: feedbackDuration, presentationID: id)
+            }
+            self.animateIn()
+        }
+    }
+
+    private func animateIn() {
+        isShowing = true
+        alphaValue = 1
+        orderFront(nil)
+        guard let layer = container.layer else { return }
+
+        layer.removeAllAnimations()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.opacity = 1
+        CATransaction.commit()
+
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = 0.18
+        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        layer.add(fade, forKey: "fade")
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let rise = CASpringAnimation(keyPath: "transform.translation.y")
+        rise.fromValue = -5
+        rise.toValue = 0
+        rise.mass = 1
+        rise.stiffness = 320
+        rise.damping = 26
+        rise.duration = rise.settlingDuration
+        layer.add(rise, forKey: "rise")
+    }
+
+    private func finishHiding() {
+        orderOut(nil)
+        container.subviews.forEach { $0.removeFromSuperview() }
+        container.layer?.removeAllAnimations()
+        container.layer?.opacity = 1
+    }
+
+    /// Looks up where the focused field is without blocking the main thread. Delivers the
+    /// pointer anchor if the lookup is slower than `timeout`, and ignores the late answer.
+    private func resolveAnchor(timeout: TimeInterval, _ deliver: @escaping @MainActor (HUDAnchor) -> Void) {
+        var delivered = false
+        let finish: @MainActor (HUDAnchor) -> Void = { anchor in
+            guard !delivered else { return }
+            delivered = true
+            deliver(anchor)
+        }
+        Task.detached(priority: .userInitiated) {
+            let anchor = FocusedElementInspector.hudAnchor()
+            await MainActor.run { finish(anchor) }
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            finish(.cursor)
+        }
+    }
+
+    private func startTracking() {
+        ticksUntilAnchorRefresh = 30
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.trackPosition()
@@ -199,31 +283,46 @@ final class RecordingIndicatorWindow: NSPanel {
         }
         RunLoop.main.add(timer, forMode: .common)
         trackingTimer = timer
+    }
 
-        if let feedbackDuration {
-            installDismissalMonitors()
-            let id = presentationID
-            autoHideTask = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: UInt64(feedbackDuration * 1_000_000_000))
-                guard !Task.isCancelled else { return }
-                self?.dismissFeedback(presentationID: id)
-            }
+    private func scheduleFeedbackDismissal(after duration: TimeInterval, presentationID id: Int) {
+        installDismissalMonitors()
+        autoHideTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.dismissFeedback(presentationID: id)
         }
     }
 
+    // MARK: Position
+
     private func trackPosition() {
         ticksUntilAnchorRefresh -= 1
-        if ticksUntilAnchorRefresh <= 0 {
-            currentAnchor = FocusedElementInspector.hudAnchor()
+        if ticksUntilAnchorRefresh <= 0, !isRefreshingAnchor {
             ticksUntilAnchorRefresh = 30
+            isRefreshingAnchor = true
+            let id = presentationID
+            Task.detached(priority: .utility) { [weak self] in
+                let anchor = FocusedElementInspector.hudAnchor()
+                await MainActor.run {
+                    guard let self else { return }
+                    self.isRefreshingAnchor = false
+                    guard self.presentationID == id else { return }
+                    self.currentAnchor = anchor
+                }
+            }
         }
         updatePosition()
+    }
+
+    private var pillSize: NSSize {
+        NSSize(width: frame.width - Self.inset * 2, height: frame.height - Self.inset * 2)
     }
 
     private func updatePosition() {
         switch currentAnchor {
         case .field(let inputFrame):
-            setClampedOrigin(
+            setClampedPillOrigin(
                 NSPoint(x: inputFrame.minX, y: inputFrame.maxY + 6),
                 on: screen(containing: NSPoint(x: inputFrame.midX, y: inputFrame.midY))
             )
@@ -236,27 +335,36 @@ final class RecordingIndicatorWindow: NSPanel {
 
     private func positionNearPointer(_ pointer: NSPoint) {
         guard let screen = screen(containing: pointer) else { return }
-        setFrameOrigin(
+        setPillOrigin(
             HUDPlacementPolicy.cursorOrigin(
                 pointer: pointer,
-                hudSize: frame.size,
+                hudSize: pillSize,
                 visibleFrame: screen.visibleFrame
             )
         )
     }
 
-    private func setClampedOrigin(_ origin: NSPoint, on screen: NSScreen?) {
+    private func setClampedPillOrigin(_ origin: NSPoint, on screen: NSScreen?) {
         guard let screen else { return }
         let visibleFrame = screen.visibleFrame
-        let size = frame.size
+        let size = pillSize
         let x = max(visibleFrame.minX + 4, min(origin.x, visibleFrame.maxX - size.width - 4))
         let y = max(visibleFrame.minY + 4, min(origin.y, visibleFrame.maxY - size.height - 4))
-        setFrameOrigin(NSPoint(x: x, y: y))
+        setPillOrigin(NSPoint(x: x, y: y))
+    }
+
+    /// The window is larger than the pill by the shadow inset on every side.
+    private func setPillOrigin(_ pillOrigin: NSPoint) {
+        let origin = NSPoint(x: pillOrigin.x - Self.inset, y: pillOrigin.y - Self.inset)
+        guard origin != frame.origin else { return }
+        setFrameOrigin(origin)
     }
 
     private func screen(containing point: NSPoint) -> NSScreen? {
         NSScreen.screens.first(where: { $0.frame.contains(point) }) ?? NSScreen.main
     }
+
+    // MARK: Feedback dismissal
 
     private func installDismissalMonitors() {
         let id = presentationID
@@ -292,16 +400,6 @@ final class RecordingIndicatorWindow: NSPanel {
             self.localDismissalMonitor = nil
         }
     }
-
-    private func fadeIn() {
-        alphaValue = 0
-        orderFront(nil)
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            self.animator().alphaValue = 1
-        }
-    }
 }
 
 private struct ProcessingIndicatorView: View {
@@ -324,51 +422,6 @@ private struct ProcessingIndicatorView: View {
         .animation(.easeInOut(duration: 0.15), value: activeDot)
         .onReceive(timer) { _ in
             activeDot = (activeDot + 1) % 3
-        }
-    }
-}
-
-// MARK: - SwiftUI bar view
-
-private struct RecordingIndicatorView: View {
-
-    @ObservedObject var recorder: AudioRecorder
-
-    private let barCount = 5
-    private let minH: CGFloat = 3
-    private let maxH: CGFloat = 20
-    private let idleHeights: [CGFloat] = [8, 14, 20, 14, 8]
-
-    @State private var heights: [CGFloat] = [8, 14, 20, 14, 8]
-
-    private let timer = Timer.publish(every: 0.07, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 3) {
-            ForEach(0..<barCount, id: \.self) { i in
-                Capsule()
-                    .fill(Color.white.opacity(0.8))
-                    .frame(width: 3, height: heights[i])
-                    .animation(.easeOut(duration: 0.12), value: heights[i])
-            }
-        }
-        .frame(width: 36, height: 18)
-        .clipped()
-        .padding(.horizontal, 6)
-        .padding(.vertical, 8)
-        .background(Capsule().fill(.black.opacity(0.72)))
-        .onReceive(timer) { _ in
-            let level = recorder.micLevel
-            guard level > 0.02 else {
-                if heights != idleHeights {
-                    heights = idleHeights
-                }
-                return
-            }
-            let boosted = pow(CGFloat(level), 0.8)
-            for i in 0..<barCount {
-                heights[i] = minH + (maxH - minH) * boosted * CGFloat.random(in: 0.55...1.0)
-            }
         }
     }
 }

@@ -330,6 +330,11 @@ class AppState: ObservableObject {
             // seconds after they stop. The transcription waits on the same load.
             let transcriber = self.transcriber
             Task.detached(priority: .userInitiated) { try? await transcriber.prepareModel(modelID) }
+            // Before the history write and the capture start, so the HUD answers the key press
+            // immediately rather than after the database and the audio engine.
+            if mode == .paste {
+                RecordingIndicatorWindow.shared.show(recorder: recorder)
+            }
             if mode == .paste {
                 let store = try await history.requireStore()
                 let frontmost = NSWorkspace.shared.frontmostApplication
@@ -341,9 +346,6 @@ class AppState: ObservableObject {
                 history.changed()
             }
             DiagnosticLog.log("[Recording] Starting \(mode == .paste ? "paste" : "markdown") capture with model \(modelID.rawValue).")
-            if mode == .paste {
-                RecordingIndicatorWindow.shared.show(recorder: recorder)
-            }
             try await recorder.startRecording(captureSystemAudio: mode == .markdown)
             if mode == .markdown {
                 activity = .recording(mode: .markdown, startedAt: Date())

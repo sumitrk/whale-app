@@ -70,6 +70,10 @@
 		VAD000000000000000000011 /* VoiceActivityEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000001 /* VoiceActivityEditor.swift */; };
 		VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */; };
 		VAD000000000000000000013 /* VoiceActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000003 /* VoiceActivityTests.swift */; };
+		57CEE872EEAE12BAFC9F7D4C /* LevelEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */; };
+		70BB9F8472D5AE8D04FB24B1 /* RecordingBarsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */; };
+		C0746934B2975886BECF4FC2 /* HUDShadowContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */; };
+		B8A8C9A8633045C95677E274 /* RecordingPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8407F2542D3FD7B882AF819A /* RecordingPillView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -141,6 +145,10 @@
 		VAD000000000000000000001 /* VoiceActivityEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityEditor.swift; sourceTree = "<group>"; };
 		VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityDetectionStage.swift; sourceTree = "<group>"; };
 		VAD000000000000000000003 /* VoiceActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityTests.swift; sourceTree = "<group>"; };
+		8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelEnvelope.swift; sourceTree = "<group>"; };
+		AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingBarsView.swift; sourceTree = "<group>"; };
+		5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDShadowContainer.swift; sourceTree = "<group>"; };
+		8407F2542D3FD7B882AF819A /* RecordingPillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPillView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -184,6 +192,7 @@
 		1FF43984F054E7654B1EEA37 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				5C4B84D889611007CE6B4C8F /* HUD */,
 				173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */,
 				AIA000000000000000000101 /* AIActionCoordinator.swift */,
 				AIA000000000000000000102 /* AIActionModels.swift */,
@@ -284,6 +293,17 @@
 				VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */,
 			);
 			path = Pipeline;
+			sourceTree = "<group>";
+		};
+		5C4B84D889611007CE6B4C8F /* HUD */ = {
+			isa = PBXGroup;
+			children = (
+				8407F2542D3FD7B882AF819A /* RecordingPillView.swift */,
+				5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */,
+				AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */,
+				8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */,
+			);
+			path = HUD;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -413,6 +433,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B8A8C9A8633045C95677E274 /* RecordingPillView.swift in Sources */,
+				C0746934B2975886BECF4FC2 /* HUDShadowContainer.swift in Sources */,
+				70BB9F8472D5AE8D04FB24B1 /* RecordingBarsView.swift in Sources */,
+				57CEE872EEAE12BAFC9F7D4C /* LevelEnvelope.swift in Sources */,
 				173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */,
 				AIA000000000000000000001 /* AIActionCoordinator.swift in Sources */,
 				AIA000000000000000000002 /* AIActionModels.swift in Sources */,

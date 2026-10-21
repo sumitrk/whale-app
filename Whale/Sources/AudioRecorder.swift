@@ -2,6 +2,7 @@ import AudioToolbox
 import AVFoundation
 import CoreAudio
 import Foundation
+import QuartzCore
 
 struct RecordingInputDevice: Sendable {
     let uniqueID: String
@@ -41,8 +42,11 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     // MARK: - State
 
     @Published var isRecording = false
-    /// Normalised microphone RMS level, 0…1. Updated on the main thread ~20× per second.
-    @Published var micLevel: Float = 0
+    /// Normalised microphone level, written from the capture thread for every buffer and
+    /// read by the recording HUD once per display frame. Deliberately not `@Published`: a
+    /// main-thread hop and an `objectWillChange` per audio buffer re-rendered every observer
+    /// of the recorder dozens of times a second.
+    let levelMeter = MicLevelMeter()
     /// Flips to true on the main thread once the first audio buffer arrives from the mic tap.
     @Published var isMicActive = false
 
@@ -86,14 +90,6 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     private var lastBluetoothConfigChangeAt: Date?
     private var lastUsableBluetoothBufferAt: Date?
 
-    // MARK: - Mic level indicator (decay-smoothed)
-
-    private var lastMicLevelUpdate: Date = .distantPast
-    private var micLevelDecayTimer: DispatchSourceTimer?
-    private let micLevelDecayInterval: TimeInterval = 0.05
-    private let micLevelStalenessThreshold: TimeInterval = 0.15
-    private let micLevelDecayFactor: Float = 0.55
-
     // MARK: - Sample buffers (lock-protected)
 
     private var systemAudioSamples: [Float] = []
@@ -131,14 +127,14 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
                 try startSystemAudioCapture()
             }
             try await startMicCapture()
-            startMicLevelDecay()
+            levelMeter.reset()
             isRecording = true
             let modeLabel = captureSystemAudio ? "mic + system audio" : "mic only"
             print("AudioRecorder: engine started (\(modeLabel))")
         } catch {
             stopSystemAudioCapture()
             await stopMicCapture()
-            stopMicLevelDecay()
+            levelMeter.reset()
             isRecording = false
             throw error
         }
@@ -163,37 +159,13 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
 
         stopSystemAudioCapture()
         await stopMicCapture()
-        stopMicLevelDecay()
-        micLevel = 0
+        levelMeter.reset()
         isMicActive = false
 
         isRecording = false
         print("AudioRecorder: recording stopped")
 
         return try mixAndWriteWAV()
-    }
-
-    // MARK: - Mic level decay timer
-
-    private func startMicLevelDecay() {
-        stopMicLevelDecay()
-        let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + micLevelDecayInterval,
-                       repeating: micLevelDecayInterval)
-        timer.setEventHandler { [weak self] in
-            guard let self else { return }
-            let elapsed = Date().timeIntervalSince(self.lastMicLevelUpdate)
-            guard elapsed > self.micLevelStalenessThreshold else { return }
-            let decayed = self.micLevel * self.micLevelDecayFactor
-            self.micLevel = decayed < 0.01 ? 0 : decayed
-        }
-        timer.resume()
-        micLevelDecayTimer = timer
-    }
-
-    private func stopMicLevelDecay() {
-        micLevelDecayTimer?.cancel()
-        micLevelDecayTimer = nil
     }
 
     // MARK: - App-owned storage
@@ -962,11 +934,12 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             sum += sample * sample
         }
         let rms = sqrt(sum / Float(samples.count))
-        let normalised = min(1.0, rms * 40)
-        DispatchQueue.main.async {
-            self.lastMicLevelUpdate = Date()
-            self.micLevel = max(normalised, self.micLevel * 0.7)
-            if !self.isMicActive { self.isMicActive = true }
+        levelMeter.record(min(1.0, rms * 40))
+        if !levelMeter.hasSignal {
+            levelMeter.hasSignal = true
+            DispatchQueue.main.async {
+                if !self.isMicActive { self.isMicActive = true }
+            }
         }
     }
 
@@ -1107,4 +1080,48 @@ private extension Data {
     mutating func appendString(_ s: String) { append(contentsOf: s.utf8) }
     mutating func appendUInt16(_ v: UInt16) { var x = v.littleEndian; append(Data(bytes: &x, count: 2)) }
     mutating func appendUInt32(_ v: UInt32) { var x = v.littleEndian; append(Data(bytes: &x, count: 4)) }
+}
+
+/// The latest microphone level, shared between the capture thread and the HUD.
+///
+/// The HUD smooths it per frame, so this only holds the newest reading and when it arrived:
+/// a reading older than `staleAfter` counts as silence, which is what lets the bars settle when
+/// the mic stops delivering buffers without a timer to decay them.
+final class MicLevelMeter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var level: Float = 0
+    private var updatedAt: CFTimeInterval = 0
+    private var signal = false
+    private let staleAfter: CFTimeInterval = 0.15
+
+    func record(_ newLevel: Float) {
+        let now = CACurrentMediaTime()
+        lock.lock()
+        level = newLevel
+        updatedAt = now
+        lock.unlock()
+    }
+
+    /// 0…1, or 0 when no buffer has arrived recently.
+    var current: Float {
+        let now = CACurrentMediaTime()
+        lock.lock()
+        defer { lock.unlock() }
+        return now - updatedAt > staleAfter ? 0 : level
+    }
+
+    /// Whether a buffer has arrived since the last reset. Lets the capture thread announce
+    /// the first buffer once instead of hopping to the main thread for every one.
+    var hasSignal: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return signal }
+        set { lock.lock(); signal = newValue; lock.unlock() }
+    }
+
+    func reset() {
+        lock.lock()
+        level = 0
+        updatedAt = 0
+        signal = false
+        lock.unlock()
+    }
 }
