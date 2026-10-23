@@ -8,4 +8,6 @@ struct RecordingResult: Sendable {
     let inputDeviceName: String
     let isBluetoothInput: Bool
     let wasPaddedForASR: Bool
+    /// `AudioProcessing.speechPeak` of the microphone audio.
+    var microphonePeak: Float = 1
 }

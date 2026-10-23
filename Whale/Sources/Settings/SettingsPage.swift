@@ -5,6 +5,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case general
     case shortcuts
     case models
+    case cleanUp
     case vocabulary
     case replacements
     case aiActions
@@ -18,6 +19,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: "General"
         case .shortcuts: "Shortcuts"
         case .models: "Models"
+        case .cleanUp: "Clean up"
         case .vocabulary: "Vocabulary"
         case .replacements: "Replacements"
         case .aiActions: "AI Actions"
@@ -31,6 +33,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: "gearshape.fill"
         case .shortcuts: "keyboard.fill"
         case .models: "waveform"
+        case .cleanUp: "wand.and.stars"
         case .vocabulary: "character.book.closed.fill"
         case .replacements: "arrow.left.arrow.right"
         case .aiActions: "sparkles"
@@ -44,6 +47,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: .settingsGray
         case .shortcuts: .settingsIndigo
         case .models: .settingsBlue
+        case .cleanUp: .settingsTeal
         case .vocabulary: .settingsYellow
         case .replacements: .settingsPink
         case .aiActions: .settingsPurple
@@ -68,7 +72,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 
         var pages: [SettingsPage] {
             switch self {
-            case .dictation: [.general, .shortcuts, .models, .vocabulary, .replacements, .aiActions]
+            case .dictation: [.general, .shortcuts, .models, .cleanUp, .vocabulary, .replacements, .aiActions]
             case .data: [.history, .permissions]
             }
         }

@@ -11,6 +11,7 @@ struct SettingsPageView: View {
         case .general: GeneralSettingsView(updater: updater)
         case .shortcuts: ShortcutsSettingsView()
         case .models: ModelsSettingsView()
+        case .cleanUp: CleanUpSettingsView()
         case .vocabulary: VocabularySettingsView()
         case .replacements: ReplacementsSettingsView()
         case .aiActions: AIActionSettingsView()

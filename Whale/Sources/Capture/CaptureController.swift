@@ -26,9 +26,14 @@ final class CaptureController: ObservableObject {
     private let playSound: (FeedbackSound) -> Void
     private let selectedModel: () -> BuiltInModelID
     private let canStart: () -> Bool
+    /// Recording continues this long after the key is released, so the last word isn't clipped.
+    private let tailPadding: Duration
+    /// Dictation and AI Action stop on their own after this long. Meetings never do.
+    private let maxRecordingDuration: Duration
 
     private var run: Run?
     private var processingTask: Task<Void, Never>?
+    private var maxDurationTask: Task<Void, Never>?
 
     private final class Run {
         let id = UUID()
@@ -57,7 +62,9 @@ final class CaptureController: ObservableObject {
         deliver: @escaping @MainActor (String) -> DeliveryOutcome,
         playSound: @escaping (FeedbackSound) -> Void = { $0.play() },
         selectedModel: @escaping () -> BuiltInModelID,
-        canStart: @escaping () -> Bool = { true }
+        canStart: @escaping () -> Bool = { true },
+        tailPadding: Duration = .milliseconds(180),
+        maxRecordingDuration: Duration = .seconds(10 * 60)
     ) {
         self.recorder = recorder
         self.models = models
@@ -69,6 +76,8 @@ final class CaptureController: ObservableObject {
         self.playSound = playSound
         self.selectedModel = selectedModel
         self.canStart = canStart
+        self.tailPadding = tailPadding
+        self.maxRecordingDuration = maxRecordingDuration
         recorder.onRecordingReady = { [weak self] in
             self?.microphoneDidBecomeReady()
         }
@@ -158,6 +167,8 @@ final class CaptureController: ObservableObject {
         self.run = nil
         processingTask?.cancel()
         processingTask = nil
+        maxDurationTask?.cancel()
+        maxDurationTask = nil
         phase = .idle
         hud.update(.cancelled(replaced: reason == Self.replacedReason))
         await stopRecorderDiscardingAudio()
@@ -179,6 +190,16 @@ final class CaptureController: ObservableObject {
     private func beginRecording(_ run: Run) {
         phase = .recording(run.intent, startedAt: .now)
         playSound(.start)
+
+        guard run.intent != .transcriptMode else { return }
+        let limit = maxRecordingDuration
+        maxDurationTask?.cancel()
+        maxDurationTask = Task { [weak self] in
+            try? await Task.sleep(for: limit)
+            guard !Task.isCancelled, let self, self.run === run, case .recording = self.phase else { return }
+            DiagnosticLog.log("[Capture] \(run.intent.diagnosticName) reached the recording limit; stopping.")
+            self.release(run.intent)
+        }
     }
 
     private func stopAndProcess(_ run: Run) {
@@ -190,17 +211,34 @@ final class CaptureController: ObservableObject {
 
     private func process(_ run: Run) async {
         let startedAt = phase.recordingStartedAt ?? .now
+        maxDurationTask?.cancel()
+        maxDurationTask = nil
         phase = .processing(run.intent)
         hud.update(.processing(run.intent))
 
         do {
+            try await Task.sleep(for: tailPadding)
+            try ensureCurrent(run)
             let recording = try await recorder.stopRecording()
             let wavURL = recording.wavURL
             defer { try? FileManager.default.removeItem(at: wavURL) }
             DiagnosticLog.log(
                 "[Capture] Stopped. captured=\(recording.capturedSampleCount16k) written=\(recording.writtenSampleCount16k) " +
-                "padded=\(recording.wasPaddedForASR) bluetooth=\(recording.isBluetoothInput)"
+                "padded=\(recording.wasPaddedForASR) bluetooth=\(recording.isBluetoothInput) " +
+                "peak=\(String(format: "%.2f", recording.microphonePeak))"
             )
+
+            // A tap, or a recording with no speech in it: transcribing it only invites the model
+            // to hallucinate something to type.
+            if !run.intent.capturesSystemAudio,
+               Double(recording.capturedSampleCount16k) / AudioProcessing.sampleRate <= 0.3
+                || recording.microphonePeak < AudioProcessing.speechThreshold {
+                end(run)
+                hud.update(.finished)
+                DiagnosticLog.log("[Capture] Nothing heard; skipped transcription.")
+                await run.entry?.finish(.failed, instruction: nil, result: nil, error: "Nothing heard", audioSeconds: nil)
+                return
+            }
 
             let pipeline = pipelineFactory()
             let modelID = run.modelID
@@ -276,6 +314,8 @@ final class CaptureController: ObservableObject {
         guard self.run === run else { return }
         self.run = nil
         processingTask = nil
+        maxDurationTask?.cancel()
+        maxDurationTask = nil
         phase = .idle
     }
 

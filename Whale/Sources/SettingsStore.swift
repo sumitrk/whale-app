@@ -55,6 +55,24 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(hudPosition.rawValue, forKey: Keys.hudPosition) }
     }
 
+    // MARK: - Clean up
+
+    /// Rule-based Clean Up after transcription: spoken commands, corrections, lists, style.
+    @Published var cleanUpEnabled: Bool {
+        didSet { ud.set(cleanUpEnabled, forKey: Keys.cleanUpEnabled) }
+    }
+    @Published var cleanUpStyle: CleanUpStyle {
+        didSet { ud.set(cleanUpStyle.rawValue, forKey: Keys.cleanUpStyle) }
+    }
+    /// "First, … second, …" becomes a numbered list.
+    @Published var cleanUpLists: Bool {
+        didSet { ud.set(cleanUpLists, forKey: Keys.cleanUpLists) }
+    }
+    /// In mail apps, the greeting and sign-off get their own paragraphs.
+    @Published var cleanUpEmailLayout: Bool {
+        didSet { ud.set(cleanUpEmailLayout, forKey: Keys.cleanUpEmailLayout) }
+    }
+
     // MARK: - Dictionary
 
     /// Names and jargon, spelled the way the user wants them typed.
@@ -198,6 +216,10 @@ class SettingsStore: ObservableObject {
         builtInModelLanguages    = ud.dictionary(forKey: Keys.builtInModelLanguages) as? [String: String] ?? [:]
         builtInModelLanguageCapabilities = ud.dictionary(forKey: Keys.builtInModelLanguageCapabilities) as? [String: String] ?? [:]
         aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
+        cleanUpEnabled           = (ud.object(forKey: Keys.cleanUpEnabled) as? Bool) ?? true
+        cleanUpStyle             = CleanUpStyle(rawValue: ud.string(forKey: Keys.cleanUpStyle) ?? "") ?? .semiFormal
+        cleanUpLists             = (ud.object(forKey: Keys.cleanUpLists) as? Bool) ?? true
+        cleanUpEmailLayout       = (ud.object(forKey: Keys.cleanUpEmailLayout) as? Bool) ?? true
         vocabulary               = ud.stringArray(forKey: Keys.vocabulary) ?? []
         replacements             = ud.data(forKey: Keys.replacements)
             .flatMap { try? JSONDecoder().decode([TextReplacement].self, from: $0) } ?? []
@@ -439,6 +461,10 @@ class SettingsStore: ObservableObject {
         /// while transcribing, so a second model is no longer worth its download.
         static let removedCleanupKeys = ["transcriptCleanupEnabled", "cleanupStyling", "cleanupStructure", "cleanupContext"]
         static let aiActionMasterPrompt = "aiActionMasterPrompt"
+        static let cleanUpEnabled = "cleanUpEnabled"
+        static let cleanUpStyle = "cleanUpStyle"
+        static let cleanUpLists = "cleanUpLists"
+        static let cleanUpEmailLayout = "cleanUpEmailLayout"
         static let vocabulary = "vocabulary"
         static let replacements = "replacements"
         static let openRouterKeyRejected = "openRouterKeyRejected"

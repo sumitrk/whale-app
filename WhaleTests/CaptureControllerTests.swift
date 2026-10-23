@@ -224,6 +224,68 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(capture.phase, .starting(.aiAction, stopRequested: false))
     }
 
+    // MARK: - Guards
+
+    func testSilentDictationIsNotTranscribed() async throws {
+        recorder.microphonePeak = 0.05
+        await capture.start(.dictation)
+        recorder.becomeReady()
+        capture.release(.dictation)
+        await waitUntilIdle()
+
+        XCTAssertTrue(delivered.isEmpty)
+        XCTAssertEqual(hud.events.last, .finished)
+        let entry = try XCTUnwrap(history.finalized.first)
+        XCTAssertEqual(entry.outcome, .failed)
+        XCTAssertEqual(entry.error, "Nothing heard")
+    }
+
+    func testTooShortDictationIsNotTranscribed() async throws {
+        recorder.capturedSamples = 3_200
+        await capture.start(.dictation)
+        recorder.becomeReady()
+        capture.release(.dictation)
+        await waitUntilIdle()
+
+        XCTAssertTrue(delivered.isEmpty)
+        XCTAssertEqual(history.finalized.first?.error, "Nothing heard")
+    }
+
+    func testQuietMeetingIsStillTranscribed() async throws {
+        recorder.microphonePeak = 0
+        await capture.start(.transcriptMode)
+        capture.release(.transcriptMode)
+        await waitUntilIdle()
+
+        XCTAssertEqual(transcriptMode.completed.map(\.text), ["hello there (formatted)"])
+    }
+
+    func testDictationStopsAtTheRecordingLimit() async throws {
+        capture = CaptureController(
+            recorder: recorder,
+            models: models,
+            history: history,
+            hud: hud,
+            handlers: [.dictation: DictationHandler()],
+            pipelineFactory: { [unowned self] in
+                TranscriptionPipeline(stages: [FakeTranscriptionStage(text: transcript, error: nil)])
+            },
+            deliver: { [unowned self] in
+                delivered.append($0)
+                return deliveryOutcome
+            },
+            playSound: { _ in },
+            selectedModel: { .parakeetEnglishV2 },
+            maxRecordingDuration: .milliseconds(50)
+        )
+
+        await capture.start(.dictation)
+        recorder.becomeReady()
+        await waitUntilIdle()
+
+        XCTAssertEqual(delivered, ["hello there"])
+    }
+
     // MARK: - History Entries, stored
 
     func testEachFlowLeavesItsOutcomeInHistory() async throws {
@@ -317,6 +379,8 @@ private final class FakeRecorder: CaptureRecorder {
     var onRecordingReady: (() -> Void)?
     var starts = 0
     var capturedSystemAudio = false
+    var capturedSamples = 32_000
+    var microphonePeak: Float = 1
 
     func startRecording(captureSystemAudio: Bool) async throws {
         starts += 1
@@ -334,12 +398,13 @@ private final class FakeRecorder: CaptureRecorder {
         FileManager.default.createFile(atPath: url.path, contents: Data())
         return RecordingResult(
             wavURL: url,
-            capturedSampleCount16k: 32_000,
-            writtenSampleCount16k: 32_000,
-            durationSeconds: 2,
+            capturedSampleCount16k: capturedSamples,
+            writtenSampleCount16k: capturedSamples,
+            durationSeconds: Double(capturedSamples) / 16_000,
             inputDeviceName: "Test",
             isBluetoothInput: false,
-            wasPaddedForASR: false
+            wasPaddedForASR: false,
+            microphonePeak: microphonePeak
         )
     }
 }

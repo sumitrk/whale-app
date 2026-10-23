@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E080518FA467A1C61AB77F09 /* RuleCleanUp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E81360B13CB964AB57A67B12 /* RuleCleanUp.swift */; };
+		203D364CDF2B69285A72B113 /* CleanUpStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A8E088E150DC46FBC1B71D2 /* CleanUpStyle.swift */; };
+		423292C66B22B5B498F8C0DD /* CleanUpContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60D046392047F47376DF1389 /* CleanUpContext.swift */; };
+		C6BE0C4317381C6DAA4BA4FA /* RewriteCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4164F252D92544C03704769 /* RewriteCheck.swift */; };
+		3AA8C8DA90CBCFB247207AD8 /* CleanUpStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54207719D977E55DB7826C7 /* CleanUpStage.swift */; };
+		8DA6026378EA8642A6BD8890 /* CleanUpSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DD1D4BBE5A28A04273057CE /* CleanUpSettingsView.swift */; };
+		6C16FE45100423CFB8119538 /* CleanUpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48898940EC60817010CC7DB6 /* CleanUpTests.swift */; };
 		F978F0DC9767447832B8120B /* WhisperTranscriptionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F598D2A320D4CB136AE763B /* WhisperTranscriptionBackend.swift */; };
 		6FF177E140223C00D3C1AE97 /* TranscriptionModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8737AA5703F8713DD0AAB400 /* TranscriptionModelStore.swift */; };
 		F5AB0402885AD24C9228C380 /* TranscriptionModelRowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D053BF85D3F2A2EB726633 /* TranscriptionModelRowModel.swift */; };
@@ -166,6 +173,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		E81360B13CB964AB57A67B12 /* RuleCleanUp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleCleanUp.swift; sourceTree = "<group>"; };
+		6A8E088E150DC46FBC1B71D2 /* CleanUpStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanUpStyle.swift; sourceTree = "<group>"; };
+		60D046392047F47376DF1389 /* CleanUpContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanUpContext.swift; sourceTree = "<group>"; };
+		B4164F252D92544C03704769 /* RewriteCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RewriteCheck.swift; sourceTree = "<group>"; };
+		D54207719D977E55DB7826C7 /* CleanUpStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanUpStage.swift; sourceTree = "<group>"; };
+		7DD1D4BBE5A28A04273057CE /* CleanUpSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanUpSettingsView.swift; sourceTree = "<group>"; };
+		48898940EC60817010CC7DB6 /* CleanUpTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanUpTests.swift; sourceTree = "<group>"; };
 		5F598D2A320D4CB136AE763B /* WhisperTranscriptionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriptionBackend.swift; sourceTree = "<group>"; };
 		8737AA5703F8713DD0AAB400 /* TranscriptionModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionModelStore.swift; sourceTree = "<group>"; };
 		82D053BF85D3F2A2EB726633 /* TranscriptionModelRowModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionModelRowModel.swift; sourceTree = "<group>"; };
@@ -338,6 +352,17 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		D8A7A10BCE4DB368BB836AFC /* CleanUp */ = {
+			isa = PBXGroup;
+			children = (
+				E81360B13CB964AB57A67B12 /* RuleCleanUp.swift */,
+				6A8E088E150DC46FBC1B71D2 /* CleanUpStyle.swift */,
+				60D046392047F47376DF1389 /* CleanUpContext.swift */,
+				B4164F252D92544C03704769 /* RewriteCheck.swift */,
+			);
+			path = CleanUp;
+			sourceTree = "<group>";
+		};
 		DEDA1F77F4F5EA563C33BA13 /* Transcription */ = {
 			isa = PBXGroup;
 			children = (
@@ -416,6 +441,8 @@
 			children = (
 				DEDA1F77F4F5EA563C33BA13 /* Transcription */,
 				3D93E494C5B58FFE817ECD3D /* Audio */,
+				D8A7A10BCE4DB368BB836AFC /* CleanUp */,
+				7DD1D4BBE5A28A04273057CE /* CleanUpSettingsView.swift */,
 				EDE18A91BFEE86E508E88245 /* HistoryEntryHandle.swift */,
 				FB2EB44B5025997953DF5935 /* LiveHistoryEntry.swift */,
 				B15EDA3793AE45FEAA52477F /* HistoryController.swift */,
@@ -497,6 +524,7 @@
 				C1A000000000000000000002 /* HotkeyManagerTests.swift */,
 				TP0000000000000000000004 /* SmartFormattingTests.swift */,
 				37092AA26EEEB00BFCB6B48C /* PersonalDictionaryTests.swift */,
+				48898940EC60817010CC7DB6 /* CleanUpTests.swift */,
 				PP0000000000000000000006 /* TextInsertionManagerTests.swift */,
 				AA0000000000000000000013 /* TranscriptionModelTests.swift */,
 				PP0000000000000000000005 /* TranscriptionPipelineTests.swift */,
@@ -533,6 +561,7 @@
 				VAD000000000000000000001 /* VoiceActivityEditor.swift */,
 				TP0000000000000000000002 /* SmartFormattingStage.swift */,
 				1E6D4359C4933CFA28F4DD45 /* PersonalDictionaryStage.swift */,
+				D54207719D977E55DB7826C7 /* CleanUpStage.swift */,
 				VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */,
 			);
 			path = Pipeline;
@@ -705,6 +734,7 @@
 				C1A000000000000000000001 /* HotkeyManagerTests.swift in Sources */,
 				TP0000000000000000000003 /* SmartFormattingTests.swift in Sources */,
 				C0272ED2DB4F2FCAB7141F6F /* PersonalDictionaryTests.swift in Sources */,
+				6C16FE45100423CFB8119538 /* CleanUpTests.swift in Sources */,
 				PP0000000000000000000016 /* TextInsertionManagerTests.swift in Sources */,
 				AA0000000000000000000003 /* TranscriptionModelTests.swift in Sources */,
 				PP0000000000000000000015 /* TranscriptionPipelineTests.swift in Sources */,
@@ -828,6 +858,12 @@
 				94E2FF4554D92D4265DAFE60 /* ShortcutsSettingsView.swift in Sources */,
 				TP0000000000000000000001 /* SmartFormattingStage.swift in Sources */,
 				FD78C33B55E313AA7E580B58 /* PersonalDictionaryStage.swift in Sources */,
+				E080518FA467A1C61AB77F09 /* RuleCleanUp.swift in Sources */,
+				203D364CDF2B69285A72B113 /* CleanUpStyle.swift in Sources */,
+				423292C66B22B5B498F8C0DD /* CleanUpContext.swift in Sources */,
+				C6BE0C4317381C6DAA4BA4FA /* RewriteCheck.swift in Sources */,
+				3AA8C8DA90CBCFB247207AD8 /* CleanUpStage.swift in Sources */,
+				8DA6026378EA8642A6BD8890 /* CleanUpSettingsView.swift in Sources */,
 				PP0000000000000000000014 /* TextInsertionManager.swift in Sources */,
 				TAW000000000000000000001 /* TranscriptArtifactWriter.swift in Sources */,
 				84740FA4C22131C091BD729B /* TranscribeMeetingApp.swift in Sources */,

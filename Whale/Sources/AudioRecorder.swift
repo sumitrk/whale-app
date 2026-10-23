@@ -634,7 +634,8 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             durationSeconds: Double(prepared.capturedCount) / AudioProcessing.sampleRate,
             inputDeviceName: inputDeviceName,
             isBluetoothInput: inputDevice?.isBluetooth ?? false,
-            wasPaddedForASR: prepared.wasPadded
+            wasPaddedForASR: prepared.wasPadded,
+            microphonePeak: AudioProcessing.speechPeak(of: mic)
         )
         currentInputDevice = nil
         return result

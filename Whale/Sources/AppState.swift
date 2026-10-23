@@ -41,12 +41,23 @@ class AppState: ObservableObject {
             ],
             pipelineFactory: pipelineFactory ?? {
                 // Rebuilt per recording, so a settings change applies to the next one.
-                TranscriptionPipeline(stages: [
+                let settings = SettingsStore.shared
+                var stages: [PipelineStage] = [
                     // VoiceActivityDetectionStage(),
                     TranscriptionStage(backends: .shared),
                     SmartFormattingStage(),
-                    PersonalDictionaryStage(dictionary: SettingsStore.shared.personalDictionary),
-                ])
+                ]
+                if settings.cleanUpEnabled {
+                    // Built as recording stops, so the frontmost app is where the text goes.
+                    let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                    stages.append(CleanUpStage(
+                        style: settings.cleanUpStyle,
+                        allowLists: settings.cleanUpLists,
+                        context: CleanUpContext(bundleID: bundleID, emailLayout: settings.cleanUpEmailLayout)
+                    ))
+                }
+                stages.append(PersonalDictionaryStage(dictionary: settings.personalDictionary))
+                return TranscriptionPipeline(stages: stages)
             },
             deliver: { Delivery.shared.deliver($0) },
             selectedModel: { SettingsStore.shared.selectedBuiltInModelID },

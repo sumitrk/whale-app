@@ -75,6 +75,24 @@ enum AudioProcessing {
         return min(1, sqrt(sum / Float(samples.count)) * 40)
     }
 
+    /// The loudest 0.1 s of a recording, as perceptual loudness in 0...1 mapped from
+    /// -50...-10 dBFS RMS. Below `speechThreshold` nothing was said. From Kaze (MIT).
+    static func speechPeak(of samples: [Float], windowSize: Int = Int(sampleRate / 10)) -> Float {
+        var peak: Float = 0
+        var start = 0
+        while start < samples.count {
+            let window = samples[start..<min(start + windowSize, samples.count)]
+            let rms = sqrt(window.reduce(Float(0)) { $0 + $1 * $1 } / Float(window.count))
+            let db = 20 * log10(max(rms, 1e-7))
+            peak = max(peak, min(max((db + 50) / 40, 0), 1))
+            start += windowSize
+        }
+        return peak
+    }
+
+    /// A recording whose `speechPeak` stays below this is treated as silence.
+    static let speechThreshold: Float = 0.18
+
     // MARK: - Resampling and mixing
 
     /// Linear interpolation; enough for speech going to a 16 kHz model.
