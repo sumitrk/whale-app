@@ -8,6 +8,8 @@ import SwiftUI
 final class HUDPillModel {
     var content: HUDPillContent = .processing
     var isPresented = false
+    /// Leaving fades out completely; arriving starts from 90% opacity.
+    var isLeaving = false
     /// Where the pill sits in the window, which is sized for the widest pill: the corner nearest
     /// the field or pointer it belongs to, so the pill grows away from it.
     var alignment: Alignment = .topLeading

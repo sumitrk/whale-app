@@ -15,7 +15,7 @@ struct RecordingPillView: View {
                 .clipShape(.capsule)
         }
         .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.9)
-        .opacity(model.isPresented ? 1 : 0)
+        .opacity(model.isPresented ? 1 : model.isLeaving ? 0 : 0.9)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: model.alignment)
     }
 

@@ -108,9 +108,9 @@ final class RecordingIndicatorWindow: NSPanel {
     /// Room for the widest pill, a two-line message.
     private static let pillArea = NSSize(width: 400, height: 56)
 
-    private static let appear = Animation.spring(duration: 0.42, bounce: 0.32)
-    private static let morph = Animation.spring(duration: 0.38, bounce: 0.18)
-    private static let disappear = Animation.easeIn(duration: 0.16)
+    private static let appear = Animation.spring(duration: 0.25, bounce: 0.32)
+    private static let morph = Animation.spring(duration: 0.25, bounce: 0.18)
+    private static let disappear = Animation.spring(duration: 0.25, bounce: 0)
 
     private let model = HUDPillModel()
 
@@ -179,8 +179,10 @@ final class RecordingIndicatorWindow: NSPanel {
         }
         isShowing = false
 
-        // The reverse of appearing: back down to 90% as it fades.
+        // The reverse of appearing: back down to 90% scale, fading all the way out, since the
+        // window is ordered out once it's done.
         withAnimation(Self.disappear) {
+            model.isLeaving = true
             model.isPresented = false
         } completion: { [weak self] in
             // Unless a new presentation brought it back in the meantime.
@@ -237,8 +239,12 @@ final class RecordingIndicatorWindow: NSPanel {
         isShowing = true
         isOnScreen = true
         orderFront(nil)
-        // Springs up from 90%; Reduce Motion keeps only the fade (the view skips the scale).
-        withAnimation(Self.appear) { model.isPresented = true }
+        // Springs up from 90% scale and 90% opacity; Reduce Motion keeps only the opacity change
+        // (the view skips the scale).
+        withAnimation(Self.appear) {
+            model.isLeaving = false
+            model.isPresented = true
+        }
     }
 
     private func finishHiding() {
