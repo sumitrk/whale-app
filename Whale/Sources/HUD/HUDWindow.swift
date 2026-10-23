@@ -67,7 +67,8 @@ enum HUDPlacementPolicy {
 
 // MARK: - Floating panel
 
-/// Non-activating HUD that floats above all windows near the cursor.
+/// Draws the HUD: a non-activating panel that floats above all windows near the cursor. What
+/// it shows and for how long is decided by `HUD`; this places it and animates it.
 ///
 /// One pill for every state: the recording bars, the processing wave, the paste hint and
 /// messages are contents of the same `RecordingPillView`, which morphs from one to the next.
@@ -84,22 +85,8 @@ enum HUDPlacementPolicy {
 /// - the pill's view is built once and reused, so pressing the key doesn't build a new
 ///   SwiftUI hierarchy at the moment it needs to appear.
 @MainActor
-final class RecordingIndicatorWindow: NSPanel {
-    enum PasteHintReason: Equatable {
-        case manualPasteOnly
-        case accessibilityMissing
-
-        var diagnosticName: String {
-            switch self {
-            case .manualPasteOnly:
-                return "manualPasteOnly"
-            case .accessibilityMissing:
-                return "accessibilityMissing"
-            }
-        }
-    }
-
-    static let shared = RecordingIndicatorWindow()
+final class HUDWindow: NSPanel, HUDSurface {
+    static let shared = HUDWindow()
     static let feedbackDismissalEvents: NSEvent.EventTypeMask = [
         .leftMouseDown, .rightMouseDown, .otherMouseDown,
     ]
@@ -175,15 +162,6 @@ final class RecordingIndicatorWindow: NSPanel {
     /// finished leaving.
     var hasContent: Bool { isAppearing || isShowing || isOnScreen }
 
-    func show(meter: MicLevelMeter) {
-        present(.recording(meter))
-    }
-
-    /// The bars turn into a travelling wave while the words are worked out.
-    func showProcessing() {
-        present(.processing)
-    }
-
     func hide() {
         // Always invalidate the presentation: a quick tap can call this while the anchor
         // lookup is still running, and that presentation must not appear afterwards.
@@ -199,18 +177,10 @@ final class RecordingIndicatorWindow: NSPanel {
         animateOut()
     }
 
-    /// Show a brief paste/accessibility nudge.
-    func showHint(reason: PasteHintReason) {
-        present(.pasteHint(reason), feedbackDuration: 2)
-    }
-
-    func showMessage(_ message: String, isError: Bool, duration: TimeInterval) {
-        present(.message(message, isError: isError), feedbackDuration: duration)
-    }
-
     // MARK: Presentation
 
-    private func present(_ content: HUDPillContent, feedbackDuration: TimeInterval? = nil) {
+    /// Shows `content`, leaving after `dismissAfter` or at the next click when it's set.
+    func present(_ content: HUDPillContent, dismissAfter feedbackDuration: TimeInterval?) {
         presentationID &+= 1
         let id = presentationID
         stopPresentationObservers()

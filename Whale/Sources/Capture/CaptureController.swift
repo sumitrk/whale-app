@@ -22,7 +22,7 @@ final class CaptureController: ObservableObject {
     private let hud: CaptureHUD
     private let handlers: [CaptureIntent: CaptureIntentHandler]
     private let pipelineFactory: () -> TranscriptionPipeline
-    private let deliver: @MainActor (String) -> Void
+    private let deliver: @MainActor (String) -> PasteHintReason?
     private let playSound: (FeedbackSound) -> Void
     private let selectedModel: () -> BuiltInModelID
     private let canStart: () -> Bool
@@ -55,7 +55,7 @@ final class CaptureController: ObservableObject {
         hud: CaptureHUD,
         handlers: [CaptureIntent: CaptureIntentHandler],
         pipelineFactory: @escaping () -> TranscriptionPipeline,
-        deliver: @escaping @MainActor (String) -> Void,
+        deliver: @escaping @MainActor (String) -> PasteHintReason?,
         playSound: @escaping (FeedbackSound) -> Void = { $0.play() },
         selectedModel: @escaping () -> BuiltInModelID,
         canStart: @escaping () -> Bool = { true }
@@ -101,9 +101,7 @@ final class CaptureController: ObservableObject {
             // Neural Engine after an update), loading now overlaps with the user talking.
             models.warm(run.modelID)
             // Before the History write and the microphone, so the HUD answers the key at once.
-            if intent != .transcriptMode {
-                hud.showRecording(recorder.levelMeter)
-            }
+            hud.update(.recording(intent, recorder.levelMeter))
 
             if let kind = intent.historyKind {
                 let frontmost = NSWorkspace.shared.frontmostApplication
@@ -163,14 +161,11 @@ final class CaptureController: ObservableObject {
         processingTask?.cancel()
         processingTask = nil
         phase = .idle
-        hud.hide()
+        hud.update(.cancelled(replaced: reason == Self.replacedReason))
         await stopRecorderDiscardingAudio()
         await run.handler.cancel()
         await finalize(run, outcome: .cancelled, errorText: reason)
         DiagnosticLog.log("[Capture] Cancelled \(run.intent.diagnosticName): \(reason).")
-        if reason != Self.replacedReason {
-            hud.showMessage("Cancelled", isError: false, duration: 1)
-        }
     }
 
     // MARK: - Lifecycle
@@ -198,12 +193,7 @@ final class CaptureController: ObservableObject {
     private func process(_ run: Run) async {
         let startedAt = phase.recordingStartedAt ?? .now
         phase = .processing(run.intent)
-        if run.intent == .transcriptMode {
-            hud.hide()
-        } else {
-            // The bars become the processing wave.
-            hud.showProcessing()
-        }
+        hud.update(.processing(run.intent))
 
         do {
             let recording = try await recorder.stopRecording()
@@ -236,7 +226,7 @@ final class CaptureController: ObservableObject {
             guard !text.isEmpty else {
                 // Nothing was said; leave quietly.
                 end(run)
-                hud.hide()
+                hud.update(.finished)
                 await finalize(run, outcome: .failed, errorText: "The transcription was empty")
                 return
             }
@@ -249,10 +239,10 @@ final class CaptureController: ObservableObject {
             end(run)
             switch completion {
             case .deliver(let output, let instruction):
-                deliver(output)
+                hud.update(.delivered(pasteHint: deliver(output)))
                 await finalize(run, outcome: .succeeded, instructionText: instruction, resultText: output, audioSeconds: audioSeconds)
             case .saved:
-                break
+                hud.update(.finished)
             }
             playSound(.finish)
         } catch {
@@ -271,15 +261,17 @@ final class CaptureController: ObservableObject {
             return
         }
         end(run)
-        hud.hide()
+        let message = error.localizedDescription
+        // A tap too short to capture anything isn't worth a message.
+        if case RecorderError.noAudioCaptured = error {
+            hud.update(.finished)
+        } else {
+            hud.update(.failed(message))
+        }
         await stopRecorderDiscardingAudio()
         await run.handler.cancel()
-        let message = error.localizedDescription
         DiagnosticLog.log("[Capture] \(run.intent.diagnosticName) failed: \(message)")
         await finalize(run, outcome: .failed, errorText: message)
-        // A tap too short to capture anything isn't worth a message.
-        if case RecorderError.noAudioCaptured = error { return }
-        hud.showMessage(message, isError: true, duration: 4)
     }
 
     private func end(_ run: Run) {

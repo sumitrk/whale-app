@@ -42,7 +42,7 @@ struct RecordingPillView: View {
 /// Shown briefly when auto-paste is not possible (no focused text input).
 /// Lets the user know the transcript is ready on the clipboard.
 private struct PasteHintView: View {
-    let reason: RecordingIndicatorWindow.PasteHintReason
+    let reason: PasteHintReason
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {

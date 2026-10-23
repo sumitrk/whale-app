@@ -5,7 +5,7 @@ import CoreGraphics
 enum InsertionStrategy: Equatable {
     case directAX
     case simulatedPaste
-    case copyOnly(RecordingIndicatorWindow.PasteHintReason)
+    case copyOnly(PasteHintReason)
 
     var showsPasteHint: Bool {
         if case .copyOnly = self { return true }
@@ -182,8 +182,11 @@ enum TextInsertionManager {
         currentChangeCount == expectedTemporaryChangeCount
     }
 
+    /// Inserts `text` into the focused field, or copies it. Returns why it was only copied, for
+    /// the HUD's paste hint; nil when it was inserted.
     @MainActor
-    static func insertOrCopy(_ text: String) {
+    @discardableResult
+    static func insertOrCopy(_ text: String) -> PasteHintReason? {
         let focusedElement = FocusedElementInspector.focusedElementContext()
         let snapshot = focusedElement?.snapshot
         let canPostEvents = CGPreflightPostEventAccess()
@@ -196,17 +199,12 @@ enum TextInsertionManager {
             "[Paste] strategy=\(strategy.diagnosticName) textLength=\(text.count) trusted=\(AXIsProcessTrusted()) " +
             "canPostEvents=\(canPostEvents) target=\(diagnosticDescription(for: snapshot))"
         )
-        if !strategy.showsPasteHint {
-            RecordingIndicatorWindow.shared.hide()
-        }
-
         switch strategy {
         case .directAX:
             guard let focusedElement else {
                 copyToClipboard(text)
                 DiagnosticLog.log("[Paste] Falling back to copyOnly because focused element context disappeared before DirectAX insertion.")
-                RecordingIndicatorWindow.shared.showHint(reason: .manualPasteOnly)
-                return
+                return .manualPasteOnly
             }
             do {
                 try insertViaDirectAX(text, into: focusedElement)
@@ -223,8 +221,9 @@ enum TextInsertionManager {
         case .copyOnly(let reason):
             copyToClipboard(text)
             DiagnosticLog.log("[Paste] Copied transcript without auto-paste. reason=\(reason.diagnosticName)")
-            RecordingIndicatorWindow.shared.showHint(reason: reason)
+            return reason
         }
+        return nil
     }
 
     private static func diagnosticDescription(for snapshot: FocusedElementSnapshot?) -> String {

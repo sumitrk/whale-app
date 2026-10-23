@@ -12,6 +12,7 @@ final class CaptureControllerTests: XCTestCase {
     private var transcript = "hello there"
     private var pipelineError: Error?
     private var delivered: [String] = []
+    private var pasteHint: PasteHintReason?
     private var sounds: [FeedbackSound] = []
     private var capture: CaptureController!
 
@@ -25,6 +26,7 @@ final class CaptureControllerTests: XCTestCase {
         transcript = "hello there"
         pipelineError = nil
         delivered = []
+        pasteHint = nil
         sounds = []
         capture = CaptureController(
             recorder: recorder,
@@ -38,7 +40,10 @@ final class CaptureControllerTests: XCTestCase {
                     SuffixStage(suffix: " (formatted)"),
                 ])
             },
-            deliver: { [unowned self] in delivered.append($0) },
+            deliver: { [unowned self] in
+                delivered.append($0)
+                return pasteHint
+            },
             playSound: { [unowned self] in sounds.append($0) },
             selectedModel: { .parakeetEnglishV2 }
         )
@@ -65,7 +70,11 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(entry.outcome, .succeeded)
         XCTAssertEqual(entry.result, "hello there (formatted)")
         XCTAssertEqual(entry.audioSeconds, 2)
-        XCTAssertEqual(hud.events, ["recording", "processing"])
+        XCTAssertEqual(hud.events, [
+            .recording(.dictation, recorder.levelMeter),
+            .processing(.dictation),
+            .delivered(pasteHint: nil),
+        ])
         XCTAssertFalse(recorder.capturedSystemAudio)
     }
 
@@ -103,7 +112,11 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(transcriptMode.completed.count, 1)
         XCTAssertTrue(delivered.isEmpty)
         XCTAssertTrue(history.created.isEmpty)
-        XCTAssertEqual(hud.events, ["hide"], "no pill while a meeting records")
+        XCTAssertEqual(hud.events, [
+            .recording(.transcriptMode, recorder.levelMeter),
+            .processing(.transcriptMode),
+            .finished,
+        ])
     }
 
     // MARK: - Failures
@@ -116,7 +129,7 @@ final class CaptureControllerTests: XCTestCase {
         await waitUntilIdle()
 
         XCTAssertTrue(delivered.isEmpty)
-        XCTAssertEqual(hud.events.last, "error: Transcription failed")
+        XCTAssertEqual(hud.events.last, .failed("Transcription failed"))
         XCTAssertEqual(history.finalized.first?.outcome, .failed)
     }
 
@@ -127,7 +140,7 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(capture.phase, .idle)
         XCTAssertEqual(recorder.starts, 0)
         XCTAssertTrue(history.created.isEmpty)
-        XCTAssertTrue(hud.events.last?.hasPrefix("error: ") == true)
+        XCTAssertEqual(hud.events, [.failed(BuiltInModelID.parakeetEnglishV2.descriptor.installationPrompt)])
     }
 
     func testAHandlerThatRefusesStopsTheCaptureBeforeAnythingShows() async {
@@ -136,7 +149,7 @@ final class CaptureControllerTests: XCTestCase {
 
         XCTAssertEqual(capture.phase, .idle)
         XCTAssertEqual(recorder.starts, 0)
-        XCTAssertEqual(hud.events, ["hide", "error: Not ready"])
+        XCTAssertEqual(hud.events, [.failed("Not ready")], "nothing showed before the refusal")
     }
 
     func testAnEmptyTranscriptLeavesQuietly() async {
@@ -148,7 +161,7 @@ final class CaptureControllerTests: XCTestCase {
         await waitUntilIdle()
 
         XCTAssertTrue(delivered.isEmpty)
-        XCTAssertEqual(hud.events.last, "hide")
+        XCTAssertEqual(hud.events.last, .finished)
         XCTAssertEqual(history.finalized.first?.outcome, .failed)
     }
 
@@ -163,7 +176,17 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertFalse(recorder.isRecording)
         XCTAssertTrue(delivered.isEmpty)
         XCTAssertEqual(history.finalized.first?.outcome, .cancelled)
-        XCTAssertEqual(hud.events.last, "message: Cancelled")
+        XCTAssertEqual(hud.events.last, .cancelled(replaced: false))
+    }
+
+    func testACopiedDeliveryReportsItsPasteHint() async {
+        pasteHint = .manualPasteOnly
+        await capture.start(.dictation)
+        recorder.becomeReady()
+        capture.release(.dictation)
+        await waitUntilIdle()
+
+        XCTAssertEqual(hud.events.last, .delivered(pasteHint: .manualPasteOnly))
     }
 
     func testEscapeNeverThrowsAwayAMeeting() async {
@@ -206,7 +229,8 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(history.created, [.aiAction, .aiAction])
         XCTAssertEqual(history.finalized.first?.outcome, .cancelled)
         XCTAssertEqual(history.finalized.first?.error, "Replaced by a newer AI Action")
-        XCTAssertFalse(hud.events.contains("message: Cancelled"), "a replaced action leaves without a message")
+        XCTAssertTrue(hud.events.contains(.cancelled(replaced: true)))
+        XCTAssertFalse(hud.events.contains(.cancelled(replaced: false)))
         XCTAssertEqual(capture.phase, .starting(.aiAction, stopRequested: false))
     }
 
@@ -222,7 +246,10 @@ final class CaptureControllerTests: XCTestCase {
             pipelineFactory: { [unowned self] in
                 TranscriptionPipeline(stages: [FakeTranscriptionStage(text: transcript, error: nil)])
             },
-            deliver: { [unowned self] in delivered.append($0) },
+            deliver: { [unowned self] in
+                delivered.append($0)
+                return pasteHint
+            },
             playSound: { [unowned self] in sounds.append($0) },
             selectedModel: { .parakeetEnglishV2 }
         )
@@ -297,13 +324,8 @@ private final class FakeModels: CaptureModels, @unchecked Sendable {
 
 @MainActor
 private final class FakeHUD: CaptureHUD {
-    var events: [String] = []
-    func showRecording(_ meter: MicLevelMeter) { events.append("recording") }
-    func showProcessing() { events.append("processing") }
-    func hide() { events.append("hide") }
-    func showMessage(_ message: String, isError: Bool, duration: TimeInterval) {
-        events.append("\(isError ? "error" : "message"): \(message)")
-    }
+    var events: [HUDEvent] = []
+    func update(_ event: HUDEvent) { events.append(event) }
 }
 
 @MainActor

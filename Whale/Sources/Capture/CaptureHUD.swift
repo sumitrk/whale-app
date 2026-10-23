@@ -1,16 +1,7 @@
 import Foundation
 
-/// The HUD as the capture module drives it.
+/// The HUD as the capture module reports to it.
 @MainActor
 protocol CaptureHUD: AnyObject {
-    func showRecording(_ meter: MicLevelMeter)
-    func showProcessing()
-    func hide()
-    func showMessage(_ message: String, isError: Bool, duration: TimeInterval)
-}
-
-extension RecordingIndicatorWindow: CaptureHUD {
-    func showRecording(_ meter: MicLevelMeter) {
-        show(meter: meter)
-    }
+    func update(_ event: HUDEvent)
 }

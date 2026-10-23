@@ -5,7 +5,7 @@ import Foundation
 enum HUDPillContent: Equatable {
     case recording(MicLevelMeter)
     case processing
-    case pasteHint(RecordingIndicatorWindow.PasteHintReason)
+    case pasteHint(PasteHintReason)
     case message(String, isError: Bool)
 
     /// The live meter while recording or processing, both of which draw the bars.

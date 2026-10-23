@@ -34,7 +34,7 @@ class AppState: ObservableObject {
             recorder: recorder,
             models: LocalCaptureModels(transcriber: .shared),
             history: HistoryController.shared,
-            hud: RecordingIndicatorWindow.shared,
+            hud: HUD.shared,
             handlers: [
                 .dictation: DictationHandler(),
                 .transcriptMode: TranscriptModeHandler(settings: .shared),
@@ -186,9 +186,9 @@ class AppState: ObservableObject {
     // MARK: - Startup
 
     private func prepareApp() async {
-        RecordingIndicatorWindow.shared.showProcessing()
+        HUD.shared.update(.preparing)
         defer {
-            RecordingIndicatorWindow.shared.hide()
+            HUD.shared.update(.finished)
             isPreparing = false
         }
 
