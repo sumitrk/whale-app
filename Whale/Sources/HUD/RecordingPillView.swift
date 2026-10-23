@@ -6,16 +6,12 @@ import SwiftUI
 struct RecordingPillView: View {
     let model: HUDPillModel
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         HUDShadowContainer {
             content
                 .background(.black, in: .capsule)
                 .clipShape(.capsule)
         }
-        .scaleEffect(model.isPresented || reduceMotion ? 1 : model.isLeaving ? 0.9 : 0.5)
-        .opacity(model.isPresented ? 1 : model.isLeaving ? 0 : 0.9)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: model.alignment)
     }
 

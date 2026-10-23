@@ -66,10 +66,22 @@ enum RecordingActivity: Equatable {
     }
 }
 
+/// Loaded once each: reading the sound on every press held the main thread for up to 50ms just
+/// as the HUD was springing in.
+@MainActor private var loadedSounds: [String: NSSound] = [:]
+
 @discardableResult
 @MainActor
 func playSound(_ name: String) -> TimeInterval {
-    guard let sound = NSSound(named: name) else { return 0 }
+    let sound: NSSound
+    if let loaded = loadedSounds[name] {
+        sound = loaded
+    } else {
+        guard let named = NSSound(named: name)?.copy() as? NSSound else { return 0 }
+        loadedSounds[name] = named
+        sound = named
+    }
+    if sound.isPlaying { sound.stop() }
     let duration = sound.duration
     sound.play()
     return duration

@@ -75,6 +75,10 @@ enum HUDPlacementPolicy {
 /// nearest what it's anchored to.
 ///
 /// Built to stay smooth while the app is busy starting a recording:
+/// - arriving and leaving are Core Animation springs on the pill's layer, which the render
+///   server runs even while the main thread is blocked. Starting the microphone and playing the
+///   start sound stall the main thread for 25–100ms at a time in the first quarter second,
+///   which SwiftUI animations, stepped on the main thread, showed as dropped frames;
 /// - the focused-field lookup that decides where the pill sits runs off the main thread, with a
 ///   short timeout, instead of stalling the first frames of the appearance;
 /// - the pill's view is built once and reused, so pressing the key doesn't build a new
@@ -108,11 +112,20 @@ final class RecordingIndicatorWindow: NSPanel {
     /// Room for the widest pill, a two-line message.
     private static let pillArea = NSSize(width: 400, height: 56)
 
-    private static let appear = Animation.spring(duration: 0.25, bounce: 0.32)
+    /// Arriving: up from 80% scale and 90% opacity.
+    private static let appearDuration: TimeInterval = 0.25
+    private static let appearBounce: CGFloat = 0.32
+    private static let appearScale: CGFloat = 0.8
+    private static let appearOpacity: Float = 0.9
+    /// Leaving: down to 90% scale, fading out.
+    private static let disappearDuration: TimeInterval = 0.1
+    private static let disappearScale: CGFloat = 0.9
+    /// Between contents, inside the pill: a SwiftUI animation, since it reshapes the view.
     private static let morph = Animation.spring(duration: 0.25, bounce: 0.18)
-    private static let disappear = Animation.spring(duration: 0.1, bounce: 0)
 
     private let model = HUDPillModel()
+    private let container: NSView
+    private let host: NSHostingView<RecordingPillView>
 
     private var trackingTimer: Timer?
     private var currentAnchor: HUDAnchor = .cursor
@@ -132,13 +145,16 @@ final class RecordingIndicatorWindow: NSPanel {
             width: Self.pillArea.width + Self.inset * 2,
             height: Self.pillArea.height + Self.inset * 2
         )
-        let host = NSHostingView(rootView: RecordingPillView(model: model))
+        container = NSView(frame: NSRect(origin: .zero, size: size))
+        container.wantsLayer = true
+        host = NSHostingView(rootView: RecordingPillView(model: model))
         // The window keeps its size whatever the pill shows; the pill moves inside it.
         host.sizingOptions = []
-        host.frame = NSRect(origin: .zero, size: size)
+        host.frame = container.bounds
         host.autoresizingMask = [.width, .height]
+        container.addSubview(host)
         super.init(
-            contentRect: host.frame,
+            contentRect: container.frame,
             styleMask:   [.nonactivatingPanel, .borderless],
             backing:     .buffered,
             defer:       false
@@ -150,7 +166,7 @@ final class RecordingIndicatorWindow: NSPanel {
         level              = .floating
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         animationBehavior  = .none
-        contentView        = host
+        contentView        = container
     }
 
     /// Whether a presentation is on screen or on its way: true from `show…` until the pill has
@@ -178,17 +194,7 @@ final class RecordingIndicatorWindow: NSPanel {
             return
         }
         isShowing = false
-
-        // The reverse of appearing: back down to 90% scale, fading all the way out, since the
-        // window is ordered out once it's done.
-        withAnimation(Self.disappear) {
-            model.isLeaving = true
-            model.isPresented = false
-        } completion: { [weak self] in
-            // Unless a new presentation brought it back in the meantime.
-            guard let self, !self.isShowing else { return }
-            self.finishHiding()
-        }
+        animateOut()
     }
 
     /// Show a brief paste/accessibility nudge.
@@ -238,18 +244,114 @@ final class RecordingIndicatorWindow: NSPanel {
         isAppearing = false
         isShowing = true
         isOnScreen = true
-        orderFront(nil)
-        // Springs up from 50% scale and 90% opacity; Reduce Motion keeps only the opacity change
-        // (the view skips the scale).
-        withAnimation(Self.appear) {
-            model.isLeaving = false
-            model.isPresented = true
+        // Lay the new content out now, so the first frame on screen is this pill, not the last.
+        host.layoutSubtreeIfNeeded()
+        guard let layer = container.layer else {
+            orderFront(nil)
+            return
         }
+
+        layer.removeAllAnimations()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.opacity = 1
+        layer.transform = CATransform3DIdentity
+        CATransaction.commit()
+        orderFront(nil)
+
+        // Springs up from 80% scale and 90% opacity; Reduce Motion keeps only the opacity change.
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let fade = CASpringAnimation(perceptualDuration: Self.appearDuration, bounce: 0)
+        fade.keyPath = "opacity"
+        fade.fromValue = Self.appearOpacity
+        fade.toValue = 1
+        fade.duration = fade.settlingDuration
+        layer.add(fade, forKey: "opacity")
+
+        guard !reduceMotion else { return }
+        let grow = CASpringAnimation(perceptualDuration: Self.appearDuration, bounce: Self.appearBounce)
+        grow.keyPath = "transform"
+        grow.fromValue = NSValue(caTransform3D: pillScale(Self.appearScale))
+        grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        grow.duration = grow.settlingDuration
+        layer.add(grow, forKey: "transform")
+    }
+
+    /// The reverse of appearing: down to 90% scale, fading all the way out, since the window is
+    /// ordered out once it's done.
+    private func animateOut() {
+        guard let layer = container.layer else {
+            finishHiding()
+            return
+        }
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let from = layer.presentation() ?? layer
+        let endTransform = reduceMotion ? CATransform3DIdentity : pillScale(Self.disappearScale)
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            MainActor.assumeIsolated {
+                // Unless a new presentation brought it back in the meantime.
+                guard let self, !self.isShowing else { return }
+                self.finishHiding()
+            }
+        }
+        let fade = CASpringAnimation(perceptualDuration: Self.disappearDuration, bounce: 0)
+        fade.keyPath = "opacity"
+        fade.fromValue = from.opacity
+        fade.toValue = 0
+        fade.duration = fade.settlingDuration
+        let shrink = CASpringAnimation(perceptualDuration: Self.disappearDuration, bounce: 0)
+        shrink.keyPath = "transform"
+        shrink.fromValue = NSValue(caTransform3D: from.transform)
+        shrink.toValue = NSValue(caTransform3D: endTransform)
+        shrink.duration = shrink.settlingDuration
+        layer.opacity = 0
+        layer.transform = endTransform
+        layer.add(fade, forKey: "opacity")
+        layer.add(shrink, forKey: "transform")
+        CATransaction.commit()
     }
 
     private func finishHiding() {
         isOnScreen = false
         orderOut(nil)
+        guard let layer = container.layer else { return }
+        layer.removeAllAnimations()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.opacity = 1
+        layer.transform = CATransform3DIdentity
+        CATransaction.commit()
+    }
+
+    /// Scales the container about the pill's centre rather than the window's corner. The pill
+    /// sits in one corner of the window, its size the SwiftUI view's own.
+    private func pillScale(_ scale: CGFloat) -> CATransform3D {
+        let bounds = container.bounds
+        let fitting = host.fittingSize
+        let width = min(max(fitting.width, 0), bounds.width)
+        let height = min(max(fitting.height, 0), bounds.height)
+        let alignment = model.alignment
+        let midX: CGFloat = switch alignment.horizontal {
+        case .leading: width / 2
+        case .trailing: bounds.width - width / 2
+        default: bounds.midX
+        }
+        // Layer coordinates run up from the bottom, so a top-aligned pill sits at the top.
+        let midY: CGFloat = switch alignment.vertical {
+        case .top: bounds.height - height / 2
+        case .bottom: height / 2
+        default: bounds.midY
+        }
+        // Transforms apply about the layer's anchor point (the bottom-left corner for a view's
+        // layer), so move the pill's centre there, scale, and move it back.
+        let anchor = container.layer?.anchorPoint ?? .zero
+        let x = midX - anchor.x * bounds.width
+        let y = midY - anchor.y * bounds.height
+        var transform = CATransform3DMakeTranslation(x, y, 0)
+        transform = CATransform3DScale(transform, scale, scale, 1)
+        return CATransform3DTranslate(transform, -x, -y, 0)
     }
 
     /// Looks up where the focused field is without blocking the main thread. Delivers the
