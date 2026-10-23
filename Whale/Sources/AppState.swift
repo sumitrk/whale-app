@@ -533,6 +533,8 @@ class AppState: ObservableObject {
     // MARK: - Startup
 
     private func prepareApp() async {
+        RecordingIndicatorWindow.shared.showProcessing()
+        defer { RecordingIndicatorWindow.shared.hide() }
 
         AppRuntimeInfo.migrateSandboxDataIfNeeded()
         recorder.prepareMicrophoneCapture()
