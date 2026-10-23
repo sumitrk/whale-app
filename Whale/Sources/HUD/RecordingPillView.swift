@@ -20,7 +20,11 @@ struct RecordingPillView: View {
     @ViewBuilder
     private var content: some View {
         if model.content.showsWaveform {
-            RecordingBarsView(meter: model.content.meter, isProcessing: model.content == .processing)
+            RecordingBarsView(
+                meter: model.content.meter,
+                isProcessing: model.content == .processing,
+                isPaused: !model.isVisible
+            )
                 .frame(width: 36, height: 20)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 8)

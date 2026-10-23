@@ -255,6 +255,7 @@ final class RecordingIndicatorWindow: NSPanel {
         isAppearing = false
         isShowing = true
         isOnScreen = true
+        model.isVisible = true
         // Lay the new content out now, so the first frame on screen is this pill, not the last.
         host.layoutSubtreeIfNeeded()
         guard let layer = container.layer else {
@@ -326,6 +327,7 @@ final class RecordingIndicatorWindow: NSPanel {
 
     private func finishHiding() {
         isOnScreen = false
+        model.isVisible = false
         orderOut(nil)
         guard let layer = container.layer else { return }
         layer.removeAllAnimations()

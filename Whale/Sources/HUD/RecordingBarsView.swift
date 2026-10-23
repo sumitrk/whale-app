@@ -10,6 +10,7 @@ import SwiftUI
 struct RecordingBarsView: View {
     let meter: MicLevelMeter?
     let isProcessing: Bool
+    var isPaused = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var envelope = LevelEnvelope()
@@ -23,7 +24,7 @@ struct RecordingBarsView: View {
     private static let spacing: Double = 3
 
     var body: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: nil, paused: isPaused)) { timeline in
             Canvas { context, size in
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 let level = envelope.next(target: Double(meter?.current ?? 0), at: time)
