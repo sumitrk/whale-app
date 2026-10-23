@@ -16,19 +16,5 @@
   cards and the `Settings*Row` types. Use them rather than `Form`, so pages keep Spark's look.
 
 ## Git Workflow
-- **Never commit directly to `main`**
-- For every plan step or feature, create a branch first:
-  ```bash
-  git checkout -b step-02-swift-menubar-shell
-  # ... do the work, commit along the way ...
-  git push origin step-02-swift-menubar-shell
-  ```
-- Once the step is complete and tested, merge into main:
-  ```bash
-  git checkout main
-  git merge step-02-swift-menubar-shell
-  git push origin main
-  git branch -d step-02-swift-menubar-shell
-  ```
-- Branch naming: `step-XX-<short-description>` for plan steps, `feat/<short-description>` for features, `fix/<short-description>` for bug fixes
-- This makes it easy to revert any step by reverting the merge commit
+- Direct commits to `main` are allowed.
+- Use a branch only when isolated review or experimentation is useful.
