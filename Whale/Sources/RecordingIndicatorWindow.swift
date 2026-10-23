@@ -175,8 +175,8 @@ final class RecordingIndicatorWindow: NSPanel {
     /// finished leaving.
     var hasContent: Bool { isAppearing || isShowing || isOnScreen }
 
-    func show(recorder: AudioRecorder) {
-        present(.recording(recorder.levelMeter))
+    func show(meter: MicLevelMeter) {
+        present(.recording(meter))
     }
 
     /// The bars turn into a travelling wave while the words are worked out.

@@ -18,18 +18,10 @@ struct MenuBarView: View {
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if appState.isRecording {
-                Button {
-                    Task { await appState.stopRecording() }
-                } label: {
-                    Label("Stop dictation", systemImage: "stop.fill")
-                }
-            } else {
-                Button {
-                    appState.startClipboardOnlyDictation()
-                } label: {
-                    Label("Start dictation (clipboard only)", systemImage: "mic.fill")
-                }
+            ClipboardDictationButton(capture: appState.capture) {
+                appState.startClipboardOnlyDictation()
+            } stop: {
+                appState.stopRecording()
             }
 
             Button {

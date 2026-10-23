@@ -5,116 +5,55 @@ import FluidAudio
 import Foundation
 import SwiftUI
 
-enum AppStatus: Equatable {
-    case starting
-    case ready
-    case recording
-    case transcribing
-    case processing(String)
-    case error(String)
-}
-
-/// Tracks how the current recording was triggered.
-enum RecordingMode: Sendable, Equatable {
-    case markdown   // ⌘⇧T: Transcribe → .md file → Finder
-    case paste      // Fn:   Transcribe only → clipboard + auto-paste
-}
-
-enum RecordingActivity: Equatable {
-    case idle
-    case starting(mode: RecordingMode, stopRequested: Bool)
-    case recording(mode: RecordingMode, startedAt: Date)
-    case processing(mode: RecordingMode)
-    case error(String)
-
-    var isRecording: Bool {
-        if case .recording = self { return true }
-        return false
-    }
-
-    var isBusy: Bool {
-        switch self {
-        case .starting, .recording, .processing:
-            return true
-        case .idle, .error:
-            return false
-        }
-    }
-
-    var mode: RecordingMode? {
-        switch self {
-        case .idle, .error:
-            return nil
-        case .starting(let mode, _), .recording(let mode, _), .processing(let mode):
-            return mode
-        }
-    }
-
-    var startedAt: Date? {
-        guard case .recording(_, let startedAt) = self else { return nil }
-        return startedAt
-    }
-
-    var stopRequested: Bool {
-        guard case .starting(_, let stopRequested) = self else { return false }
-        return stopRequested
-    }
-
-    mutating func requestStop() {
-        guard case .starting(let mode, false) = self else { return }
-        self = .starting(mode: mode, stopRequested: true)
-    }
-}
-
+/// Wires the app together: the shortcuts, the one capture module, onboarding and launch.
+/// Holds no capture state of its own; `capture` does.
 @MainActor
 class AppState: ObservableObject {
-    @Published var status: AppStatus = .starting
-    @Published private var activity: RecordingActivity = .idle
-    @Published var lastMeetingPath: String? = nil
-    /// Set after every transcription — observed by the onboarding test screen.
-    @Published var lastTranscript: String = ""
-
     let recorder = AudioRecorder()
     let hotkey   = HotkeyManager()
     let accessibility: AccessibilityController
     let openRouterClient = OpenRouterClient()
     let openRouterConnection = OpenRouterConnection()
-    let aiActionCoordinator: AIActionCoordinator
+    let capture: CaptureController
 
     private let settings = SettingsStore.shared
     private let transcriber = LocalTranscriptionService.shared
-    private let transcriptWriter = TranscriptArtifactWriter()
-    private let pipelineFactory: () -> TranscriptionPipeline
     private let history = HistoryController.shared
     private var cancellables = Set<AnyCancellable>()
     private let onboarding = OnboardingWindowController()
-
-    private var currentModelID: BuiltInModelID = .parakeetEnglishV2
-    private var currentHistoryEntryID: UUID?
+    /// Until launch has loaded History and the model, shortcuts do nothing.
+    private var isPreparing = true
 
     init(
         accessibility: AccessibilityController,
         pipelineFactory: (() -> TranscriptionPipeline)? = nil
     ) {
         self.accessibility = accessibility
-        self.pipelineFactory = pipelineFactory ?? {
-            // Rebuilt per recording, so a settings change applies to the next one.
-            TranscriptionPipeline(stages: [
-                // VoiceActivityDetectionStage(),
-                TranscriptionStage(transcriber: LocalTranscriptionService.shared),
-                SmartFormattingStage(),
-                PersonalDictionaryStage(dictionary: SettingsStore.shared.personalDictionary),
-            ])
-        }
-        self.aiActionCoordinator = AIActionCoordinator(
-            client: openRouterClient,
-            history: .shared,
-            settings: .shared,
-            canStart: { true }
+        var canStart: () -> Bool = { false }
+        self.capture = CaptureController(
+            recorder: recorder,
+            models: LocalCaptureModels(transcriber: .shared),
+            history: HistoryController.shared,
+            hud: RecordingIndicatorWindow.shared,
+            handlers: [
+                .dictation: DictationHandler(),
+                .transcriptMode: TranscriptModeHandler(settings: .shared),
+                .aiAction: AIActionHandler(client: openRouterClient, settings: .shared),
+            ],
+            pipelineFactory: pipelineFactory ?? {
+                // Rebuilt per recording, so a settings change applies to the next one.
+                TranscriptionPipeline(stages: [
+                    // VoiceActivityDetectionStage(),
+                    TranscriptionStage(transcriber: LocalTranscriptionService.shared),
+                    SmartFormattingStage(),
+                    PersonalDictionaryStage(dictionary: SettingsStore.shared.personalDictionary),
+                ])
+            },
+            deliver: { TextInsertionManager.insertOrCopy($0) },
+            selectedModel: { SettingsStore.shared.selectedBuiltInModelID },
+            canStart: { canStart() }
         )
-        recorder.onRecordingReady = { [weak self] in
-            self?.handleRecorderReady()
-        }
+        canStart = { [weak self] in self?.isPreparing == false }
 
         Task { await prepareApp() }
         Task.detached(priority: .utility) { RemovedCleanupModel.deleteIfPresent(.current) }
@@ -134,11 +73,6 @@ class AppState: ObservableObject {
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _, _ in self?.rebuildHotkeys() }
-            .store(in: &cancellables)
-
-        aiActionCoordinator.$state
-            .receive(on: RunLoop.main)
-            .sink { [weak self] state in self?.handleAIActionState(state) }
             .store(in: &cancellables)
 
         accessibility.$isTrusted
@@ -182,32 +116,7 @@ class AppState: ObservableObject {
         }
     }
 
-    var isReady: Bool { status == .ready }
-
-    var isRecording: Bool { activity.isRecording }
-
-    private var isBusy: Bool {
-        activity.isBusy || status == .starting || aiActionCoordinator.state.isActive
-    }
-
-    var statusLabel: String {
-        switch status {
-        case .starting:      return "Preparing transcription…"
-        case .ready:
-            let action = settings.dictationKeyMode == .toggle ? "press" : "hold"
-            return "Ready  (\(settings.toggleKeyLabel) to record | \(action) \(settings.pttKeyLabel) to dictate)"
-        case .recording:
-            if activity.mode == .paste {
-                let action = settings.dictationKeyMode == .toggle ? "press" : "release"
-                return "Dictating…  (\(action) \(settings.pttKeyLabel) to stop)"
-            }
-            if activity.mode == .markdown { return "Recording…  (⌘⇧T to stop)" }
-            return "Listening for an AI Action…"
-        case .transcribing:  return "Transcribing…"
-        case .processing(let message): return message
-        case .error(let m):  return "Error: \(m)"
-        }
-    }
+    var isRecording: Bool { capture.phase.isRecording }
 
     // MARK: - Hotkey setup
 
@@ -216,20 +125,7 @@ class AppState: ObservableObject {
         let pttFlags = NSEvent.ModifierFlags(rawValue: UInt(settings.pttModifiers))
         let actionFlags = NSEvent.ModifierFlags(rawValue: UInt(settings.aiActionModifiers))
 
-        let toggleAction: @MainActor () -> Void = { [weak self] in
-            self?.toggleMarkdown()
-        }
-        let pttPressAction: @MainActor () -> Void = { [weak self] in
-            guard let self else { return }
-            if self.settings.dictationKeyMode == .toggle, self.activity.mode == .paste {
-                self.finishDictation()
-                return
-            }
-            guard !self.isBusy else { return }
-            if !self.accessibility.isTrusted { self.accessibility.refresh() }
-            Task { await self.startRecording(mode: .paste) }
-        }
-
+        let capture = capture
         hotkey.rebuild(
             toggleKeyCode: settings.toggleKeyCode,
             toggleModifiers: toggleFlags,
@@ -238,303 +134,63 @@ class AppState: ObservableObject {
             actionKeyCode: settings.aiActionKeyCode,
             actionModifiers: actionFlags,
             mode: .full,
-            onToggle: toggleAction,
-            onPTTPress: pttPressAction,
-            onPTTRelease: { [weak self] in
-                guard let self, self.settings.dictationKeyMode == .hold else { return }
-                self.finishDictation()
+            onToggle: {
+                if capture.phase.intent == .transcriptMode {
+                    capture.release(.transcriptMode)
+                } else {
+                    Task { await capture.start(.transcriptMode) }
+                }
             },
-            onActionPress: { [weak self] in
+            onPTTPress: { [weak self] in
                 guard let self else { return }
-                if !self.aiActionCoordinator.state.isActive, self.isBusy { return }
-                Task { await self.aiActionCoordinator.press() }
+                if self.settings.dictationKeyMode == .toggle, capture.phase.intent == .dictation {
+                    capture.release(.dictation)
+                    return
+                }
+                guard !capture.isBusy else { return }
+                if !self.accessibility.isTrusted { self.accessibility.refresh() }
+                Task { await capture.start(.dictation) }
             },
-            onActionRelease: { [weak self] in
-                self?.aiActionCoordinator.release()
+            onPTTRelease: { [weak self] in
+                guard self?.settings.dictationKeyMode == .hold else { return }
+                capture.release(.dictation)
             },
-            onActionCancel: { [weak self] in
-                guard let self, self.aiActionCoordinator.state.isActive else { return }
-                Task { await self.aiActionCoordinator.cancel() }
+            onActionPress: {
+                Task { await capture.start(.aiAction) }
+            },
+            onActionRelease: {
+                capture.release(.aiAction)
+            },
+            onActionCancel: {
+                guard capture.phase.intent == .aiAction else { return }
+                Task { await capture.cancel() }
+            },
+            onEscape: {
+                Task { await capture.cancelFromEscape() }
             }
         )
     }
 
-    /// Stops a dictation: on release in hold mode, on the second press in toggle mode. A stop
-    /// that arrives while the microphone is still starting is remembered and applied once it's up.
-    private func finishDictation() {
-        if case .starting(let mode, _) = activity, mode == .paste {
-            activity.requestStop()
-            if recorder.isRecording {
-                Task { await stopRecording() }
-            }
-            return
-        }
-        guard activity.isRecording, activity.mode == .paste else { return }
-        Task { await stopRecording() }
-    }
-
-    private func handleRecorderReady() {
-        guard case .starting(let mode, let stopRequested) = activity, mode == .paste else { return }
-        if stopRequested {
-            Task { await self.stopRecording() }
-            return
-        }
-        activity = .recording(mode: .paste, startedAt: Date())
-        status = .recording
-        FeedbackSound.start.play()
+    /// The menu's stop button, for whichever capture is recording.
+    func stopRecording() {
+        guard let intent = capture.phase.intent else { return }
+        capture.release(intent)
     }
 
     func startClipboardOnlyDictation() {
-        guard !isBusy else { return }
+        guard !capture.isBusy else { return }
         accessibility.refresh()
-        Task { await startRecording(mode: .paste) }
-    }
-
-    // MARK: - Toggle (⌘⇧T)
-
-    func toggleMarkdown() {
-        if case .recording(let mode, _) = activity, mode == .markdown {
-            Task { await stopRecording() }
-        } else if !isBusy {
-            Task { await startRecording(mode: .markdown) }
-        }
-        // ignore ⌘⇧T while in PTT mode
-    }
-
-    // MARK: - Recording core
-
-    fileprivate func startRecording(mode: RecordingMode) async {
-        guard !isBusy else { return }
-
-        activity = .starting(mode: mode, stopRequested: false)
-        status = .starting
-
-        do {
-            let modelID = settings.selectedBuiltInModelID
-            guard try await transcriber.isModelInstalled(modelID) else {
-                let message = modelID.descriptor.installationPrompt
-                DiagnosticLog.log("[Recording] Selected model \(modelID.rawValue) is not installed.")
-                activity = .error(message)
-                status = .error(message)
-                return
-            }
-
-            currentModelID = modelID
-            // Usually already loaded at launch. When it isn't — the model was just switched,
-            // or the first load after an update is still compiling for the Neural Engine —
-            // starting now lets the load overlap with the user talking instead of adding
-            // seconds after they stop. The transcription waits on the same load.
-            let transcriber = self.transcriber
-            Task.detached(priority: .userInitiated) { try? await transcriber.prepareModel(modelID) }
-            // Before the history write and the capture start, so the HUD answers the key press
-            // immediately rather than after the database and the audio engine.
-            if mode == .paste {
-                RecordingIndicatorWindow.shared.show(recorder: recorder)
-            }
-            if mode == .paste {
-                let store = try await history.requireStore()
-                let frontmost = NSWorkspace.shared.frontmostApplication
-                currentHistoryEntryID = try await store.createEntry(
-                    kind: .dictation,
-                    sourceAppName: frontmost?.localizedName,
-                    sourceAppBundleID: SourceApp.bundleID(frontmost?.bundleIdentifier)
-                )
-                history.changed()
-            }
-            DiagnosticLog.log("[Recording] Starting \(mode == .paste ? "paste" : "markdown") capture with model \(modelID.rawValue).")
-            try await recorder.startRecording(captureSystemAudio: mode == .markdown)
-            if mode == .markdown {
-                activity = .recording(mode: .markdown, startedAt: Date())
-                status = .recording
-                FeedbackSound.start.play()
-            } else if activity.stopRequested {
-                await stopRecording()
-            }
-        } catch {
-            RecordingIndicatorWindow.shared.hide()
-            await finalizeCurrentDictation(outcome: .failed, errorText: error.localizedDescription)
-            activity = .error(error.localizedDescription)
-            status = .error(error.localizedDescription)
-        }
-    }
-
-    func stopRecording() async {
-        let mode: RecordingMode
-        let startedAt: Date
-        switch activity {
-        case .starting(let activeMode, _):
-            mode = activeMode
-            startedAt = Date()
-        case .recording(let activeMode, let recordingStartedAt):
-            mode = activeMode
-            startedAt = recordingStartedAt
-        case .idle, .processing, .error:
-            return
-        }
-
-        activity = .processing(mode: mode)
-        status = .transcribing
-        // The bars become the processing wave; inserting the words then either sends the pill
-        // away or turns it into the paste hint.
-        if mode == .paste {
-            RecordingIndicatorWindow.shared.showProcessing()
-        } else {
-            RecordingIndicatorWindow.shared.hide()
-        }
-
-        do {
-            let recording = try await recorder.stopRecording()
-            let wavURL = recording.wavURL
-            defer {
-                try? FileManager.default.removeItem(at: wavURL)
-            }
-            DiagnosticLog.log(
-                "[Recording] Stopped capture. WAV=\(wavURL.path) captured=\(recording.capturedSampleCount16k) written=\(recording.writtenSampleCount16k) padded=\(recording.wasPaddedForASR)"
-            )
-            print(
-                "WAV saved: \(wavURL.path) " +
-                "[captured=\(recording.capturedSampleCount16k) written=\(recording.writtenSampleCount16k) " +
-                "padded=\(recording.wasPaddedForASR) bluetooth=\(recording.isBluetoothInput)]"
-            )
-
-            let audioSource: AudioSource = mode == .paste ? .microphone : .system
-            let pipeline = pipelineFactory()
-            let activeModelID = currentModelID
-            let result = try await Task.detached(priority: .userInitiated) {
-                try await pipeline.process(
-                    wavURL: wavURL,
-                    modelID: activeModelID,
-                    audioSource: audioSource
-                )
-            }.value
-            let transcript = result.processedTranscript
-            DiagnosticLog.log(
-                "[Recording] Transcript ready (\(transcript.count) chars, stages: \(result.stagesExecuted.joined(separator: " -> ")))."
-            )
-            print("Transcript ready (\(transcript.count) chars, stages: \(result.stagesExecuted.joined(separator: " → ")))")
-            if !result.warnings.isEmpty {
-                print("Pipeline warnings: \(result.warnings.joined(separator: " | "))")
-                DiagnosticLog.log("[Recording] Pipeline warnings: \(result.warnings.joined(separator: " | "))")
-            }
-            lastTranscript = transcript
-
-            defer {
-                for artifact in result.artifactsToDelete {
-                    try? FileManager.default.removeItem(at: artifact)
-                }
-            }
-
-            switch mode {
-
-            case .paste:
-                activity = .idle
-                status = .ready
-                guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    RecordingIndicatorWindow.shared.hide()
-                    DiagnosticLog.log("[Recording] Empty transcript; skipped clipboard insertion.")
-                    await finalizeCurrentDictation(outcome: .failed, errorText: "The transcription was empty")
-                    return
-                }
-                TextInsertionManager.insertOrCopy(transcript)
-                await finalizeCurrentDictation(
-                    outcome: .succeeded,
-                    instructionText: transcript,
-                    resultText: transcript,
-                    audioSeconds: Double(recording.capturedSampleCount16k) / 16_000
-                )
-                FeedbackSound.finish.play()
-
-            case .markdown:
-                RecordingIndicatorWindow.shared.hide()
-                let duration = Int(Date().timeIntervalSince(startedAt) / 60)
-                let artifact = TranscriptArtifactWriter.Document(
-                    startedAt: startedAt,
-                    durationMinutes: duration,
-                    model: currentModelID.descriptor,
-                    transcript: transcript
-                )
-                let mdURL = try transcriptWriter.write(artifact, to: settings.transcriptFolder)
-                print("Saved: \(mdURL.path)")
-
-                lastMeetingPath = mdURL.path
-                activity = .idle
-                status = .ready
-                FeedbackSound.finish.play()
-
-                NSWorkspace.shared.selectFile(mdURL.path, inFileViewerRootedAtPath: "")
-
-            }
-
-        } catch is CancellationError {
-            activity = .idle
-            RecordingIndicatorWindow.shared.hide()
-            status = .ready
-            print("Processing cancelled")
-            DiagnosticLog.log("[Recording] Processing cancelled.")
-            await finalizeCurrentDictation(outcome: .cancelled, errorText: "Cancelled")
-        } catch RecorderError.noAudioCaptured where mode == .paste {
-            activity = .idle
-            RecordingIndicatorWindow.shared.hide()
-            status = .ready
-            DiagnosticLog.log("[Recording] No audio was captured in paste mode.")
-            await finalizeCurrentDictation(outcome: .failed, errorText: "No audio was captured")
-        } catch {
-            activity = .error(error.localizedDescription)
-            RecordingIndicatorWindow.shared.hide()
-            status = .error(error.localizedDescription)
-            print("Recording error: \(error.localizedDescription)")
-            DiagnosticLog.log("[Recording] Failed: \(error.localizedDescription)")
-            await finalizeCurrentDictation(outcome: .failed, errorText: error.localizedDescription)
-        }
-    }
-
-    private func handleAIActionState(_ actionState: AIActionState) {
-        switch actionState {
-        case .idle:
-            if status != .starting { status = .ready }
-        case .capturingContext:
-            status = .processing("Capturing context…")
-        case .listening:
-            status = .recording
-        case .transcribing:
-            status = .transcribing
-        case .processing:
-            status = .processing("Running AI Action…")
-        case .delivering:
-            status = .processing("Delivering…")
-        case .succeeded, .cancelled:
-            status = .ready
-        case .failed(let message):
-            status = .error(message)
-        }
-    }
-
-    private func finalizeCurrentDictation(
-        outcome: HistoryOutcome,
-        instructionText: String? = nil,
-        resultText: String? = nil,
-        errorText: String? = nil,
-        audioSeconds: Double? = nil
-    ) async {
-        guard let id = currentHistoryEntryID else { return }
-        currentHistoryEntryID = nil
-        guard let store = try? await history.requireStore() else { return }
-        try? await store.finalize(
-            id,
-            outcome: outcome,
-            instructionText: instructionText,
-            resultText: resultText,
-            errorText: errorText,
-            audioSeconds: audioSeconds
-        )
-        history.changed()
+        Task { await capture.start(.dictation) }
     }
 
     // MARK: - Startup
 
     private func prepareApp() async {
         RecordingIndicatorWindow.shared.showProcessing()
-        defer { RecordingIndicatorWindow.shared.hide() }
+        defer {
+            RecordingIndicatorWindow.shared.hide()
+            isPreparing = false
+        }
 
         AppRuntimeInfo.migrateSandboxDataIfNeeded()
         recorder.prepareMicrophoneCapture()
@@ -543,7 +199,7 @@ class AppState: ObservableObject {
         do {
             try await history.prepare()
         } catch {
-            status = .error(error.localizedDescription)
+            DiagnosticLog.log("[Startup] History unavailable: \(error.localizedDescription)")
             return
         }
         // Runs in the background, so verifying the key costs the first AI
@@ -568,11 +224,7 @@ class AppState: ObservableObject {
                 try await modelStore.prepare(modelID)
             } catch {
                 DiagnosticLog.log("[Startup] Failed to prepare \(modelID.rawValue): \(error.localizedDescription)")
-                status = .error(error.localizedDescription)
-                return
             }
         }
-
-        status = .ready
     }
 }
