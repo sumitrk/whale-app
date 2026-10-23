@@ -76,8 +76,8 @@ final class TranscriptionPipelineTests: XCTestCase {
 
     func testTranscriptionStageUsesSelectedLocalModel() async throws {
         let backend = RecordingBackend()
-        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
-        let pipeline = TranscriptionPipeline(stages: [TranscriptionStage(transcriber: service)])
+        let service = TranscriptionBackends([.parakeet: backend, .whisper: backend])
+        let pipeline = TranscriptionPipeline(stages: [TranscriptionStage(backends: service)])
         let result = try await pipeline.process(wavURL: wav, modelID: .parakeetEnglishV2, audioSource: .microphone)
         XCTAssertEqual(result.processedTranscript, "ok")
         let backendSnapshot = await backend.snapshot()

@@ -8,14 +8,14 @@ protocol CaptureModels: Sendable {
 }
 
 struct LocalCaptureModels: CaptureModels {
-    let transcriber: LocalTranscriptionService
+    let backends: TranscriptionBackends
 
     func isInstalled(_ modelID: BuiltInModelID) async throws -> Bool {
-        try await transcriber.isModelInstalled(modelID)
+        try await backends[modelID].isInstalled(modelID: modelID)
     }
 
     func warm(_ modelID: BuiltInModelID) {
-        let transcriber = transcriber
-        Task.detached(priority: .userInitiated) { try? await transcriber.prepareModel(modelID) }
+        let backend = backends[modelID]
+        Task.detached(priority: .userInitiated) { try? await backend.prepare(modelID: modelID) }
     }
 }

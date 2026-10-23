@@ -466,13 +466,13 @@ final class VADPipelineIntegrationTests: XCTestCase {
 
     func testPipelineTranscriptionStagePopulatesRawTranscript() async throws {
         let backend = RecordingBackend()
-        let service = LocalTranscriptionService(backends: [
+        let service = TranscriptionBackends([
             .parakeet: backend,
             .whisper: backend,
         ])
 
         let pipeline = TranscriptionPipeline(stages: [
-            TranscriptionStage(transcriber: service),
+            TranscriptionStage(backends: service),
             AppendingStage(name: "Postprocess", suffix: " [post]"),
         ])
 

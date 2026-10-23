@@ -183,12 +183,12 @@ final class TranscriptionModelTests: XCTestCase {
 
         // Parakeet is installed, Whisper is not — exactly the shape that used to trigger the
         // silent fallback from the selected Whisper model back to Parakeet.
-        let service = LocalTranscriptionService(backends: [
+        let service = TranscriptionBackends([
             .parakeet: RecordingBackend(),
             .whisper: RecordingBackend(isInstalled: false),
             .apple: RecordingBackend(),
         ])
-        let store = TranscriptionModelStore(service: service)
+        let store = TranscriptionModelStore(backends: service)
 
         SettingsStore.shared.selectedBuiltInModelID = .whisperLargeV3Turbo
         await store.refreshNow()
@@ -206,21 +206,22 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertFalse(row.isReady)
     }
 
-    func testCoordinatorRoutesByModelGroup() async throws {
+    func testBackendsAreLookedUpByModelGroup() async throws {
         let parakeet = RecordingBackend()
         let whisper = RecordingBackend()
-        let service = LocalTranscriptionService(backends: [
+        let service = TranscriptionBackends([
             .parakeet: parakeet,
             .whisper: whisper,
         ])
 
-        _ = try await service.isModelInstalled(.parakeetEnglishV2)
-        try await service.installModel(.whisperLargeV3Turbo)
-        try await service.connectLocalModel(
-            .whisperLocalFolder,
-            folderURL: URL(fileURLWithPath: "/tmp/local-whisper-model", isDirectory: true)
+        _ = try await service[.parakeetEnglishV2].isInstalled(modelID: .parakeetEnglishV2)
+        try await service[.whisperLargeV3Turbo].install(modelID: .whisperLargeV3Turbo, progressHandler: nil)
+        try await service[.whisperLocalFolder].connectLocalModel(
+            modelID: .whisperLocalFolder,
+            folderURL: URL(fileURLWithPath: "/tmp/local-whisper-model", isDirectory: true),
+            progressHandler: nil
         )
-        _ = try await service.transcribe(
+        _ = try await service[.parakeetEnglishV2].transcribe(
             modelID: .parakeetEnglishV2,
             wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
             source: .microphone
@@ -290,11 +291,11 @@ final class TranscriptionModelTests: XCTestCase {
 
         let parakeet = RecordingBackend()
         let whisper = RecordingBackend()
-        let service = LocalTranscriptionService(backends: [
+        let service = TranscriptionBackends([
             .parakeet: parakeet,
             .whisper: whisper,
         ])
-        let store = TranscriptionModelStore(service: service)
+        let store = TranscriptionModelStore(backends: service)
 
         await store.refresh(.parakeetEnglishV2)
         await store.refresh(.whisperLargeV3Turbo)
@@ -308,8 +309,8 @@ final class TranscriptionModelTests: XCTestCase {
 
     func testModelStoreSharesOperationLifecycleAcrossInstallResetAndConnect() async {
         let backend = ModelOperationBackend()
-        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(backends: service)
 
         store.install(.parakeetEnglishV2)
         await backend.waitUntilStarted(.install)
@@ -341,8 +342,8 @@ final class TranscriptionModelTests: XCTestCase {
 
     func testModelStoreCancellationIgnoresLateProgressAndCompletion() async {
         let backend = ModelOperationBackend()
-        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(backends: service)
 
         store.install(.parakeetEnglishV2)
         await backend.waitUntilStarted(.install)
@@ -1206,8 +1207,8 @@ final class ModelInstallFeedbackTests: XCTestCase {
     /// retry is immediately possible.
     func testCancellingADownloadReturnsTheRowToItsPreviousState() async {
         let backend = ModelOperationBackend()
-        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(backends: service)
 
         store.install(.parakeetEnglishV2)
         await backend.waitUntilStarted(.install)
@@ -1623,8 +1624,8 @@ private actor SlowPrepareBackend: BuiltInTranscriptionBackend {
 final class ModelPreparingIndicatorTests: XCTestCase {
     /// A slow first load shows as preparing, then clears.
     func testSlowLoadShowsPreparingUntilItFinishes() async throws {
-        let service = LocalTranscriptionService(backends: [.parakeet: SlowPrepareBackend(delayNanoseconds: 800_000_000)])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: SlowPrepareBackend(delayNanoseconds: 800_000_000)])
+        let store = TranscriptionModelStore(backends: service)
 
         let load = Task { try await store.prepare(.barkCleanEnglish) }
         try await Task.sleep(nanoseconds: 500_000_000)
@@ -1636,8 +1637,8 @@ final class ModelPreparingIndicatorTests: XCTestCase {
 
     /// A warm load is over before the indicator would appear, so nothing flashes.
     func testFastLoadNeverShowsPreparing() async throws {
-        let service = LocalTranscriptionService(backends: [.parakeet: SlowPrepareBackend(delayNanoseconds: 50_000_000)])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: SlowPrepareBackend(delayNanoseconds: 50_000_000)])
+        let store = TranscriptionModelStore(backends: service)
 
         try await store.prepare(.barkCleanEnglish)
         try await Task.sleep(nanoseconds: 400_000_000)

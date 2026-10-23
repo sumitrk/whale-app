@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F978F0DC9767447832B8120B /* WhisperTranscriptionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F598D2A320D4CB136AE763B /* WhisperTranscriptionBackend.swift */; };
+		6FF177E140223C00D3C1AE97 /* TranscriptionModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8737AA5703F8713DD0AAB400 /* TranscriptionModelStore.swift */; };
+		F5AB0402885AD24C9228C380 /* TranscriptionModelRowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D053BF85D3F2A2EB726633 /* TranscriptionModelRowModel.swift */; };
+		E885234EB8058777D4ECAFE5 /* TranscriptionBackends.swift in Sources */ = {isa = PBXBuildFile; fileRef = 866CD9D97E83ED8C7D73E776 /* TranscriptionBackends.swift */; };
+		618DE2F2FB09E8BD92156135 /* ParakeetTranscriptionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B362C303C2BF4B9AB202C7 /* ParakeetTranscriptionBackend.swift */; };
+		61BF9794F27D1819020F6968 /* ModelInstallState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C284F07DA88403AB7228F48 /* ModelInstallState.swift */; };
+		6E4C751580916DDCA74DE7F5 /* LocalTranscriptionError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C91776C8D1F28E201759E65 /* LocalTranscriptionError.swift */; };
+		6CCFF6FD75B612C051111F13 /* BuiltInTranscriptionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172015DDC16DEFAA1505E266 /* BuiltInTranscriptionBackend.swift */; };
+		7088B343838978F7CFC9433D /* BuiltInModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18DA6FC33DB77D38AD1302F8 /* BuiltInModelCatalog.swift */; };
 		5056E5F36A1D49E6AF8CDAC6 /* MicrophoneReadinessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FDAE0968626D4B6FE25044C /* MicrophoneReadinessTests.swift */; };
 		215BDF404BF72F8BBEF6D1F5 /* AudioProcessingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A7442EC797039628A9B2B1 /* AudioProcessingTests.swift */; };
 		6AFE3657EAB59206B22A3B90 /* MicLevelMeter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3398A11D0783DAE8A508C33 /* MicLevelMeter.swift */; };
@@ -51,7 +60,6 @@
 		9BA17C12A7F769F5DFCDBAE8 /* CaptureCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA35A2F182C994CE680BE862 /* CaptureCompletion.swift */; };
 		C9E51932945BA251DFBED492 /* AIActionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0079DCC881B0BA349A6A40B8 /* AIActionHandler.swift */; };
 		173C2A9B4D6E8F1029384756 /* AccessibilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */; };
-		1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */; };
 		2A7C41E60B95D6F8114A3C7A /* AppleSpeechTranscriptionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A7C41E50B95D6F8114A3C79 /* AppleSpeechTranscriptionBackend.swift */; };
 		BAC1EA000000000000000001 /* BarkCleanModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC1EA000000000000000002 /* BarkCleanModel.swift */; };
 		2A7C41E40B95D6F8114A3C78 /* TranscriptionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A7C41E30B95D6F8114A3C77 /* TranscriptionLanguage.swift */; };
@@ -158,6 +166,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5F598D2A320D4CB136AE763B /* WhisperTranscriptionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriptionBackend.swift; sourceTree = "<group>"; };
+		8737AA5703F8713DD0AAB400 /* TranscriptionModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionModelStore.swift; sourceTree = "<group>"; };
+		82D053BF85D3F2A2EB726633 /* TranscriptionModelRowModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionModelRowModel.swift; sourceTree = "<group>"; };
+		866CD9D97E83ED8C7D73E776 /* TranscriptionBackends.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionBackends.swift; sourceTree = "<group>"; };
+		73B362C303C2BF4B9AB202C7 /* ParakeetTranscriptionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParakeetTranscriptionBackend.swift; sourceTree = "<group>"; };
+		7C284F07DA88403AB7228F48 /* ModelInstallState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallState.swift; sourceTree = "<group>"; };
+		6C91776C8D1F28E201759E65 /* LocalTranscriptionError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionError.swift; sourceTree = "<group>"; };
+		172015DDC16DEFAA1505E266 /* BuiltInTranscriptionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuiltInTranscriptionBackend.swift; sourceTree = "<group>"; };
+		18DA6FC33DB77D38AD1302F8 /* BuiltInModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuiltInModelCatalog.swift; sourceTree = "<group>"; };
 		8FDAE0968626D4B6FE25044C /* MicrophoneReadinessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneReadinessTests.swift; sourceTree = "<group>"; };
 		E7A7442EC797039628A9B2B1 /* AudioProcessingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioProcessingTests.swift; sourceTree = "<group>"; };
 		C3398A11D0783DAE8A508C33 /* MicLevelMeter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicLevelMeter.swift; sourceTree = "<group>"; };
@@ -202,7 +219,6 @@
 		BA35A2F182C994CE680BE862 /* CaptureCompletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCompletion.swift; sourceTree = "<group>"; };
 		0079DCC881B0BA349A6A40B8 /* AIActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIActionHandler.swift; sourceTree = "<group>"; };
 		173C2A9B4D6E8F1029384755 /* AccessibilityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityController.swift; sourceTree = "<group>"; };
-		1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionService.swift; sourceTree = "<group>"; };
 		2A7C41E50B95D6F8114A3C79 /* AppleSpeechTranscriptionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechTranscriptionBackend.swift; sourceTree = "<group>"; };
 		BAC1EA000000000000000002 /* BarkCleanModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarkCleanModel.swift; sourceTree = "<group>"; };
 		2A7C41E30B95D6F8114A3C77 /* TranscriptionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionLanguage.swift; sourceTree = "<group>"; };
@@ -322,6 +338,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		DEDA1F77F4F5EA563C33BA13 /* Transcription */ = {
+			isa = PBXGroup;
+			children = (
+				5F598D2A320D4CB136AE763B /* WhisperTranscriptionBackend.swift */,
+				8737AA5703F8713DD0AAB400 /* TranscriptionModelStore.swift */,
+				82D053BF85D3F2A2EB726633 /* TranscriptionModelRowModel.swift */,
+				866CD9D97E83ED8C7D73E776 /* TranscriptionBackends.swift */,
+				73B362C303C2BF4B9AB202C7 /* ParakeetTranscriptionBackend.swift */,
+				7C284F07DA88403AB7228F48 /* ModelInstallState.swift */,
+				6C91776C8D1F28E201759E65 /* LocalTranscriptionError.swift */,
+				172015DDC16DEFAA1505E266 /* BuiltInTranscriptionBackend.swift */,
+				18DA6FC33DB77D38AD1302F8 /* BuiltInModelCatalog.swift */,
+			);
+			path = Transcription;
+			sourceTree = "<group>";
+		};
 		3D93E494C5B58FFE817ECD3D /* Audio */ = {
 			isa = PBXGroup;
 			children = (
@@ -382,6 +414,7 @@
 		1FF43984F054E7654B1EEA37 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				DEDA1F77F4F5EA563C33BA13 /* Transcription */,
 				3D93E494C5B58FFE817ECD3D /* Audio */,
 				EDE18A91BFEE86E508E88245 /* HistoryEntryHandle.swift */,
 				FB2EB44B5025997953DF5935 /* LiveHistoryEntry.swift */,
@@ -409,7 +442,6 @@
 				B2FDB9E4AEC2578CBCEADEF5 /* HotkeyManager.swift */,
 				9E38A11A0F59E213976F5390 /* KeyRecorderView.swift */,
 				AIA000000000000000000108 /* KeychainStore.swift */,
-				1C91A4D42C0C4A0B9F20A111 /* LocalTranscriptionService.swift */,
 				2A7C41E50B95D6F8114A3C79 /* AppleSpeechTranscriptionBackend.swift */,
 				BAC1EA000000000000000002 /* BarkCleanModel.swift */,
 				2A7C41E30B95D6F8114A3C77 /* TranscriptionLanguage.swift */,
@@ -684,6 +716,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F978F0DC9767447832B8120B /* WhisperTranscriptionBackend.swift in Sources */,
+				6FF177E140223C00D3C1AE97 /* TranscriptionModelStore.swift in Sources */,
+				F5AB0402885AD24C9228C380 /* TranscriptionModelRowModel.swift in Sources */,
+				E885234EB8058777D4ECAFE5 /* TranscriptionBackends.swift in Sources */,
+				618DE2F2FB09E8BD92156135 /* ParakeetTranscriptionBackend.swift in Sources */,
+				61BF9794F27D1819020F6968 /* ModelInstallState.swift in Sources */,
+				6E4C751580916DDCA74DE7F5 /* LocalTranscriptionError.swift in Sources */,
+				6CCFF6FD75B612C051111F13 /* BuiltInTranscriptionBackend.swift in Sources */,
+				7088B343838978F7CFC9433D /* BuiltInModelCatalog.swift in Sources */,
 				6AFE3657EAB59206B22A3B90 /* MicLevelMeter.swift in Sources */,
 				17E8ADB0C445C9145F606AED /* RecorderError.swift in Sources */,
 				87D9E29B740522B30B2DBAE1 /* RecordingResult.swift in Sources */,
@@ -764,7 +805,6 @@
 				44B72D2C29F587378408A9BA /* HotkeyManager.swift in Sources */,
 				29A65EDEADEA0F1B5158FD69 /* KeyRecorderView.swift in Sources */,
 				AIA000000000000000000008 /* KeychainStore.swift in Sources */,
-				1C91A4D52C0C4A0B9F20A111 /* LocalTranscriptionService.swift in Sources */,
 				2A7C41E60B95D6F8114A3C7A /* AppleSpeechTranscriptionBackend.swift in Sources */,
 				BAC1EA000000000000000001 /* BarkCleanModel.swift in Sources */,
 				2A7C41E40B95D6F8114A3C78 /* TranscriptionLanguage.swift in Sources */,

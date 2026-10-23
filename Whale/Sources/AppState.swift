@@ -17,7 +17,6 @@ class AppState: ObservableObject {
     let capture: CaptureController
 
     private let settings = SettingsStore.shared
-    private let transcriber = LocalTranscriptionService.shared
     private let history = HistoryController.shared
     private var cancellables = Set<AnyCancellable>()
     private let onboarding = OnboardingWindowController()
@@ -32,7 +31,7 @@ class AppState: ObservableObject {
         var canStart: () -> Bool = { false }
         self.capture = CaptureController(
             recorder: recorder,
-            models: LocalCaptureModels(transcriber: .shared),
+            models: LocalCaptureModels(backends: .shared),
             history: HistoryController.shared,
             hud: HUD.shared,
             handlers: [
@@ -44,7 +43,7 @@ class AppState: ObservableObject {
                 // Rebuilt per recording, so a settings change applies to the next one.
                 TranscriptionPipeline(stages: [
                     // VoiceActivityDetectionStage(),
-                    TranscriptionStage(transcriber: LocalTranscriptionService.shared),
+                    TranscriptionStage(backends: .shared),
                     SmartFormattingStage(),
                     PersonalDictionaryStage(dictionary: SettingsStore.shared.personalDictionary),
                 ])
@@ -208,7 +207,7 @@ class AppState: ObservableObject {
 
         if AppRuntimeInfo.current.shouldResetParakeetCacheOnLaunch {
             do {
-                try await transcriber.resetModel(.parakeetEnglishV2)
+                try await TranscriptionBackends.shared[.parakeetEnglishV2].resetModel(modelID: .parakeetEnglishV2)
                 DiagnosticLog.log("[Parakeet] Reset model cache on launch via \(AppRuntimeInfo.resetParakeetCacheEnvironmentKey).")
             } catch {
                 DiagnosticLog.log("[Parakeet] Failed to reset model cache on launch: \(error.localizedDescription)")
