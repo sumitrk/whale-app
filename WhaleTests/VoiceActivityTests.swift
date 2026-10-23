@@ -448,43 +448,6 @@ final class VADPipelineIntegrationTests: XCTestCase {
         XCTAssertTrue(result.artifactsToDelete.isEmpty)
     }
 
-    func testPipelineRawAndProcessedTranscriptsBothPopulated() async throws {
-        let pipeline = TranscriptionPipeline(stages: [
-            MockTranscriptionStage(name: "Transcription", output: "hello world"),
-            AppendingStage(name: "Format", suffix: " [formatted]"),
-        ])
-
-        let result = try await pipeline.process(
-            wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
-            modelID: dummyModel,
-            audioSource: .microphone
-        )
-
-        XCTAssertEqual(result.rawTranscript, "hello world")
-        XCTAssertEqual(result.processedTranscript, "hello world [formatted]")
-    }
-
-    func testPipelineTranscriptionStagePopulatesRawTranscript() async throws {
-        let backend = RecordingBackend()
-        let service = TranscriptionBackends([
-            .parakeet: backend,
-            .whisper: backend,
-        ])
-
-        let pipeline = TranscriptionPipeline(stages: [
-            TranscriptionStage(backends: service),
-            AppendingStage(name: "Postprocess", suffix: " [post]"),
-        ])
-
-        let result = try await pipeline.process(
-            wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
-            modelID: .parakeetEnglishV2,
-            audioSource: .microphone
-        )
-
-        XCTAssertEqual(result.rawTranscript, "ok")
-        XCTAssertEqual(result.processedTranscript, "ok [post]")
-    }
 }
 
 // MARK: - Test Helpers

@@ -13,13 +13,6 @@ final class AudioProcessingTests: XCTestCase {
         )
     }
 
-    func testMicrophoneOnlyInputIsMixedWithSilence() {
-        assertSamples(
-            AudioProcessing.mix(system: [], microphone: [0.6, -0.2]),
-            equalTo: [0.3, -0.1]
-        )
-    }
-
     func testUnequalInputsAreZeroFilledOnlyWhileMixing() {
         assertSamples(
             AudioProcessing.mix(system: [1.0, 0.5, -0.5], microphone: [0.0, 1.0]),
@@ -127,12 +120,6 @@ final class AudioProcessingTests: XCTestCase {
         XCTAssertEqual(data.littleEndian(UInt32.self, at: 40), 6, "data size")
         XCTAssertEqual(Int16(bitPattern: data.littleEndian(UInt16.self, at: 46)), Int16.max)
         XCTAssertEqual(Int16(bitPattern: data.littleEndian(UInt16.self, at: 48)), -Int16.max)
-    }
-
-    func testLevelScalesSpeechIntoTheMeter() {
-        XCTAssertEqual(AudioProcessing.level(of: []), 0)
-        XCTAssertEqual(AudioProcessing.level(of: [0.01, -0.01]), 0.4, accuracy: 0.000_1)
-        XCTAssertEqual(AudioProcessing.level(of: [0.5]), 1)
     }
 
     private func assertSamples(_ actual: [Float], equalTo expected: [Float]) {

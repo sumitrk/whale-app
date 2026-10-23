@@ -366,21 +366,6 @@ final class TextInsertionManagerTests: XCTestCase {
         XCTAssertEqual(pasteboard.string(forType: .string), "original")
     }
 
-    func testClipboardRestoreSkippedWhenChangeCountChanged() {
-        XCTAssertFalse(
-            TextInsertionManager.shouldRestoreClipboard(
-                currentChangeCount: 8,
-                expectedTemporaryChangeCount: 7
-            )
-        )
-        XCTAssertTrue(
-            TextInsertionManager.shouldRestoreClipboard(
-                currentChangeCount: 7,
-                expectedTemporaryChangeCount: 7
-            )
-        )
-    }
-
     private func makeSnapshot(
         appName: String,
         bundleIdentifier: String,

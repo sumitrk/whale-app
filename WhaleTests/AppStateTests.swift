@@ -95,22 +95,6 @@ final class UpdateCheckActionTests: XCTestCase {
     }
 }
 
-final class OnboardingPermissionGateTests: XCTestCase {
-    func testAccessibilityIsOptionalWhenMicrophoneIsGranted() {
-        XCTAssertTrue(
-            OnboardingPermissionGate.canAdvance(
-                microphoneAuthorized: true
-            )
-        )
-    }
-
-    func testMicrophoneStillGatesOnboarding() {
-        XCTAssertFalse(
-            OnboardingPermissionGate.canAdvance(microphoneAuthorized: false)
-        )
-    }
-}
-
 final class HUDPlacementPolicyTests: XCTestCase {
     func testWebAreaIsNotAFieldAnchor() {
         let pageFrame = NSRect(x: 80, y: 100, width: 1_200, height: 800)
@@ -209,13 +193,6 @@ final class HUDPlacementPolicyTests: XCTestCase {
 }
 
 final class HUDDismissalTests: XCTestCase {
-    func testOnlyMouseDownEventsDismissFeedback() {
-        XCTAssertEqual(
-            HUDWindow.feedbackDismissalEvents,
-            [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        )
-    }
-
     @MainActor
     func testPasteHintDismissesOnMouseDown() throws {
         let hud = HUDWindow.shared

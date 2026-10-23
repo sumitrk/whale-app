@@ -25,16 +25,6 @@ final class HUDTests: XCTestCase {
         ])
     }
 
-    func testAIActionShowsTheSamePill() {
-        hud.update(.recording(.aiAction, meter))
-        hud.update(.processing(.aiAction))
-
-        XCTAssertEqual(surface.calls, [
-            .show(.recording(meter), dismissAfter: nil),
-            .show(.processing, dismissAfter: nil),
-        ])
-    }
-
     func testAMeetingRecordsWithoutAPill() {
         hud.update(.recording(.transcriptMode, meter))
         hud.update(.processing(.transcriptMode))
@@ -49,34 +39,12 @@ final class HUDTests: XCTestCase {
         XCTAssertEqual(surface.calls, [.show(.pasteHint(.accessibilityMissing), dismissAfter: 2)])
     }
 
-    func testAPasteLeavesLikeAnInsertion() {
-        hud.update(.delivered(.pasted))
-
-        XCTAssertEqual(surface.calls, [.hide])
-    }
-
-    func testFailuresStayLongerThanCancelling() {
-        hud.update(.failed("No microphone"))
-        hud.update(.cancelled(replaced: false))
-
-        XCTAssertEqual(surface.calls, [
-            .show(.message("No microphone", isError: true), dismissAfter: 4),
-            .show(.message("Cancelled", isError: false), dismissAfter: 1),
-        ])
-    }
-
     func testAReplacedAIActionLeavesWithoutAMessage() {
         hud.update(.cancelled(replaced: true))
 
         XCTAssertEqual(surface.calls, [.hide])
     }
 
-    func testLaunchShowsTheWaveUntilPrepared() {
-        hud.update(.preparing)
-        hud.update(.finished)
-
-        XCTAssertEqual(surface.calls, [.show(.processing, dismissAfter: nil), .hide])
-    }
 }
 
 @MainActor

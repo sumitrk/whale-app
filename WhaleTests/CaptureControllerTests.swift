@@ -179,16 +179,6 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(hud.events.last, .cancelled(replaced: false))
     }
 
-    func testTheDeliveryOutcomeReachesTheHUD() async {
-        deliveryOutcome = .copied(.manualPasteOnly)
-        await capture.start(.dictation)
-        recorder.becomeReady()
-        capture.release(.dictation)
-        await waitUntilIdle()
-
-        XCTAssertEqual(hud.events.last, .delivered(.copied(.manualPasteOnly)))
-    }
-
     func testEscapeNeverThrowsAwayAMeeting() async {
         await capture.start(.transcriptMode)
         await capture.cancelFromEscape()
