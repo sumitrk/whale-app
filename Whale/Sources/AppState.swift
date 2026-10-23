@@ -49,7 +49,7 @@ class AppState: ObservableObject {
                     PersonalDictionaryStage(dictionary: SettingsStore.shared.personalDictionary),
                 ])
             },
-            deliver: { TextInsertionManager.insertOrCopy($0) },
+            deliver: { Delivery.shared.deliver($0) },
             selectedModel: { SettingsStore.shared.selectedBuiltInModelID },
             canStart: { canStart() }
         )

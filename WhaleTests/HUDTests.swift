@@ -16,7 +16,7 @@ final class HUDTests: XCTestCase {
     func testDictationShowsBarsThenTheWaveThenLeavesOnceInserted() {
         hud.update(.recording(.dictation, meter))
         hud.update(.processing(.dictation))
-        hud.update(.delivered(pasteHint: nil))
+        hud.update(.delivered(.inserted))
 
         XCTAssertEqual(surface.calls, [
             .show(.recording(meter), dismissAfter: nil),
@@ -44,9 +44,15 @@ final class HUDTests: XCTestCase {
     }
 
     func testCopiedTextBecomesThePasteHintForTwoSeconds() {
-        hud.update(.delivered(pasteHint: .accessibilityMissing))
+        hud.update(.delivered(.copied(.accessibilityMissing)))
 
         XCTAssertEqual(surface.calls, [.show(.pasteHint(.accessibilityMissing), dismissAfter: 2)])
+    }
+
+    func testAPasteLeavesLikeAnInsertion() {
+        hud.update(.delivered(.pasted))
+
+        XCTAssertEqual(surface.calls, [.hide])
     }
 
     func testFailuresStayLongerThanCancelling() {

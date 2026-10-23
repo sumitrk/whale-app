@@ -12,7 +12,7 @@ final class CaptureControllerTests: XCTestCase {
     private var transcript = "hello there"
     private var pipelineError: Error?
     private var delivered: [String] = []
-    private var pasteHint: PasteHintReason?
+    private var deliveryOutcome: DeliveryOutcome = .inserted
     private var sounds: [FeedbackSound] = []
     private var capture: CaptureController!
 
@@ -26,7 +26,7 @@ final class CaptureControllerTests: XCTestCase {
         transcript = "hello there"
         pipelineError = nil
         delivered = []
-        pasteHint = nil
+        deliveryOutcome = .inserted
         sounds = []
         capture = CaptureController(
             recorder: recorder,
@@ -42,7 +42,7 @@ final class CaptureControllerTests: XCTestCase {
             },
             deliver: { [unowned self] in
                 delivered.append($0)
-                return pasteHint
+                return deliveryOutcome
             },
             playSound: { [unowned self] in sounds.append($0) },
             selectedModel: { .parakeetEnglishV2 }
@@ -73,7 +73,7 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(hud.events, [
             .recording(.dictation, recorder.levelMeter),
             .processing(.dictation),
-            .delivered(pasteHint: nil),
+            .delivered(.inserted),
         ])
         XCTAssertFalse(recorder.capturedSystemAudio)
     }
@@ -179,14 +179,14 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(hud.events.last, .cancelled(replaced: false))
     }
 
-    func testACopiedDeliveryReportsItsPasteHint() async {
-        pasteHint = .manualPasteOnly
+    func testTheDeliveryOutcomeReachesTheHUD() async {
+        deliveryOutcome = .copied(.manualPasteOnly)
         await capture.start(.dictation)
         recorder.becomeReady()
         capture.release(.dictation)
         await waitUntilIdle()
 
-        XCTAssertEqual(hud.events.last, .delivered(pasteHint: .manualPasteOnly))
+        XCTAssertEqual(hud.events.last, .delivered(.copied(.manualPasteOnly)))
     }
 
     func testEscapeNeverThrowsAwayAMeeting() async {
@@ -248,7 +248,7 @@ final class CaptureControllerTests: XCTestCase {
             },
             deliver: { [unowned self] in
                 delivered.append($0)
-                return pasteHint
+                return deliveryOutcome
             },
             playSound: { [unowned self] in sounds.append($0) },
             selectedModel: { .parakeetEnglishV2 }

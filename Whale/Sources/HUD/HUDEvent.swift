@@ -7,8 +7,8 @@ enum HUDEvent: Equatable {
     case preparing
     case recording(CaptureIntent, MicLevelMeter)
     case processing(CaptureIntent)
-    /// The text reached the Insertion Target, or the clipboard for the reason given.
-    case delivered(pasteHint: PasteHintReason?)
+    /// The text reached the Insertion Target, or was left on the clipboard.
+    case delivered(DeliveryOutcome)
     /// Done with nothing to say: saved elsewhere, nothing heard, launch finished.
     case finished
     case failed(String)

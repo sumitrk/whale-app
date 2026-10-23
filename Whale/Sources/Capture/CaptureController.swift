@@ -22,7 +22,7 @@ final class CaptureController: ObservableObject {
     private let hud: CaptureHUD
     private let handlers: [CaptureIntent: CaptureIntentHandler]
     private let pipelineFactory: () -> TranscriptionPipeline
-    private let deliver: @MainActor (String) -> PasteHintReason?
+    private let deliver: @MainActor (String) -> DeliveryOutcome
     private let playSound: (FeedbackSound) -> Void
     private let selectedModel: () -> BuiltInModelID
     private let canStart: () -> Bool
@@ -55,7 +55,7 @@ final class CaptureController: ObservableObject {
         hud: CaptureHUD,
         handlers: [CaptureIntent: CaptureIntentHandler],
         pipelineFactory: @escaping () -> TranscriptionPipeline,
-        deliver: @escaping @MainActor (String) -> PasteHintReason?,
+        deliver: @escaping @MainActor (String) -> DeliveryOutcome,
         playSound: @escaping (FeedbackSound) -> Void = { $0.play() },
         selectedModel: @escaping () -> BuiltInModelID,
         canStart: @escaping () -> Bool = { true }
@@ -239,7 +239,7 @@ final class CaptureController: ObservableObject {
             end(run)
             switch completion {
             case .deliver(let output, let instruction):
-                hud.update(.delivered(pasteHint: deliver(output)))
+                hud.update(.delivered(deliver(output)))
                 await finalize(run, outcome: .succeeded, instructionText: instruction, resultText: output, audioSeconds: audioSeconds)
             case .saved:
                 hud.update(.finished)

@@ -7,11 +7,6 @@ enum InsertionStrategy: Equatable {
     case simulatedPaste
     case copyOnly(PasteHintReason)
 
-    var showsPasteHint: Bool {
-        if case .copyOnly = self { return true }
-        return false
-    }
-
     var diagnosticName: String {
         switch self {
         case .directAX:
@@ -38,6 +33,9 @@ enum CharacterProbeResult: Equatable {
     case unsupported
 }
 
+/// The decisions behind delivering text, free of side effects: which strategy suits the
+/// focused element, how a replacement edits a field's value, and when to restore the
+/// clipboard. `Delivery` acts on them.
 enum TextInsertionManager {
 
     struct PasteboardSnapshot: Equatable {
@@ -77,26 +75,6 @@ enum TextInsertionManager {
     struct NormalizedEditingState {
         let currentValue: String
         let selectedRange: CFRange
-    }
-
-    private enum DirectAXInsertionError: LocalizedError {
-        case valueUnavailable
-        case selectedRangeUnavailable
-        case invalidSelectedRange
-        case valueWriteFailed(AXError)
-
-        var errorDescription: String? {
-            switch self {
-            case .valueUnavailable:
-                return "AX value is not readable as String"
-            case .selectedRangeUnavailable:
-                return "AX selected text range is not readable"
-            case .invalidSelectedRange:
-                return "AX selected text range is out of bounds"
-            case .valueWriteFailed(let error):
-                return "AX value write failed (\(error.rawValue))"
-            }
-        }
     }
 
     static func insertionStrategy(
@@ -182,51 +160,7 @@ enum TextInsertionManager {
         currentChangeCount == expectedTemporaryChangeCount
     }
 
-    /// Inserts `text` into the focused field, or copies it. Returns why it was only copied, for
-    /// the HUD's paste hint; nil when it was inserted.
-    @MainActor
-    @discardableResult
-    static func insertOrCopy(_ text: String) -> PasteHintReason? {
-        let focusedElement = FocusedElementInspector.focusedElementContext()
-        let snapshot = focusedElement?.snapshot
-        let canPostEvents = CGPreflightPostEventAccess()
-        let strategy = insertionStrategy(
-            for: snapshot,
-            isAccessibilityTrusted: AXIsProcessTrusted(),
-            canPostEvents: canPostEvents
-        )
-        DiagnosticLog.log(
-            "[Paste] strategy=\(strategy.diagnosticName) textLength=\(text.count) trusted=\(AXIsProcessTrusted()) " +
-            "canPostEvents=\(canPostEvents) target=\(diagnosticDescription(for: snapshot))"
-        )
-        switch strategy {
-        case .directAX:
-            guard let focusedElement else {
-                copyToClipboard(text)
-                DiagnosticLog.log("[Paste] Falling back to copyOnly because focused element context disappeared before DirectAX insertion.")
-                return .manualPasteOnly
-            }
-            do {
-                try insertViaDirectAX(text, into: focusedElement)
-                DiagnosticLog.log("[Paste] Inserted transcript via DirectAX.")
-            } catch {
-                let message = "DirectAX insertion failed: \(error.localizedDescription). Falling back to simulated paste."
-                print(message)
-                DiagnosticLog.log(message)
-                simulatedPastePreservingClipboard(text)
-            }
-        case .simulatedPaste:
-            DiagnosticLog.log("[Paste] Using simulated Command-V paste.")
-            simulatedPastePreservingClipboard(text)
-        case .copyOnly(let reason):
-            copyToClipboard(text)
-            DiagnosticLog.log("[Paste] Copied transcript without auto-paste. reason=\(reason.diagnosticName)")
-            return reason
-        }
-        return nil
-    }
-
-    private static func diagnosticDescription(for snapshot: FocusedElementSnapshot?) -> String {
+    static func diagnosticDescription(for snapshot: FocusedElementSnapshot?) -> String {
         guard let snapshot else { return "none" }
         let appName = snapshot.appName ?? "unknown"
         let bundleID = snapshot.bundleIdentifier ?? "unknown"
@@ -237,176 +171,5 @@ enum TextInsertionManager {
             : snapshot.directInsertBlockers.joined(separator: ",")
         return "app=\(appName) bundle=\(bundleID) role=\(role) subrole=\(subrole) " +
             "writable=\(snapshot.isWritableTextTarget) direct=\(snapshot.canDirectInsertSafely) blockers=\(blockers)"
-    }
-
-    private static func insertViaDirectAX(_ text: String, into context: FocusedElementContext) throws {
-        guard let currentValue = stringValue(of: context.element) else {
-            throw DirectAXInsertionError.valueUnavailable
-        }
-        guard let selectedRange = selectedTextRange(of: context.element) else {
-            throw DirectAXInsertionError.selectedRangeUnavailable
-        }
-
-        let characterProbe: CharacterProbeResult = currentValue.isEmpty
-            ? .unsupported
-            : probeFirstCharacter(of: context.element)
-
-        let normalizedState = normalizedEditingState(
-            currentValue: currentValue,
-            selectedRange: selectedRange,
-            placeholderValue: context.placeholderValue,
-            numberOfCharacters: context.numberOfCharacters,
-            characterProbe: characterProbe
-        )
-
-        guard let replacement = replacingSelectedRange(
-            in: normalizedState.currentValue,
-            selectedRange: normalizedState.selectedRange,
-            with: text
-        ) else {
-            throw DirectAXInsertionError.invalidSelectedRange
-        }
-
-        let setValueError = AXUIElementSetAttributeValue(
-            context.element,
-            kAXValueAttribute as CFString,
-            replacement.updatedValue as CFString
-        )
-        guard setValueError == .success else {
-            throw DirectAXInsertionError.valueWriteFailed(setValueError)
-        }
-
-        applyCaretSelection(
-            replacement.resultingSelectedRange,
-            to: context.element
-        )
-    }
-
-    /// Probes `AXStringForRange({0,1})` to verify whether `AXValue` contains
-    /// real content or a phantom placeholder leaked by the AX implementation.
-    private static func probeFirstCharacter(of element: AXUIElement) -> CharacterProbeResult {
-        var cfRange = CFRange(location: 0, length: 1)
-        guard let rangeValue = AXValueCreate(.cfRange, &cfRange) else { return .unsupported }
-
-        var result: CFTypeRef?
-        let error = AXUIElementCopyParameterizedAttributeValue(
-            element,
-            "AXStringForRange" as CFString,
-            rangeValue,
-            &result
-        )
-
-        switch error {
-        case .success:
-            if let str = result as? String, !str.isEmpty {
-                return .content
-            }
-            return .empty
-        case .parameterizedAttributeUnsupported, .attributeUnsupported, .notImplemented:
-            return .unsupported
-        default:
-            return .empty
-        }
-    }
-
-    private static func simulatedPastePreservingClipboard(_ text: String) {
-        let pasteboard = NSPasteboard.general
-        let originalClipboard = PasteboardSnapshot.capture(from: pasteboard)
-        copyToClipboard(text, on: pasteboard)
-        let temporaryChangeCount = pasteboard.changeCount
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            postCommandV()
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                if shouldRestoreClipboard(
-                    currentChangeCount: pasteboard.changeCount,
-                    expectedTemporaryChangeCount: temporaryChangeCount
-                ) {
-                    originalClipboard.restore(to: pasteboard)
-                    let message = "Clipboard restored after simulated paste."
-                    print(message)
-                    DiagnosticLog.log(message)
-                } else {
-                    let message = "Clipboard restore skipped because pasteboard changed after Whale wrote it."
-                    print(message)
-                    DiagnosticLog.log(message)
-                }
-            }
-        }
-    }
-
-    private static func copyToClipboard(_ text: String, on pasteboard: NSPasteboard = .general) {
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-    }
-
-    private static func postCommandV() {
-        let src = CGEventSource(stateID: .combinedSessionState)
-        let down = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: true)
-        let up = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: false)
-        down?.flags = .maskCommand
-        up?.flags = .maskCommand
-        down?.post(tap: .cghidEventTap)
-        usleep(10_000)
-        up?.post(tap: .cghidEventTap)
-    }
-
-    private static func stringValue(of element: AXUIElement) -> String? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element,
-            kAXValueAttribute as CFString,
-            &value
-        ) == .success else { return nil }
-        return value as? String
-    }
-
-    private static func selectedTextRange(of element: AXUIElement) -> CFRange? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element,
-            kAXSelectedTextRangeAttribute as CFString,
-            &value
-        ) == .success,
-              let value,
-              CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
-
-        let axValue = value as! AXValue
-        guard AXValueGetType(axValue) == .cfRange else { return nil }
-
-        var range = CFRange(location: 0, length: 0)
-        guard AXValueGetValue(axValue, .cfRange, &range) else { return nil }
-        return range
-    }
-
-    private static func setSelectedTextRange(_ range: NSRange, of element: AXUIElement) -> AXError {
-        var cfRange = CFRange(location: range.location, length: range.length)
-        guard let value = AXValueCreate(.cfRange, &cfRange) else { return .failure }
-        return AXUIElementSetAttributeValue(
-            element,
-            kAXSelectedTextRangeAttribute as CFString,
-            value
-        )
-    }
-
-    private static func applyCaretSelection(_ range: NSRange, to element: AXUIElement) {
-        let initialError = setSelectedTextRange(range, of: element)
-        if initialError != .success {
-            let message = "DirectAX inserted text but could not update caret immediately (\(initialError.rawValue))."
-            print(message)
-            DiagnosticLog.log(message)
-        }
-
-        for delay in [0.02, 0.08] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                let retryError = setSelectedTextRange(range, of: element)
-                if retryError != .success {
-                    let message = "DirectAX caret retry failed after \(delay)s (\(retryError.rawValue))."
-                    print(message)
-                    DiagnosticLog.log(message)
-                }
-            }
-        }
     }
 }

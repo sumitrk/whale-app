@@ -36,8 +36,8 @@ final class HUD: CaptureHUD {
         case .processing(let intent):
             // The bars become the travelling wave while the words are worked out.
             intent == .transcriptMode ? .hide : .show(.processing, dismissAfter: nil)
-        case .delivered(let pasteHint):
-            if let pasteHint {
+        case .delivered(let outcome):
+            if let pasteHint = outcome.pasteHint {
                 .show(.pasteHint(pasteHint), dismissAfter: pasteHintDuration)
             } else {
                 .hide

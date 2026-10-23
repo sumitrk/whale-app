@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3D59467A0C155BF0210E086A /* DeliveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3969DC5AFB5970E642BE071B /* DeliveryTests.swift */; };
+		65839E31C93B432D4E0C8BE0 /* MacDeliverySystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1766454BB5A089E12DB7261 /* MacDeliverySystem.swift */; };
+		F7D35855DEB81F37E0FF3D36 /* DeliveryTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E4D4B9B4199F7F497D19F08 /* DeliveryTarget.swift */; };
+		86B52C693E6A660939EDFAA5 /* DeliverySystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC8CA19E381EBFE782736776 /* DeliverySystem.swift */; };
+		4D1838B394ADCC5099F15A2F /* DeliveryOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 289A66432A0A8CEFDA5A7BB2 /* DeliveryOutcome.swift */; };
+		E795FD3CDB4CB90E0D3305C6 /* Delivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65614402774B261962839134 /* Delivery.swift */; };
 		AC7F674927F38C9AD4B8043C /* HUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4561FBAAE3006E1EFF26A63 /* HUDTests.swift */; };
 		3E3EED2E247C0D60F1EE741E /* PasteHintReason.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413B3230F54F0F6D906ED26E /* PasteHintReason.swift */; };
 		48C431101E6D72122B12F255 /* HUDSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86AE97598745E410A13241DA /* HUDSurface.swift */; };
@@ -139,6 +145,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		3969DC5AFB5970E642BE071B /* DeliveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryTests.swift; sourceTree = "<group>"; };
+		F1766454BB5A089E12DB7261 /* MacDeliverySystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDeliverySystem.swift; sourceTree = "<group>"; };
+		3E4D4B9B4199F7F497D19F08 /* DeliveryTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryTarget.swift; sourceTree = "<group>"; };
+		EC8CA19E381EBFE782736776 /* DeliverySystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliverySystem.swift; sourceTree = "<group>"; };
+		289A66432A0A8CEFDA5A7BB2 /* DeliveryOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryOutcome.swift; sourceTree = "<group>"; };
+		65614402774B261962839134 /* Delivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Delivery.swift; sourceTree = "<group>"; };
 		F4561FBAAE3006E1EFF26A63 /* HUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDTests.swift; sourceTree = "<group>"; };
 		413B3230F54F0F6D906ED26E /* PasteHintReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteHintReason.swift; sourceTree = "<group>"; };
 		86AE97598745E410A13241DA /* HUDSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDSurface.swift; sourceTree = "<group>"; };
@@ -284,6 +296,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		160FA3215D064AF66788DAC6 /* Delivery */ = {
+			isa = PBXGroup;
+			children = (
+				F1766454BB5A089E12DB7261 /* MacDeliverySystem.swift */,
+				3E4D4B9B4199F7F497D19F08 /* DeliveryTarget.swift */,
+				EC8CA19E381EBFE782736776 /* DeliverySystem.swift */,
+				289A66432A0A8CEFDA5A7BB2 /* DeliveryOutcome.swift */,
+				65614402774B261962839134 /* Delivery.swift */,
+			);
+			path = Delivery;
+			sourceTree = "<group>";
+		};
 		63CB1E274CCC100CD835E011 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
@@ -317,6 +341,7 @@
 		1FF43984F054E7654B1EEA37 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				160FA3215D064AF66788DAC6 /* Delivery */,
 				6EB4A37DF68DB5A4AD76F18A /* ClipboardDictationButton.swift */,
 				63CB1E274CCC100CD835E011 /* Capture */,
 				D5315D4D3455F012BCA802AE /* Settings */,
@@ -384,6 +409,7 @@
 		AA0000000000000000000021 /* WhaleTests */ = {
 			isa = PBXGroup;
 			children = (
+				3969DC5AFB5970E642BE071B /* DeliveryTests.swift */,
 				F4561FBAAE3006E1EFF26A63 /* HUDTests.swift */,
 				7630DABADCF2556D7C8E97AC /* CaptureControllerTests.swift */,
 				AIA000000000000000000110 /* AIActionTests.swift */,
@@ -589,6 +615,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3D59467A0C155BF0210E086A /* DeliveryTests.swift in Sources */,
 				AC7F674927F38C9AD4B8043C /* HUDTests.swift in Sources */,
 				13E0A82D8BE7C7B44E4D48C6 /* CaptureControllerTests.swift in Sources */,
 				AIA000000000000000000010 /* AIActionTests.swift in Sources */,
@@ -608,6 +635,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				65839E31C93B432D4E0C8BE0 /* MacDeliverySystem.swift in Sources */,
+				F7D35855DEB81F37E0FF3D36 /* DeliveryTarget.swift in Sources */,
+				86B52C693E6A660939EDFAA5 /* DeliverySystem.swift in Sources */,
+				4D1838B394ADCC5099F15A2F /* DeliveryOutcome.swift in Sources */,
+				E795FD3CDB4CB90E0D3305C6 /* Delivery.swift in Sources */,
 				3E3EED2E247C0D60F1EE741E /* PasteHintReason.swift in Sources */,
 				48C431101E6D72122B12F255 /* HUDSurface.swift in Sources */,
 				10C50207360D5F34D75D5929 /* HUDPresentation.swift in Sources */,
