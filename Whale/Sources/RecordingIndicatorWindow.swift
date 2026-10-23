@@ -112,9 +112,11 @@ final class RecordingIndicatorWindow: NSPanel {
     /// Room for the widest pill, a two-line message.
     private static let pillArea = NSSize(width: 400, height: 56)
 
-    /// Arriving: a fade up from 90% opacity, at full size.
+    /// Arriving: up from 95% scale and 90% opacity.
     private static let appearDuration: TimeInterval = 0.25
     private static let appearOpacity: Float = 0.9
+    private static let appearScale: CGFloat = 0.95
+    private static let appearBounce: CGFloat = 0.32
     /// Leaving: down to 90% scale, fading out.
     private static let disappearDuration: TimeInterval = 0.1
     private static let disappearScale: CGFloat = 0.9
@@ -258,13 +260,22 @@ final class RecordingIndicatorWindow: NSPanel {
         CATransaction.commit()
         orderFront(nil)
 
-        // Fades up from 90% opacity, at full size.
+        // Springs up from 95% scale and 90% opacity; Reduce Motion keeps only the opacity change.
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let fade = CASpringAnimation(perceptualDuration: Self.appearDuration, bounce: 0)
         fade.keyPath = "opacity"
         fade.fromValue = Self.appearOpacity
         fade.toValue = 1
         fade.duration = fade.settlingDuration
         layer.add(fade, forKey: "opacity")
+
+        guard !reduceMotion else { return }
+        let grow = CASpringAnimation(perceptualDuration: Self.appearDuration, bounce: Self.appearBounce)
+        grow.keyPath = "transform"
+        grow.fromValue = NSValue(caTransform3D: pillScale(Self.appearScale))
+        grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        grow.duration = grow.settlingDuration
+        layer.add(grow, forKey: "transform")
     }
 
     /// The reverse of appearing: down to 90% scale, fading all the way out, since the window is
