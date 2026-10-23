@@ -21,6 +21,11 @@ class SettingsStore: ObservableObject {
     }
     var pttKeyLabel: String { keyLabel(keyCode: pttKeyCode, modifiers: pttModifiers) }
 
+    /// Whether the dictation key is held while speaking or pressed to start and again to stop.
+    @Published var dictationKeyMode: DictationKeyMode {
+        didSet { ud.set(dictationKeyMode.rawValue, forKey: Keys.dictationKeyMode) }
+    }
+
     // MARK: - Shortcuts: AI Action
 
     /// AI Action key code (default: 59 = Left Control).
@@ -43,6 +48,22 @@ class SettingsStore: ObservableObject {
         didSet { ud.set(toggleModifiers, forKey: Keys.toggleModifiers) }
     }
     var toggleKeyLabel: String { keyLabel(keyCode: toggleKeyCode, modifiers: toggleModifiers) }
+
+    // MARK: - Dictionary
+
+    /// Names and jargon, spelled the way the user wants them typed.
+    @Published var vocabulary: [String] {
+        didSet { ud.set(vocabulary, forKey: Keys.vocabulary) }
+    }
+
+    /// Phrases swapped for the text the user wants instead.
+    @Published var replacements: [TextReplacement] {
+        didSet { ud.set(try? JSONEncoder().encode(replacements), forKey: Keys.replacements) }
+    }
+
+    var personalDictionary: PersonalDictionary {
+        PersonalDictionary(vocabulary: vocabulary, replacements: replacements)
+    }
 
     // MARK: - Transcript Mode
 
@@ -159,6 +180,7 @@ class SettingsStore: ObservableObject {
         toggleModifiers          = (ud.object(forKey: Keys.toggleModifiers) as? Int) ?? SettingsStore.defaultModifiers
         pttKeyCode               = (ud.object(forKey: Keys.pttKeyCode) as? Int) ?? 63
         pttModifiers             = (ud.object(forKey: Keys.pttModifiers) as? Int) ?? 0
+        dictationKeyMode         = DictationKeyMode(rawValue: ud.string(forKey: Keys.dictationKeyMode) ?? "") ?? .hold
         aiActionKeyCode          = (ud.object(forKey: Keys.aiActionKeyCode) as? Int) ?? 59
         aiActionModifiers        = (ud.object(forKey: Keys.aiActionModifiers) as? Int) ?? 0
         selectedBuiltInModelID   = BuiltInModelID(
@@ -169,6 +191,9 @@ class SettingsStore: ObservableObject {
         builtInModelLanguages    = ud.dictionary(forKey: Keys.builtInModelLanguages) as? [String: String] ?? [:]
         builtInModelLanguageCapabilities = ud.dictionary(forKey: Keys.builtInModelLanguageCapabilities) as? [String: String] ?? [:]
         aiActionMasterPrompt     = ud.string(forKey: Keys.aiActionMasterPrompt) ?? Self.defaultAIActionMasterPrompt
+        vocabulary               = ud.stringArray(forKey: Keys.vocabulary) ?? []
+        replacements             = ud.data(forKey: Keys.replacements)
+            .flatMap { try? JSONDecoder().decode([TextReplacement].self, from: $0) } ?? []
         openRouterKeyRejected    = ud.bool(forKey: Keys.openRouterKeyRejected)
         openRouterOutOfCredit    = ud.bool(forKey: Keys.openRouterOutOfCredit)
         openRouterKeyVerified    = ud.bool(forKey: Keys.openRouterKeyVerified)
@@ -394,6 +419,7 @@ class SettingsStore: ObservableObject {
         static let toggleModifiers       = "toggleModifiers"
         static let pttKeyCode            = "pttKeyCode"
         static let pttModifiers          = "pttModifiers"
+        static let dictationKeyMode      = "dictationKeyMode"
         static let aiActionKeyCode       = "aiActionKeyCode"
         static let aiActionModifiers     = "aiActionModifiers"
         static let selectedBuiltInModelID = "selectedBuiltInModelID"
@@ -405,6 +431,8 @@ class SettingsStore: ObservableObject {
         /// while transcribing, so a second model is no longer worth its download.
         static let removedCleanupKeys = ["transcriptCleanupEnabled", "cleanupStyling", "cleanupStructure", "cleanupContext"]
         static let aiActionMasterPrompt = "aiActionMasterPrompt"
+        static let vocabulary = "vocabulary"
+        static let replacements = "replacements"
         static let openRouterKeyRejected = "openRouterKeyRejected"
         static let openRouterOutOfCredit = "openRouterOutOfCredit"
         static let openRouterKeyVerified = "openRouterKeyVerified"

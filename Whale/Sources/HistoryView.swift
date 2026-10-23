@@ -1,19 +1,14 @@
 import AppKit
 import SwiftUI
 
-enum HistoryLayoutMetrics {
-    /// The list takes 40% of the pane; the detail view gets the remainder.
-    static let listFraction: CGFloat = 0.4
-}
-
 struct HistoryView: View {
     private static let pageSize = 50
 
     @ObservedObject private var controller = HistoryController.shared
     @State private var query = ""
     @State private var entries: [HistoryEntry] = []
-    @State private var selectedID: UUID?
-    @State private var selectedEntry: HistoryEntry?
+    @State private var stats = DictationStats()
+    @State private var expandedIDs: Set<UUID> = []
     @State private var showingClearConfirmation = false
     @State private var relativeTimeReference = Date()
     @State private var hasLoaded = false
@@ -32,58 +27,34 @@ struct HistoryView: View {
                 }
             } else {
                 // Laid out like the other Settings pages: the large title where theirs sits,
-                // then content in rounded cards — a card per entry, and the chosen one's
-                // details in a card beside them.
+                // then one column of rounded cards — the totals, then every entry, newest first.
                 VStack(alignment: .leading, spacing: 20) {
                     HistoryHeader(
                         query: $query,
                         canClear: !entries.isEmpty,
                         onClear: { showingClearConfirmation = true }
                     )
+                    .padding(.horizontal, 32)
+                    .frame(maxWidth: 640)
+                    .frame(maxWidth: .infinity)
 
-                    GeometryReader { geometry in
-                        HStack(alignment: .top, spacing: 16) {
-                            HistoryCardList(
-                                entries: entries,
-                                selectedID: $selectedID,
-                                isLoadingMore: isLoadingMore,
-                                relativeTo: relativeTimeReference,
-                                onReachEnd: { Task { await loadMore() } },
-                                onDelete: { id in Task { await delete(id) } }
-                            )
-                            .frame(width: geometry.size.width * HistoryLayoutMetrics.listFraction)
-
-                            HistoryDetailCard(
-                                entry: selectedEntry,
-                                isEmpty: hasLoaded && entries.isEmpty,
-                                isSearching: !query.isEmpty,
-                                relativeTo: relativeTimeReference
-                            )
+                    if hasLoaded && entries.isEmpty {
+                        ContentUnavailableView {
+                            Label(query.isEmpty ? "No history" : "No matching history", systemImage: "clock.arrow.circlepath")
+                        } description: {
+                            Text(query.isEmpty ? "Dictations and AI actions will appear here." : "Try a different search.")
                         }
+                        .frame(maxHeight: .infinity)
+                    } else {
+                        entryList
                     }
                 }
-                .padding(.horizontal, 32)
+                .frame(maxWidth: .infinity)
                 .padding(.top, 20)
-                .padding(.bottom, 24)
             }
         }
         .task(id: "\(query)|\(controller.revision)") { await load() }
-        .onAppear {
-            relativeTimeReference = Date()
-            if selectedID == nil {
-                selectedID = controller.lastSelectedID
-            }
-            if selectedEntry == nil {
-                selectedEntry = controller.lastSelectedEntry
-            }
-        }
-        .onChange(of: selectedID) { _, id in
-            controller.lastSelectedID = id
-            Task { await loadDetail(id) }
-        }
-        .onChange(of: selectedEntry) { _, entry in
-            controller.lastSelectedEntry = entry
-        }
+        .onAppear { relativeTimeReference = Date() }
         .confirmationDialog("Clear all history?", isPresented: $showingClearConfirmation) {
             Button("Clear history", role: .destructive) { Task { await clear() } }
         } message: {
@@ -91,35 +62,63 @@ struct HistoryView: View {
         }
     }
 
+    private var entryList: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 8) {
+                if query.isEmpty, stats.dictationCount > 0 {
+                    HistoryStatsRow(stats: stats)
+                        .padding(.bottom, 12)
+                }
+                ForEach(entries) { entry in
+                    HistoryEntryCard(
+                        entry: entry,
+                        isExpanded: expandedIDs.contains(entry.id),
+                        relativeTo: relativeTimeReference,
+                        onToggleExpanded: { toggleExpanded(entry.id) },
+                        onDelete: { Task { await delete(entry.id) } }
+                    )
+                    .onAppear {
+                        if entry.id == entries.last?.id { Task { await loadMore() } }
+                    }
+                }
+                if isLoadingMore {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 32)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollContentBackground(.hidden)
+    }
+
+    private func toggleExpanded(_ id: UUID) {
+        withAnimation(.snappy) {
+            if expandedIDs.contains(id) {
+                expandedIDs.remove(id)
+            } else {
+                expandedIDs.insert(id)
+            }
+        }
+    }
+
     private func load() async {
-        entries = []
-        hasMoreEntries = false
-        hasLoaded = false
-        isLoadingMore = false
         let requestedQuery = query
         let requestedRevision = controller.revision
 
         do {
             let store = try await controller.requireStore()
-            let page = try await store.entries(search: requestedQuery, limit: Self.pageSize)
+            let page = try await store.entries(search: requestedQuery, limit: max(Self.pageSize, entries.count))
+            let totals = try await store.dictationStats()
             guard !Task.isCancelled, requestedQuery == query, requestedRevision == controller.revision else { return }
             entries = page
-            hasMoreEntries = page.count == Self.pageSize
-            let preservedID = selectedID ?? controller.lastSelectedID
-            if let preservedID, entries.contains(where: { $0.id == preservedID }) {
-                selectedID = preservedID
-            } else {
-                selectedID = entries.first?.id
-            }
-            controller.lastSelectedID = selectedID
-            if let selectedID, let match = entries.first(where: { $0.id == selectedID }) {
-                if selectedEntry?.id != selectedID {
-                    selectedEntry = match
-                }
-                await loadDetail(selectedID)
-            } else {
-                selectedEntry = nil
-            }
+            stats = totals
+            hasMoreEntries = page.count >= Self.pageSize
+            expandedIDs.formIntersection(page.map(\.id))
             hasLoaded = true
         } catch {
             guard !Task.isCancelled, requestedQuery == query, requestedRevision == controller.revision else { return }
@@ -147,39 +146,17 @@ struct HistoryView: View {
         } catch { }
     }
 
-    private func loadDetail(_ id: UUID?) async {
-        guard let id else {
-            selectedEntry = nil
-            return
-        }
-        if selectedEntry?.id != id, let match = entries.first(where: { $0.id == id }) {
-            selectedEntry = match
-        }
-        guard let store = try? await controller.requireStore() else { return }
-        if let full = try? await store.entry(id: id), selectedID == id {
-            selectedEntry = full
-        }
-    }
-
     private func delete(_ id: UUID) async {
         guard let store = try? await controller.requireStore() else { return }
         try? await store.deleteEntry(id: id)
-        if selectedID == id {
-            selectedID = nil
-            selectedEntry = nil
-            controller.lastSelectedID = nil
-            controller.lastSelectedEntry = nil
-        }
+        expandedIDs.remove(id)
         controller.changed()
     }
 
     private func clear() async {
         guard let store = try? await controller.requireStore() else { return }
         try? await store.clear()
-        selectedID = nil
-        selectedEntry = nil
-        controller.lastSelectedID = nil
-        controller.lastSelectedEntry = nil
+        expandedIDs = []
         controller.changed()
     }
 
@@ -204,7 +181,7 @@ private struct HistoryHeader: View {
             Spacer(minLength: 16)
 
             HistorySearchField(query: $query)
-                .frame(maxWidth: 240)
+                .frame(maxWidth: 220)
 
             Menu {
                 Button("Clear history…", role: .destructive, action: onClear)
@@ -249,148 +226,242 @@ private struct HistorySearchField: View {
     }
 }
 
-/// One card per entry. The arrow keys move the selection, like the list they replace.
-private struct HistoryCardList: View {
-    let entries: [HistoryEntry]
-    @Binding var selectedID: UUID?
-    let isLoadingMore: Bool
-    let relativeTo: Date
-    let onReachEnd: () -> Void
-    let onDelete: (UUID) -> Void
+/// How fast the user speaks and what that saves them, over every dictation.
+private struct HistoryStatsRow: View {
+    let stats: DictationStats
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(entries) { entry in
-                        Button { selectedID = entry.id } label: {
-                            HistoryEntryCard(
-                                entry: entry,
-                                isSelected: entry.id == selectedID,
-                                relativeTo: relativeTo
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .id(entry.id)
-                        .contextMenu {
-                            Button("Delete", role: .destructive) { onDelete(entry.id) }
-                        }
-                        .onAppear {
-                            if entry.id == entries.last?.id { onReachEnd() }
-                        }
-                    }
-                    if isLoadingMore {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.vertical, 8)
-                    }
-                }
-                .padding(.bottom, 8)
-            }
-            .scrollIndicators(.automatic)
-            .focusable()
-            .focusEffectDisabled()
-            .onKeyPress(.upArrow) { move(by: -1, proxy: proxy) }
-            .onKeyPress(.downArrow) { move(by: 1, proxy: proxy) }
+        HStack(spacing: 8) {
+            HistoryStatTile(
+                value: stats.wordsPerMinute.map { $0.formatted() } ?? "–",
+                label: "words per minute"
+            )
+            HistoryStatTile(value: Self.duration(stats.secondsSaved), label: "saved vs. typing")
+            HistoryStatTile(value: stats.words.formatted(), label: "words dictated")
         }
     }
 
-    private func move(by offset: Int, proxy: ScrollViewProxy) -> KeyPress.Result {
-        guard let index = entries.firstIndex(where: { $0.id == selectedID }) else {
-            selectedID = entries.first?.id
-            return .handled
+    /// "3.4h", "12m", "40s": short enough to read at a glance in a tile.
+    private static func duration(_ seconds: Double) -> String {
+        if seconds >= 3600 {
+            return (seconds / 3600).formatted(.number.precision(.fractionLength(0...1))) + "h"
         }
-        let next = index + offset
-        guard entries.indices.contains(next) else { return .handled }
-        selectedID = entries[next].id
-        proxy.scrollTo(entries[next].id)
-        return .handled
+        if seconds >= 60 {
+            return Int((seconds / 60).rounded()).formatted() + "m"
+        }
+        return Int(seconds.rounded()).formatted() + "s"
     }
 }
 
-private struct HistoryEntryCard: View {
-    let entry: HistoryEntry
-    let isSelected: Bool
-    let relativeTo: Date
+private struct HistoryStatTile: View {
+    let value: String
+    let label: LocalizedStringKey
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                SourceAppIconView(name: entry.sourceAppName, bundleID: entry.sourceAppBundleID)
-                Text(entry.listTitle)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Text(relativeTime)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if !entry.listPreview.isEmpty {
-                Text(entry.listPreview)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            isSelected ? Color.accentColor.opacity(0.1) : Color(nsColor: .controlBackgroundColor),
-            in: .rect(cornerRadius: 14, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(isSelected ? Color.accentColor.opacity(0.6) : Color(nsColor: .separatorColor).opacity(0.5))
-        }
-        .contentShape(.rect(cornerRadius: 14, style: .continuous))
-        .opacity(entry.isDimmedInList ? 0.55 : 1)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-
-    private var relativeTime: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: entry.createdAt, relativeTo: relativeTo)
-    }
-}
-
-/// The selected entry, in the same rounded card the Settings sections use.
-private struct HistoryDetailCard: View {
-    let entry: HistoryEntry?
-    let isEmpty: Bool
-    let isSearching: Bool
-    let relativeTo: Date
-
-    var body: some View {
-        Group {
-            if let entry {
-                HistoryEntryDetail(entry: entry, relativeTo: relativeTo)
-            } else if isEmpty {
-                ContentUnavailableView {
-                    Label(isSearching ? "No matching history" : "No history", systemImage: "clock.arrow.circlepath")
-                } description: {
-                    Text(isSearching ? "Try a different search." : "Dictations and AI actions will appear here.")
-                }
-            } else {
-                Color.clear
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(.separator.opacity(0.5))
         }
-        .clipShape(.rect(cornerRadius: 18, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One entry: where it was said and when, and what was said, three lines of it until opened.
+private struct HistoryEntryCard: View {
+    let entry: HistoryEntry
+    let isExpanded: Bool
+    let relativeTo: Date
+    let onToggleExpanded: () -> Void
+    let onDelete: () -> Void
+
+    /// The entry with its context, loaded when an AI action is opened.
+    @State private var detail: HistoryEntry?
+    @State private var didCopy = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                SourceAppIconView(name: entry.sourceAppName, bundleID: entry.sourceAppBundleID)
+                Text(entry.listTitle)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                if !copyText.isEmpty {
+                    Button(didCopy ? "Copied" : "Copy", systemImage: didCopy ? "checkmark" : "doc.on.doc", action: copy)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.symbolEffect(.replace))
+                        .help("Copy")
+                }
+            }
+
+            if entry.kind == .aiAction, isExpanded {
+                AIActionEntryDetail(entry: detail ?? entry)
+            } else if !entry.listPreview.isEmpty {
+                ExpandableText(text: entry.listPreview, isExpanded: isExpanded, onToggle: onToggleExpanded)
+            }
+
+            if entry.kind == .aiAction {
+                Button(isExpanded ? "Show less" : "Show more", action: onToggleExpanded)
+                    .buttonStyle(.link)
+                    .font(.callout)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.5))
+        }
+        .opacity(entry.isDimmedInList ? 0.6 : 1)
+        .contextMenu {
+            Button("Copy", action: copy).disabled(copyText.isEmpty)
+            Divider()
+            Button("Delete", role: .destructive, action: onDelete)
+        }
+        .task(id: isExpanded) {
+            guard isExpanded, entry.kind == .aiAction, detail == nil else { return }
+            guard let store = try? await HistoryController.shared.requireStore() else { return }
+            detail = try? await store.entry(id: entry.id)
+        }
+    }
+
+    private var subtitle: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        let time = formatter.localizedString(for: entry.createdAt, relativeTo: relativeTo)
+        return entry.kind == .aiAction ? "AI action · \(time)" : time
+    }
+
+    private var copyText: String {
+        (entry.resultText ?? entry.instructionText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func copy() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(copyText, forType: .string)
+        withAnimation { didCopy = true }
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            withAnimation { didCopy = false }
+        }
+    }
+}
+
+/// Text cut to three lines, with "Show more" under it only when there is more to show.
+private struct ExpandableText: View {
+    private static let collapsedLines = 3
+    // 1.35em leading for the body font.
+    private static let lineSpacing = NSFont.preferredFont(forTextStyle: .body).pointSize * 0.35
+
+    let text: String
+    let isExpanded: Bool
+    let onToggle: () -> Void
+
+    @State private var isTruncated = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(text)
+                .lineSpacing(Self.lineSpacing)
+                .lineLimit(isExpanded ? nil : Self.collapsedLines)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+                .background {
+                    // Measured only while collapsed: whether the whole text fits the three lines.
+                    if !isExpanded {
+                        ViewThatFits(in: .vertical) {
+                            Text(text)
+                                .lineSpacing(Self.lineSpacing)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .hidden()
+                                .onAppear { isTruncated = false }
+                            Color.clear
+                                .onAppear { isTruncated = true }
+                        }
+                    }
+                }
+
+            if isTruncated {
+                Button(isExpanded ? "Show less" : "Show more", action: onToggle)
+                    .buttonStyle(.link)
+                    .font(.callout)
+            }
+        }
+    }
+}
+
+/// An opened AI action: the instruction, the context it was given, and what came back.
+private struct AIActionEntryDetail: View {
+    let entry: HistoryEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let instruction = entry.instructionText {
+                section("Instruction", instruction)
+            }
+            ForEach(entry.contextInputs) { input in
+                switch input.content {
+                case .text(let text):
+                    section(input.source == .selection ? "Selected text" : "Clipboard text", text)
+                case .image(let image):
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(input.source == .selection ? "Selected image" : "Clipboard image")
+                            .font(.headline)
+                        if let nsImage = NSImage(data: image.data) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 240)
+                                .clipShape(.rect(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+            if let result = entry.resultText, result != entry.instructionText {
+                section("Output", result)
+            }
+            if let error = entry.errorText {
+                section(entry.outcome == .cancelled ? "Cancellation" : "Failure", error)
+            }
+        }
+    }
+
+    private func section(_ title: LocalizedStringKey, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline)
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        }
     }
 }
 
 private struct SourceAppIconView: View {
     let name: String?
     let bundleID: String?
-    var size: CGFloat = 16
+    var size: CGFloat = 18
 
     var body: some View {
         Group {
@@ -406,86 +477,6 @@ private struct SourceAppIconView: View {
             }
         }
         .frame(width: size, height: size)
-    }
-}
-
-private struct HistoryEntryDetail: View {
-    private static let iconSize: CGFloat = 20
-    private static let iconSpacing: CGFloat = 6
-    // 1.35em leading for the body font.
-    private static let bodyLineSpacing = NSFont.preferredFont(forTextStyle: .body).pointSize * 0.35
-
-    let entry: HistoryEntry
-    let relativeTo: Date
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: Self.iconSpacing) {
-                        SourceAppIconView(
-                            name: entry.sourceAppName,
-                            bundleID: entry.sourceAppBundleID,
-                            size: Self.iconSize
-                        )
-                        Text(entry.listTitle).font(.title2.bold())
-                    }
-                    HStack(spacing: 3) {
-                        Text(entry.kind == .dictation ? "Dictation" : "AI action")
-                        Text("·")
-                        Text(relativeTime)
-                    }
-                    .foregroundStyle(.secondary)
-                    // Align the subtitle with the app name, not the icon.
-                    .padding(.leading, Self.iconSize + Self.iconSpacing)
-                }
-                if let instruction = entry.instructionText {
-                    if entry.kind == .dictation {
-                        detailText(instruction)
-                    } else {
-                        detailSection("Instruction", instruction)
-                    }
-                }
-                ForEach(entry.contextInputs) { input in
-                    switch input.content {
-                    case .text(let text):
-                        detailSection(input.source == .selection ? "Selected text" : "Clipboard text", text)
-                    case .image(let image):
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(input.source == .selection ? "Selected image" : "Clipboard image").font(.headline)
-                            if let nsImage = NSImage(data: image.data) {
-                                Image(nsImage: nsImage).resizable().scaledToFit().frame(maxHeight: 320)
-                            }
-                        }
-                    }
-                }
-                if let result = entry.resultText, result != entry.instructionText {
-                    detailSection(entry.kind == .dictation ? "Result" : "Output", result)
-                }
-                if let error = entry.errorText { detailSection(entry.outcome == .cancelled ? "Cancellation" : "Failure", error) }
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var relativeTime: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: entry.createdAt, relativeTo: relativeTo)
-    }
-
-    private func detailSection(_ title: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.headline)
-            detailText(text)
-        }
-    }
-
-    private func detailText(_ text: String) -> some View {
-        Text(text)
-            .lineSpacing(Self.bodyLineSpacing)
-            .fixedSize(horizontal: false, vertical: true)
-            .textSelection(.enabled)
+        .accessibilityHidden(true)
     }
 }

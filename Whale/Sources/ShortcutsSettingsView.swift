@@ -53,17 +53,27 @@ struct ShortcutsSettingsView: View {
         PTTPreset.allCases.map { .option($0.rawValue, $0) }
     }
 
+    private var dictationFooter: LocalizedStringKey {
+        switch store.dictationKeyMode {
+        case .hold: "Hold \(store.pttKeyLabel) to record. Release to transcribe and paste."
+        case .toggle: "Press \(store.pttKeyLabel) to record. Press it again to transcribe and paste."
+        }
+    }
+
     var body: some View {
         SettingsPageLayout(title: "Shortcuts") {
-            SettingsSection(
-                "Push to talk",
-                footer: "Hold \(store.pttKeyLabel) to record. Release to transcribe and paste."
-            ) {
+            SettingsSection("Dictation", footer: dictationFooter) {
                 SettingsPickerRow(
                     "Key",
                     icon: SettingsRowIcon("mic.fill", .settingsBlue),
                     selection: $pttPreset,
                     choices: keyChoices
+                )
+                SettingsPickerRow(
+                    "Mode",
+                    icon: SettingsRowIcon("hand.tap.fill", .settingsTeal),
+                    selection: $store.dictationKeyMode,
+                    choices: DictationKeyMode.allCases.map { .option($0.title, $0) }
                 )
                 if pttPreset == .custom {
                     SettingsRow("Custom key") {

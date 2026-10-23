@@ -171,14 +171,16 @@ actor HistoryStore {
         outcome: HistoryOutcome,
         instructionText: String? = nil,
         resultText: String? = nil,
-        errorText: String? = nil
+        errorText: String? = nil,
+        audioSeconds: Double? = nil
     ) throws {
         try transaction {
             try withStatement(
                 """
                 UPDATE history_entries
                 SET completed_at = ?, outcome = ?,
-                    instruction_text = COALESCE(?, instruction_text), result_text = ?, error_text = ?
+                    instruction_text = COALESCE(?, instruction_text), result_text = ?, error_text = ?,
+                    audio_seconds = COALESCE(?, audio_seconds)
                 WHERE id = ?
                 """
             ) { statement in
@@ -187,7 +189,12 @@ actor HistoryStore {
                 bind(instructionText, to: 3, in: statement)
                 bind(resultText, to: 4, in: statement)
                 bind(errorText, to: 5, in: statement)
-                bind(id.uuidString, to: 6, in: statement)
+                if let audioSeconds {
+                    sqlite3_bind_double(statement, 6, audioSeconds)
+                } else {
+                    sqlite3_bind_null(statement, 6)
+                }
+                bind(id.uuidString, to: 7, in: statement)
                 try stepDone(statement)
             }
             try updateFTS(entryID: id)
@@ -242,6 +249,36 @@ actor HistoryStore {
             bind(id.uuidString, to: 1, in: statement)
             guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
             return entry(from: statement, contextInputs: try inputs(entryID: id))
+        }
+    }
+
+    /// Totals over every dictation that produced text. Entries from before recordings were
+    /// timed count the time from the key press to the words, which runs slightly long.
+    func dictationStats() throws -> DictationStats {
+        try withStatement(
+            """
+            SELECT result_text, audio_seconds, created_at, completed_at
+            FROM history_entries
+            WHERE kind = 'dictation' AND outcome = 'succeeded' AND result_text IS NOT NULL
+            """
+        ) { statement in
+            var stats = DictationStats()
+            while sqlite3_step(statement) == SQLITE_ROW {
+                let words = DictationStats.wordCount(text(statement, 0) ?? "")
+                guard words > 0 else { continue }
+                let seconds: Double
+                if sqlite3_column_type(statement, 1) != SQLITE_NULL {
+                    seconds = sqlite3_column_double(statement, 1)
+                } else if sqlite3_column_type(statement, 3) != SQLITE_NULL {
+                    seconds = sqlite3_column_double(statement, 3) - sqlite3_column_double(statement, 2)
+                } else {
+                    continue
+                }
+                stats.dictationCount += 1
+                stats.words += words
+                stats.speakingSeconds += max(0, seconds)
+            }
+            return stats
         }
     }
 
@@ -326,12 +363,13 @@ actor HistoryStore {
             """
         )
         try addColumnIfMissing("source_app_bundle_id", table: "history_entries")
-        try execute("PRAGMA user_version = 2")
+        try addColumnIfMissing("audio_seconds", type: "REAL", table: "history_entries")
+        try execute("PRAGMA user_version = 3")
     }
 
     /// `ALTER TABLE ... ADD COLUMN` has no `IF NOT EXISTS`, so ask the schema
     /// first. Cheap, and it keeps the migration re-runnable.
-    private func addColumnIfMissing(_ column: String, table: String) throws {
+    private func addColumnIfMissing(_ column: String, type: String = "TEXT", table: String) throws {
         let existing = try withStatement("PRAGMA table_info(\(table))") { statement -> Set<String> in
             var names: Set<String> = []
             while sqlite3_step(statement) == SQLITE_ROW {
@@ -340,7 +378,7 @@ actor HistoryStore {
             return names
         }
         guard !existing.contains(column) else { return }
-        try execute("ALTER TABLE \(table) ADD COLUMN \(column) TEXT")
+        try execute("ALTER TABLE \(table) ADD COLUMN \(column) \(type)")
     }
 
     private func insert(_ inputs: [ContextInput], entryID: UUID) throws {
@@ -529,8 +567,6 @@ final class HistoryController: ObservableObject {
 
     @Published private(set) var errorMessage: String?
     @Published private(set) var revision = 0
-    var lastSelectedID: UUID?
-    var lastSelectedEntry: HistoryEntry?
     private var store: HistoryStore?
 
     func prepare() async throws {
@@ -556,8 +592,6 @@ final class HistoryController: ObservableObject {
 
     func reset() async throws {
         store = nil
-        lastSelectedID = nil
-        lastSelectedEntry = nil
         let opened = try await HistoryStore.resetDefault()
         store = opened
         errorMessage = nil

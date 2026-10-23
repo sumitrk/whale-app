@@ -184,7 +184,7 @@ final class AIActionCoordinator: ObservableObject {
 
     private func stopAndProcess(runID: UUID) async {
         guard isCurrent(runID), let run = activeRun, let snapshot = run.snapshot, let historyEntryID = run.historyEntryID else { return }
-        RecordingIndicatorWindow.shared.hide()
+        RecordingIndicatorWindow.shared.showProcessing()
         state = .transcribing
 
         do {

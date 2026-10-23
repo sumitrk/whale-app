@@ -6,6 +6,7 @@ extension Color {
     static let settingsIndigo = Color(red: 0.36, green: 0.30, blue: 1.0)
     static let settingsPurple = Color(red: 0.72, green: 0.26, blue: 0.98)
     static let settingsOrange = Color(red: 1.0, green: 0.52, blue: 0.08)
+    static let settingsYellow = Color(red: 0.98, green: 0.72, blue: 0.0)
     static let settingsCyan = Color(red: 0.05, green: 0.70, blue: 1.0)
     static let settingsGreen = Color(red: 0.13, green: 0.80, blue: 0.36)
     static let settingsTeal = Color(red: 0.04, green: 0.78, blue: 0.72)

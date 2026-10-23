@@ -68,14 +68,16 @@ enum HUDPlacementPolicy {
 // MARK: - Floating panel
 
 /// Non-activating HUD that floats above all windows near the cursor.
-/// Shows a live audio waveform driven by the microphone level.
+///
+/// One pill for every state: the recording bars, the processing wave, the paste hint and
+/// messages are contents of the same `RecordingPillView`, which morphs from one to the next.
+/// The window is sized for the widest pill and never resizes; the pill sits in the corner
+/// nearest what it's anchored to.
 ///
 /// Built to stay smooth while the app is busy starting a recording:
 /// - the focused-field lookup that decides where the pill sits runs off the main thread, with a
-///   short timeout, instead of stalling the first frames of the fade;
-/// - the fade and rise are Core Animation animations, which the render server runs even if the
-///   main thread hiccups, rather than an `NSWindow` alpha animation stepped from the main thread;
-/// - the recording view is built once and reused, so pressing the key doesn't build a new
+///   short timeout, instead of stalling the first frames of the appearance;
+/// - the pill's view is built once and reused, so pressing the key doesn't build a new
 ///   SwiftUI hierarchy at the moment it needs to appear.
 @MainActor
 final class RecordingIndicatorWindow: NSPanel {
@@ -103,10 +105,14 @@ final class RecordingIndicatorWindow: NSPanel {
     /// longer, and the HUD must never wait on it.
     private static let anchorTimeout: TimeInterval = 0.12
     private static var inset: CGFloat { HUDShadowContainer<EmptyView>.inset }
+    /// Room for the widest pill, a two-line message.
+    private static let pillArea = NSSize(width: 400, height: 56)
 
-    private let container: NSView
-    private var recordingHost: NSHostingView<HUDShadowContainer<RecordingPillView>>?
-    private weak var recordingMeter: MicLevelMeter?
+    private static let appear = Animation.spring(duration: 0.42, bounce: 0.32)
+    private static let morph = Animation.spring(duration: 0.38, bounce: 0.18)
+    private static let disappear = Animation.easeIn(duration: 0.16)
+
+    private let model = HUDPillModel()
 
     private var trackingTimer: Timer?
     private var currentAnchor: HUDAnchor = .cursor
@@ -116,13 +122,23 @@ final class RecordingIndicatorWindow: NSPanel {
     private var localDismissalMonitor: Any?
     private var autoHideTask: Task<Void, Never>?
     private var presentationID = 0
+    /// Asked for, waiting on the anchor lookup.
+    private var isAppearing = false
     private var isShowing = false
+    private var isOnScreen = false
 
     private init() {
-        container = NSView(frame: NSRect(x: 0, y: 0, width: 64, height: 52))
-        container.wantsLayer = true
+        let size = NSSize(
+            width: Self.pillArea.width + Self.inset * 2,
+            height: Self.pillArea.height + Self.inset * 2
+        )
+        let host = NSHostingView(rootView: RecordingPillView(model: model))
+        // The window keeps its size whatever the pill shows; the pill moves inside it.
+        host.sizingOptions = []
+        host.frame = NSRect(origin: .zero, size: size)
+        host.autoresizingMask = [.width, .height]
         super.init(
-            contentRect: container.frame,
+            contentRect: host.frame,
             styleMask:   [.nonactivatingPanel, .borderless],
             backing:     .buffered,
             defer:       false
@@ -134,92 +150,79 @@ final class RecordingIndicatorWindow: NSPanel {
         level              = .floating
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         animationBehavior  = .none
-        contentView        = container
+        contentView        = host
     }
 
-    /// Whether a presentation is on screen or on its way: true from `show…` until the fade out
-    /// finishes.
-    var hasContent: Bool { !container.subviews.isEmpty }
+    /// Whether a presentation is on screen or on its way: true from `show…` until the pill has
+    /// finished leaving.
+    var hasContent: Bool { isAppearing || isShowing || isOnScreen }
 
     func show(recorder: AudioRecorder) {
-        let meter = recorder.levelMeter
-        if recordingHost == nil || recordingMeter !== meter {
-            recordingHost = NSHostingView(rootView: HUDShadowContainer { RecordingPillView(meter: meter) })
-            recordingMeter = meter
-        }
-        present(recordingHost!, size: NSSize(width: 64, height: 52))
+        present(.recording(recorder.levelMeter))
     }
 
+    /// The bars turn into a travelling wave while the words are worked out.
     func showProcessing() {
-        present(NSHostingView(rootView: HUDShadowContainer { ProcessingIndicatorView() }), size: NSSize(width: 64, height: 52))
+        present(.processing)
     }
 
     func hide() {
         // Always invalidate the presentation: a quick tap can call this while the anchor
         // lookup is still running, and that presentation must not appear afterwards.
         presentationID &+= 1
-        let hiddenPresentationID = presentationID
+        isAppearing = false
         stopPresentationObservers()
         guard isShowing else {
-            finishHiding()
+            // Already leaving, its completion orders the window out; otherwise nothing is up.
+            if !isOnScreen { finishHiding() }
             return
         }
         isShowing = false
 
-        guard let layer = container.layer else {
-            finishHiding()
-            return
+        // The reverse of appearing: back down to 90% as it fades.
+        withAnimation(Self.disappear) {
+            model.isPresented = false
+        } completion: { [weak self] in
+            // Unless a new presentation brought it back in the meantime.
+            guard let self, !self.isShowing else { return }
+            self.finishHiding()
         }
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { [weak self] in
-            Task { @MainActor in
-                guard let self, self.presentationID == hiddenPresentationID else { return }
-                self.finishHiding()
-            }
-        }
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = layer.presentation()?.opacity ?? 1
-        fade.toValue = 0
-        fade.duration = 0.16
-        fade.timingFunction = CAMediaTimingFunction(name: .easeIn)
-        layer.opacity = 0
-        layer.add(fade, forKey: "fade")
-        CATransaction.commit()
     }
 
     /// Show a brief paste/accessibility nudge.
     func showHint(reason: PasteHintReason) {
-        let host = NSHostingView(rootView: HUDShadowContainer { PasteHintView(reason: reason) })
-        present(host, size: host.fittingSize.roundedUp, feedbackDuration: 2)
+        present(.pasteHint(reason), feedbackDuration: 2)
     }
 
     func showMessage(_ message: String, isError: Bool, duration: TimeInterval) {
-        let host = NSHostingView(rootView: HUDShadowContainer { StatusMessageView(message: message, isError: isError) })
-        present(host, size: host.fittingSize.roundedUp, feedbackDuration: duration)
+        present(.message(message, isError: isError), feedbackDuration: duration)
     }
 
     // MARK: Presentation
 
-    private func present(_ host: NSView, size: NSSize, feedbackDuration: TimeInterval? = nil) {
+    private func present(_ content: HUDPillContent, feedbackDuration: TimeInterval? = nil) {
         presentationID &+= 1
         let id = presentationID
         stopPresentationObservers()
-
-        // Window first, then the pill: added before the resize, autoresizing would stretch or
-        // squash the pill by the difference between this presentation's size and the last one's
-        // — which is what clipped the recording pill after a wider paste hint, and the reverse.
-        setContentSize(size)
-        if host.superview !== container {
-            container.subviews.forEach { $0.removeFromSuperview() }
-            container.addSubview(host)
-        }
-        host.autoresizingMask = []
-        host.frame = container.bounds
         // From the moment it's asked for, so a click during the anchor lookup still dismisses it.
         if let feedbackDuration {
             scheduleFeedbackDismissal(after: feedbackDuration, presentationID: id)
         }
 
+        // Already up: the pill turns into the new content where it is.
+        if isShowing {
+            withAnimation(Self.morph) { model.content = content }
+            startTracking()
+            return
+        }
+
+        if !isOnScreen {
+            model.content = content
+        } else {
+            // Still leaving: come back from wherever it got to.
+            withAnimation(Self.morph) { model.content = content }
+        }
+        isAppearing = true
         resolveAnchor(timeout: Self.anchorTimeout) { [weak self] anchor in
             guard let self, self.presentationID == id else { return }
             self.currentAnchor = anchor
@@ -230,40 +233,17 @@ final class RecordingIndicatorWindow: NSPanel {
     }
 
     private func animateIn() {
+        isAppearing = false
         isShowing = true
-        alphaValue = 1
+        isOnScreen = true
         orderFront(nil)
-        guard let layer = container.layer else { return }
-
-        layer.removeAllAnimations()
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        layer.opacity = 1
-        CATransaction.commit()
-
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0
-        fade.toValue = 1
-        fade.duration = 0.18
-        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        layer.add(fade, forKey: "fade")
-
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        let rise = CASpringAnimation(keyPath: "transform.translation.y")
-        rise.fromValue = -5
-        rise.toValue = 0
-        rise.mass = 1
-        rise.stiffness = 320
-        rise.damping = 26
-        rise.duration = rise.settlingDuration
-        layer.add(rise, forKey: "rise")
+        // Springs up from 90%; Reduce Motion keeps only the fade (the view skips the scale).
+        withAnimation(Self.appear) { model.isPresented = true }
     }
 
     private func finishHiding() {
+        isOnScreen = false
         orderOut(nil)
-        container.subviews.forEach { $0.removeFromSuperview() }
-        container.layer?.removeAllAnimations()
-        container.layer?.opacity = 1
     }
 
     /// Looks up where the focused field is without blocking the main thread. Delivers the
@@ -326,13 +306,13 @@ final class RecordingIndicatorWindow: NSPanel {
         updatePosition()
     }
 
-    private var pillSize: NSSize {
-        NSSize(width: frame.width - Self.inset * 2, height: frame.height - Self.inset * 2)
-    }
+    private var pillSize: NSSize { Self.pillArea }
 
     private func updatePosition() {
         switch currentAnchor {
         case .field(let inputFrame):
+            // Above the field, so the pill grows up and to the right from its corner.
+            setAlignment(.bottomLeading)
             setClampedPillOrigin(
                 NSPoint(x: inputFrame.minX, y: inputFrame.maxY + 6),
                 on: screen(containing: NSPoint(x: inputFrame.midX, y: inputFrame.midY))
@@ -346,13 +326,27 @@ final class RecordingIndicatorWindow: NSPanel {
 
     private func positionNearPointer(_ pointer: NSPoint) {
         guard let screen = screen(containing: pointer) else { return }
-        setPillOrigin(
-            HUDPlacementPolicy.cursorOrigin(
-                pointer: pointer,
-                hudSize: pillSize,
-                visibleFrame: screen.visibleFrame
-            )
+        let origin = HUDPlacementPolicy.cursorOrigin(
+            pointer: pointer,
+            hudSize: pillSize,
+            visibleFrame: screen.visibleFrame
         )
+        // The corner of the pill area nearest the pointer, so the pill stays beside it.
+        let isLeft = origin.x < pointer.x
+        let isBelow = origin.y < pointer.y
+        switch (isLeft, isBelow) {
+        case (false, true): setAlignment(.topLeading)
+        case (true, true): setAlignment(.topTrailing)
+        case (false, false): setAlignment(.bottomLeading)
+        case (true, false): setAlignment(.bottomTrailing)
+        }
+        setPillOrigin(origin)
+    }
+
+    /// Only on a change: this runs every frame, and each write would redraw the pill.
+    private func setAlignment(_ alignment: Alignment) {
+        guard model.alignment != alignment else { return }
+        model.alignment = alignment
     }
 
     private func setClampedPillOrigin(_ origin: NSPoint, on screen: NSScreen?) {
@@ -411,95 +405,4 @@ final class RecordingIndicatorWindow: NSPanel {
             self.localDismissalMonitor = nil
         }
     }
-}
-
-private struct ProcessingIndicatorView: View {
-    @State private var activeDot = 0
-    private let timer = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 3) {
-            ForEach(0..<3, id: \.self) { index in
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 6, height: 6)
-                    .opacity(index == activeDot ? 1 : 0.5)
-            }
-        }
-        .frame(width: 36, height: 18)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 8)
-        .background(Capsule().fill(.black.opacity(0.72)))
-        .animation(.easeInOut(duration: 0.15), value: activeDot)
-        .onReceive(timer) { _ in
-            activeDot = (activeDot + 1) % 3
-        }
-    }
-}
-
-// MARK: - Paste hint view
-
-/// Shown briefly when auto-paste is not possible (no focused text input).
-/// Lets the user know the transcript is ready on the clipboard.
-private struct PasteHintView: View {
-    let reason: RecordingIndicatorWindow.PasteHintReason
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            if reason == .accessibilityMissing {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.yellow)
-                    .font(.system(size: 11, weight: .semibold))
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                switch reason {
-                case .manualPasteOnly:
-                    HStack(spacing: 4) {
-                        Text("Copied")
-                            .foregroundColor(.white.opacity(0.55))
-                        Text("·")
-                            .foregroundColor(.white.opacity(0.3))
-                        Text("⌘V to paste")
-                            .foregroundColor(.white)
-                    }
-
-                case .accessibilityMissing:
-                    Text("No Accessibility permission")
-                        .foregroundColor(.white)
-                    Text("Open Settings to grant access · ⌘V to paste")
-                        .foregroundColor(.white.opacity(0.7))
-                }
-            }
-        }
-        .font(.system(size: 12, weight: .medium))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(Capsule().fill(.black.opacity(0.72)))
-    }
-}
-
-private struct StatusMessageView: View {
-    let message: String
-    let isError: Bool
-
-    var body: some View {
-        HStack(spacing: 7) {
-            Image(systemName: isError ? "exclamationmark.triangle.fill" : "xmark.circle.fill")
-                .foregroundStyle(isError ? .red : .secondary)
-            Text(message)
-                .foregroundStyle(.white)
-                .lineLimit(2)
-        }
-        .font(.system(size: 12, weight: .medium))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .frame(maxWidth: 360)
-        .background(Capsule().fill(.black.opacity(0.78)))
-    }
-}
-
-private extension NSSize {
-    /// Whole points, so fractional text widths don't clip a pill's last character.
-    var roundedUp: NSSize { NSSize(width: width.rounded(.up), height: height.rounded(.up)) }
 }

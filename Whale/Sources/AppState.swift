@@ -112,6 +112,7 @@ class AppState: ObservableObject {
                 // VoiceActivityDetectionStage(),
                 TranscriptionStage(transcriber: LocalTranscriptionService.shared),
                 SmartFormattingStage(),
+                PersonalDictionaryStage(dictionary: SettingsStore.shared.personalDictionary),
             ])
         }
         self.aiActionCoordinator = AIActionCoordinator(
@@ -201,9 +202,14 @@ class AppState: ObservableObject {
     var statusLabel: String {
         switch status {
         case .starting:      return "Preparing transcription…"
-        case .ready:         return "Ready  (⌘⇧T to record | hold Fn to dictate)"
+        case .ready:
+            let action = settings.dictationKeyMode == .toggle ? "press" : "hold"
+            return "Ready  (\(settings.toggleKeyLabel) to record | \(action) \(settings.pttKeyLabel) to dictate)"
         case .recording:
-            if activity.mode == .paste { return "Dictating…  (release Fn to stop)" }
+            if activity.mode == .paste {
+                let action = settings.dictationKeyMode == .toggle ? "press" : "release"
+                return "Dictating…  (\(action) \(settings.pttKeyLabel) to stop)"
+            }
             if activity.mode == .markdown { return "Recording…  (⌘⇧T to stop)" }
             return "Listening for an AI Action…"
         case .transcribing:  return "Transcribing…"
@@ -218,26 +224,19 @@ class AppState: ObservableObject {
         let toggleFlags = NSEvent.ModifierFlags(rawValue: UInt(settings.toggleModifiers))
         let pttFlags = NSEvent.ModifierFlags(rawValue: UInt(settings.pttModifiers))
         let actionFlags = NSEvent.ModifierFlags(rawValue: UInt(settings.aiActionModifiers))
-        let toggleAction: @MainActor () -> Void
-        let pttPressAction: @MainActor () -> Void
 
-        if accessibility.isTrusted {
-            toggleAction = { [weak self] in
-                self?.toggleMarkdown()
+        let toggleAction: @MainActor () -> Void = { [weak self] in
+            self?.toggleMarkdown()
+        }
+        let pttPressAction: @MainActor () -> Void = { [weak self] in
+            guard let self else { return }
+            if self.settings.dictationKeyMode == .toggle, self.activity.mode == .paste {
+                self.finishDictation()
+                return
             }
-            pttPressAction = { [weak self] in
-                guard let self, !self.isBusy else { return }
-                Task { await self.startRecording(mode: .paste) }
-            }
-        } else {
-            toggleAction = { [weak self] in
-                self?.toggleMarkdown()
-            }
-            pttPressAction = { [weak self] in
-                guard let self, !self.isBusy else { return }
-                self.accessibility.refresh()
-                Task { await self.startRecording(mode: .paste) }
-            }
+            guard !self.isBusy else { return }
+            if !self.accessibility.isTrusted { self.accessibility.refresh() }
+            Task { await self.startRecording(mode: .paste) }
         }
 
         hotkey.rebuild(
@@ -251,16 +250,8 @@ class AppState: ObservableObject {
             onToggle: toggleAction,
             onPTTPress: pttPressAction,
             onPTTRelease: { [weak self] in
-                guard let self else { return }
-                if case .starting(let mode, _) = self.activity, mode == .paste {
-                    self.activity.requestStop()
-                    if self.recorder.isRecording {
-                        Task { await self.stopRecording() }
-                    }
-                    return
-                }
-                guard self.activity.isRecording else { return }
-                Task { await self.stopRecording() }
+                guard let self, self.settings.dictationKeyMode == .hold else { return }
+                self.finishDictation()
             },
             onActionPress: { [weak self] in
                 guard let self else { return }
@@ -275,6 +266,20 @@ class AppState: ObservableObject {
                 Task { await self.aiActionCoordinator.cancel() }
             }
         )
+    }
+
+    /// Stops a dictation: on release in hold mode, on the second press in toggle mode. A stop
+    /// that arrives while the microphone is still starting is remembered and applied once it's up.
+    private func finishDictation() {
+        if case .starting(let mode, _) = activity, mode == .paste {
+            activity.requestStop()
+            if recorder.isRecording {
+                Task { await stopRecording() }
+            }
+            return
+        }
+        guard activity.isRecording, activity.mode == .paste else { return }
+        Task { await stopRecording() }
     }
 
     private func handleRecorderReady() {
@@ -378,7 +383,13 @@ class AppState: ObservableObject {
 
         activity = .processing(mode: mode)
         status = .transcribing
-        RecordingIndicatorWindow.shared.hide()
+        // The bars become the processing wave; inserting the words then either sends the pill
+        // away or turns it into the paste hint.
+        if mode == .paste {
+            RecordingIndicatorWindow.shared.showProcessing()
+        } else {
+            RecordingIndicatorWindow.shared.hide()
+        }
 
         do {
             let recording = try await recorder.stopRecording()
@@ -427,8 +438,8 @@ class AppState: ObservableObject {
             case .paste:
                 activity = .idle
                 status = .ready
-                RecordingIndicatorWindow.shared.hide()
                 guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    RecordingIndicatorWindow.shared.hide()
                     DiagnosticLog.log("[Recording] Empty transcript; skipped clipboard insertion.")
                     await finalizeCurrentDictation(outcome: .failed, errorText: "The transcription was empty")
                     return
@@ -437,7 +448,8 @@ class AppState: ObservableObject {
                 await finalizeCurrentDictation(
                     outcome: .succeeded,
                     instructionText: transcript,
-                    resultText: transcript
+                    resultText: transcript,
+                    audioSeconds: Double(recording.capturedSampleCount16k) / 16_000
                 )
                 playSound("Bottle")
 
@@ -510,7 +522,8 @@ class AppState: ObservableObject {
         outcome: HistoryOutcome,
         instructionText: String? = nil,
         resultText: String? = nil,
-        errorText: String? = nil
+        errorText: String? = nil,
+        audioSeconds: Double? = nil
     ) async {
         guard let id = currentHistoryEntryID else { return }
         currentHistoryEntryID = nil
@@ -520,7 +533,8 @@ class AppState: ObservableObject {
             outcome: outcome,
             instructionText: instructionText,
             resultText: resultText,
-            errorText: errorText
+            errorText: errorText,
+            audioSeconds: audioSeconds
         )
         history.changed()
     }
