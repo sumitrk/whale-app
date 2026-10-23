@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The seven bars in the HUD, drawn once per display frame.
+/// The six bars in the HUD, drawn once per display frame.
 ///
 /// While recording, heights come from the smoothed mic level plus a slow per-bar wave, so they
 /// flow instead of jumping to random heights several times a second; silence settles into the
@@ -16,8 +16,8 @@ struct RecordingBarsView: View {
     @State private var envelope = LevelEnvelope()
     @State private var blend = ProcessingBlend()
 
-    private static let restingHeights: [Double] = [6, 9, 13, 18, 13, 9, 6]
-    private static let weights: [Double] = [0.5, 0.7, 0.88, 1, 0.88, 0.7, 0.5]
+    private static let restingHeights: [Double] = [7, 11, 17, 17, 11, 7]
+    private static let weights: [Double] = [0.6, 0.85, 1, 1, 0.85, 0.6]
     private static let minHeight: Double = 3
     private static let maxHeight: Double = 20
     private static let barWidth: Double = 3
