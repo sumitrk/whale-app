@@ -81,6 +81,7 @@
 		VAD000000000000000000012 /* VoiceActivityDetectionStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */; };
 		VAD000000000000000000013 /* VoiceActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = VAD000000000000000000003 /* VoiceActivityTests.swift */; };
 		57CEE872EEAE12BAFC9F7D4C /* LevelEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */; };
+		C00AE87A12648CDE6C42180C /* HUDPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EAC82A6610D1839FD8A1AAF /* HUDPosition.swift */; };
 		2C649B20BEAF82AB4C80D733 /* ProcessingBlend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B532A498B27741444B3BFA4 /* ProcessingBlend.swift */; };
 		D8CEAE964FB8E06CBFB37552 /* HUDPillModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B196B41C53D06CEC20AF26 /* HUDPillModel.swift */; };
 		005ADA936B10E56B8A6B3EFB /* HUDPillContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D57C0C56A163899351502FB /* HUDPillContent.swift */; };
@@ -186,6 +187,7 @@
 		VAD000000000000000000002 /* VoiceActivityDetectionStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityDetectionStage.swift; sourceTree = "<group>"; };
 		VAD000000000000000000003 /* VoiceActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceActivityTests.swift; sourceTree = "<group>"; };
 		8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelEnvelope.swift; sourceTree = "<group>"; };
+		1EAC82A6610D1839FD8A1AAF /* HUDPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDPosition.swift; sourceTree = "<group>"; };
 		8B532A498B27741444B3BFA4 /* ProcessingBlend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingBlend.swift; sourceTree = "<group>"; };
 		86B196B41C53D06CEC20AF26 /* HUDPillModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDPillModel.swift; sourceTree = "<group>"; };
 		7D57C0C56A163899351502FB /* HUDPillContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDPillContent.swift; sourceTree = "<group>"; };
@@ -373,6 +375,7 @@
 				5CE0F4BD5785DCEE263DACBA /* HUDShadowContainer.swift */,
 				AA41FD5F1CB5F35816397323 /* RecordingBarsView.swift */,
 				8806DE3F1F84FB72996C1BA2 /* LevelEnvelope.swift */,
+				1EAC82A6610D1839FD8A1AAF /* HUDPosition.swift */,
 				8B532A498B27741444B3BFA4 /* ProcessingBlend.swift */,
 				86B196B41C53D06CEC20AF26 /* HUDPillModel.swift */,
 				7D57C0C56A163899351502FB /* HUDPillContent.swift */,
@@ -553,6 +556,7 @@
 				C0746934B2975886BECF4FC2 /* HUDShadowContainer.swift in Sources */,
 				70BB9F8472D5AE8D04FB24B1 /* RecordingBarsView.swift in Sources */,
 				57CEE872EEAE12BAFC9F7D4C /* LevelEnvelope.swift in Sources */,
+				C00AE87A12648CDE6C42180C /* HUDPosition.swift in Sources */,
 				2C649B20BEAF82AB4C80D733 /* ProcessingBlend.swift in Sources */,
 				D8CEAE964FB8E06CBFB37552 /* HUDPillModel.swift in Sources */,
 				005ADA936B10E56B8A6B3EFB /* HUDPillContent.swift in Sources */,

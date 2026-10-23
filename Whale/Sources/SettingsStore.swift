@@ -49,6 +49,12 @@ class SettingsStore: ObservableObject {
     }
     var toggleKeyLabel: String { keyLabel(keyCode: toggleKeyCode, modifiers: toggleModifiers) }
 
+    // MARK: - Recording pill
+
+    @Published var hudPosition: HUDPosition {
+        didSet { ud.set(hudPosition.rawValue, forKey: Keys.hudPosition) }
+    }
+
     // MARK: - Dictionary
 
     /// Names and jargon, spelled the way the user wants them typed.
@@ -181,6 +187,7 @@ class SettingsStore: ObservableObject {
         pttKeyCode               = (ud.object(forKey: Keys.pttKeyCode) as? Int) ?? 63
         pttModifiers             = (ud.object(forKey: Keys.pttModifiers) as? Int) ?? 0
         dictationKeyMode         = DictationKeyMode(rawValue: ud.string(forKey: Keys.dictationKeyMode) ?? "") ?? .hold
+        hudPosition              = HUDPosition(rawValue: ud.string(forKey: Keys.hudPosition) ?? "") ?? .nearInput
         aiActionKeyCode          = (ud.object(forKey: Keys.aiActionKeyCode) as? Int) ?? 59
         aiActionModifiers        = (ud.object(forKey: Keys.aiActionModifiers) as? Int) ?? 0
         selectedBuiltInModelID   = BuiltInModelID(
@@ -420,6 +427,7 @@ class SettingsStore: ObservableObject {
         static let pttKeyCode            = "pttKeyCode"
         static let pttModifiers          = "pttModifiers"
         static let dictationKeyMode      = "dictationKeyMode"
+        static let hudPosition           = "hudPosition"
         static let aiActionKeyCode       = "aiActionKeyCode"
         static let aiActionModifiers     = "aiActionModifiers"
         static let selectedBuiltInModelID = "selectedBuiltInModelID"

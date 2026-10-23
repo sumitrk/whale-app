@@ -109,6 +109,8 @@ final class RecordingIndicatorWindow: NSPanel {
     /// longer, and the HUD must never wait on it.
     private static let anchorTimeout: TimeInterval = 0.12
     private static var inset: CGFloat { HUDShadowContainer<EmptyView>.inset }
+    /// Space between the bottom of the screen (above the Dock) and a bottom-centred pill.
+    private static let bottomPadding: CGFloat = 24
     /// Room for the widest pill, a two-line message.
     private static let pillArea = NSSize(width: 400, height: 56)
 
@@ -232,14 +234,22 @@ final class RecordingIndicatorWindow: NSPanel {
         // anchor is known; the Core Animation spring is the arrival.
         model.content = content
         if !isShowing { isAppearing = true }
-        resolveAnchor(timeout: Self.anchorTimeout) { [weak self] anchor in
+        let place: @MainActor (HUDAnchor) -> Void = { [weak self] anchor in
             guard let self, self.presentationID == id else { return }
             self.currentAnchor = anchor
             self.updatePosition()
             self.startTracking()
             self.animateIn()
         }
+        // At the bottom of the screen nothing depends on the focused field, so don't look for it.
+        if position == .bottomCenter {
+            place(.cursor)
+        } else {
+            resolveAnchor(timeout: Self.anchorTimeout, place)
+        }
     }
+
+    private var position: HUDPosition { SettingsStore.shared.hudPosition }
 
     private func animateIn() {
         isAppearing = false
@@ -398,7 +408,7 @@ final class RecordingIndicatorWindow: NSPanel {
 
     private func trackPosition() {
         ticksUntilAnchorRefresh -= 1
-        if ticksUntilAnchorRefresh <= 0, !isRefreshingAnchor {
+        if position == .nearInput, ticksUntilAnchorRefresh <= 0, !isRefreshingAnchor {
             ticksUntilAnchorRefresh = 30
             isRefreshingAnchor = true
             let id = presentationID
@@ -418,6 +428,10 @@ final class RecordingIndicatorWindow: NSPanel {
     private var pillSize: NSSize { Self.pillArea }
 
     private func updatePosition() {
+        if position == .bottomCenter {
+            positionAtBottomCenter()
+            return
+        }
         switch currentAnchor {
         case .field(let inputFrame):
             // Above the field, so the pill grows up and to the right from its corner.
@@ -431,6 +445,18 @@ final class RecordingIndicatorWindow: NSPanel {
         case .cursor:
             positionNearPointer(NSEvent.mouseLocation)
         }
+    }
+
+    /// Centred above the bottom of the screen the pointer is on; the pill grows outwards from
+    /// the middle as its content changes.
+    private func positionAtBottomCenter() {
+        guard let screen = screen(containing: NSEvent.mouseLocation) else { return }
+        let visibleFrame = screen.visibleFrame
+        setAlignment(.bottom)
+        setPillOrigin(NSPoint(
+            x: visibleFrame.midX - pillSize.width / 2,
+            y: visibleFrame.minY + Self.bottomPadding
+        ))
     }
 
     private func positionNearPointer(_ pointer: NSPoint) {
