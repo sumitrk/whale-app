@@ -26,7 +26,7 @@ struct RecordingPillView: View {
                 isPaused: !model.isVisible
             )
                 // The bars size themselves; the pill keeps the same margin around them
-                // whatever their count (10.5pt a side, as with five bars in a 36pt slot).
+                // whatever their count (10.5pt a side).
                 .padding(.horizontal, 10.5)
                 .padding(.vertical, 8)
                 .transition(.blurReplace)
