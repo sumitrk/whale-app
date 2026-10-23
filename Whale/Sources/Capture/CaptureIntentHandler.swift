@@ -11,14 +11,14 @@ protocol CaptureIntentHandler: AnyObject {
     /// Refuses to start, synchronously, before anything is shown.
     func checkReady() throws
     /// After the History Entry exists, before the microphone opens.
-    func willRecord(entry: CaptureEntry?) async throws
-    func complete(_ transcript: CaptureTranscript, entry: CaptureEntry?) async throws -> CaptureCompletion
+    func willRecord(entry: HistoryEntryHandle?) async throws
+    func complete(_ transcript: CaptureTranscript, entry: HistoryEntryHandle?) async throws -> CaptureCompletion
     /// Stops work `complete` has in flight.
     func cancel() async
 }
 
 extension CaptureIntentHandler {
     func checkReady() throws {}
-    func willRecord(entry: CaptureEntry?) async throws {}
+    func willRecord(entry: HistoryEntryHandle?) async throws {}
     func cancel() async {}
 }

@@ -11,7 +11,7 @@ final class TranscriptModeHandler: CaptureIntentHandler {
         self.settings = settings
     }
 
-    func complete(_ transcript: CaptureTranscript, entry: CaptureEntry?) async throws -> CaptureCompletion {
+    func complete(_ transcript: CaptureTranscript, entry: HistoryEntryHandle?) async throws -> CaptureCompletion {
         let document = TranscriptArtifactWriter.Document(
             startedAt: transcript.startedAt,
             durationMinutes: Int(Date.now.timeIntervalSince(transcript.startedAt) / 60),

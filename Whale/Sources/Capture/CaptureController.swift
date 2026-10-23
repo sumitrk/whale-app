@@ -35,9 +35,8 @@ final class CaptureController: ObservableObject {
         let intent: CaptureIntent
         let handler: CaptureIntentHandler
         let modelID: BuiltInModelID
-        var entry: CaptureEntry?
+        var entry: HistoryEntryHandle?
         var cancellationReason = "Cancelled"
-        var finalized = false
 
         init(intent: CaptureIntent, handler: CaptureIntentHandler, modelID: BuiltInModelID) {
             self.intent = intent
@@ -105,12 +104,11 @@ final class CaptureController: ObservableObject {
 
             if let kind = intent.historyKind {
                 let frontmost = NSWorkspace.shared.frontmostApplication
-                let id = try await history.createEntry(
-                    kind: kind,
+                run.entry = try await history.begin(
+                    kind,
                     sourceAppName: frontmost?.localizedName,
                     sourceAppBundleID: SourceApp.bundleID(frontmost?.bundleIdentifier)
                 )
-                run.entry = CaptureEntry(id: id, history: history)
                 try ensureCurrent(run)
             }
             try await handler.willRecord(entry: run.entry)
@@ -164,7 +162,7 @@ final class CaptureController: ObservableObject {
         hud.update(.cancelled(replaced: reason == Self.replacedReason))
         await stopRecorderDiscardingAudio()
         await run.handler.cancel()
-        await finalize(run, outcome: .cancelled, errorText: reason)
+        await run.entry?.finish(.cancelled, instruction: nil, result: nil, error: reason, audioSeconds: nil)
         DiagnosticLog.log("[Capture] Cancelled \(run.intent.diagnosticName): \(reason).")
     }
 
@@ -227,7 +225,7 @@ final class CaptureController: ObservableObject {
                 // Nothing was said; leave quietly.
                 end(run)
                 hud.update(.finished)
-                await finalize(run, outcome: .failed, errorText: "The transcription was empty")
+                await run.entry?.finish(.failed, instruction: nil, result: nil, error: "The transcription was empty", audioSeconds: nil)
                 return
             }
 
@@ -240,7 +238,7 @@ final class CaptureController: ObservableObject {
             switch completion {
             case .deliver(let output, let instruction):
                 hud.update(.delivered(deliver(output)))
-                await finalize(run, outcome: .succeeded, instructionText: instruction, resultText: output, audioSeconds: audioSeconds)
+                await run.entry?.finish(.succeeded, instruction: instruction, result: output, error: nil, audioSeconds: audioSeconds)
             case .saved:
                 hud.update(.finished)
             }
@@ -253,7 +251,7 @@ final class CaptureController: ObservableObject {
     /// Any failure, in any phase. Superseded or cancelled runs are already accounted for.
     private func fail(_ run: Run, error: Error) async {
         guard self.run === run else {
-            await finalize(run, outcome: .cancelled, errorText: run.cancellationReason)
+            await run.entry?.finish(.cancelled, instruction: nil, result: nil, error: run.cancellationReason, audioSeconds: nil)
             return
         }
         if error is CancellationError {
@@ -271,7 +269,7 @@ final class CaptureController: ObservableObject {
         await stopRecorderDiscardingAudio()
         await run.handler.cancel()
         DiagnosticLog.log("[Capture] \(run.intent.diagnosticName) failed: \(message)")
-        await finalize(run, outcome: .failed, errorText: message)
+        await run.entry?.finish(.failed, instruction: nil, result: nil, error: message, audioSeconds: nil)
     }
 
     private func end(_ run: Run) {
@@ -288,26 +286,6 @@ final class CaptureController: ObservableObject {
     private func stopRecorderDiscardingAudio() async {
         guard recorder.isRecording, let recording = try? await recorder.stopRecording() else { return }
         try? FileManager.default.removeItem(at: recording.wavURL)
-    }
-
-    private func finalize(
-        _ run: Run,
-        outcome: HistoryOutcome,
-        instructionText: String? = nil,
-        resultText: String? = nil,
-        errorText: String? = nil,
-        audioSeconds: Double? = nil
-    ) async {
-        guard !run.finalized, let entry = run.entry else { return }
-        run.finalized = true
-        await history.finalize(
-            entry.id,
-            outcome: outcome,
-            instructionText: instructionText,
-            resultText: resultText,
-            errorText: errorText,
-            audioSeconds: audioSeconds
-        )
     }
 }
 

@@ -37,21 +37,17 @@ final class AIActionHandler: CaptureIntentHandler {
         }
     }
 
-    func willRecord(entry: CaptureEntry?) async throws {
+    func willRecord(entry: HistoryEntryHandle?) async throws {
         snapshot = nil
         let captured = try await ContextSnapshotCapture.capture()
         snapshot = captured
-        if let entry {
-            try await entry.history.setContext(captured, for: entry.id)
-        }
+        try await entry?.setContext(captured)
     }
 
-    func complete(_ transcript: CaptureTranscript, entry: CaptureEntry?) async throws -> CaptureCompletion {
+    func complete(_ transcript: CaptureTranscript, entry: HistoryEntryHandle?) async throws -> CaptureCompletion {
         guard let snapshot else { throw AIActionError.notReady("The AI Action has no context") }
         let instruction = transcript.text
-        if let entry {
-            try await entry.history.setInstruction(instruction, for: entry.id)
-        }
+        try await entry?.setInstruction(instruction)
         let request = try AIActionPromptBuilder.build(
             instruction: instruction,
             snapshot: snapshot,

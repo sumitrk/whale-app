@@ -234,6 +234,44 @@ final class CaptureControllerTests: XCTestCase {
         XCTAssertEqual(capture.phase, .starting(.aiAction, stopRequested: false))
     }
 
+    // MARK: - History Entries, stored
+
+    func testEachFlowLeavesItsOutcomeInHistory() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WhaleCaptureHistory-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stored = HistoryControllerTests.controller(in: directory)
+        capture = CaptureController(
+            recorder: recorder,
+            models: models,
+            history: stored,
+            hud: hud,
+            handlers: [.dictation: DictationHandler(), .aiAction: aiAction],
+            pipelineFactory: { [unowned self] in
+                TranscriptionPipeline(stages: [FakeTranscriptionStage(text: transcript, error: nil)])
+            },
+            deliver: { _ in .inserted },
+            playSound: { _ in },
+            selectedModel: { .parakeetEnglishV2 }
+        )
+
+        await capture.start(.aiAction)
+        recorder.becomeReady()
+        capture.release(.aiAction)
+        await waitUntilIdle()
+        await capture.start(.dictation)
+        recorder.becomeReady()
+        await capture.cancelFromEscape()
+
+        let entries = try await stored.entries()
+        XCTAssertEqual(
+            Set(entries.map { "\($0.kind.rawValue):\($0.outcome.rawValue)" }),
+            ["ai_action:succeeded", "dictation:cancelled"]
+        )
+        XCTAssertEqual(entries.first { $0.kind == .aiAction }?.resultText, "Result for hello there")
+    }
+
     // MARK: - Helpers
 
     private func makeCaptureWithoutFormatting() -> CaptureController {
@@ -342,25 +380,37 @@ private final class FakeHistory: CaptureHistory {
     var created: [HistoryKind] = []
     var finalized: [Finalized] = []
 
-    func createEntry(kind: HistoryKind, sourceAppName: String?, sourceAppBundleID: String?) async throws -> UUID {
+    func begin(_ kind: HistoryKind, sourceAppName: String?, sourceAppBundleID: String?) async throws -> HistoryEntryHandle {
         created.append(kind)
-        return UUID()
+        return FakeEntry(history: self)
+    }
+}
+
+@MainActor
+private final class FakeEntry: HistoryEntryHandle {
+    let id = UUID()
+    let history: FakeHistory
+    private var isFinished = false
+
+    init(history: FakeHistory) {
+        self.history = history
     }
 
-    func setContext(_ snapshot: ContextSnapshot, for id: UUID) async throws {}
-    func setInstruction(_ text: String, for id: UUID) async throws {}
+    func setContext(_ snapshot: ContextSnapshot) async throws {}
+    func setInstruction(_ text: String) async throws {}
 
-    func finalize(
-        _ id: UUID,
-        outcome: HistoryOutcome,
-        instructionText: String?,
-        resultText: String?,
-        errorText: String?,
+    func finish(
+        _ outcome: HistoryOutcome,
+        instruction: String?,
+        result: String?,
+        error: String?,
         audioSeconds: Double?
     ) async {
-        finalized.append(Finalized(
-            id: id, outcome: outcome, instruction: instructionText,
-            result: resultText, error: errorText, audioSeconds: audioSeconds
+        guard !isFinished else { return }
+        isFinished = true
+        history.finalized.append(FakeHistory.Finalized(
+            id: id, outcome: outcome, instruction: instruction,
+            result: result, error: error, audioSeconds: audioSeconds
         ))
     }
 }
@@ -384,11 +434,11 @@ private final class FakeIntentHandler: CaptureIntentHandler {
         if let readyError { throw readyError }
     }
 
-    func willRecord(entry: CaptureEntry?) async throws {
+    func willRecord(entry: HistoryEntryHandle?) async throws {
         if entry != nil { recordedEntries += 1 }
     }
 
-    func complete(_ transcript: CaptureTranscript, entry: CaptureEntry?) async throws -> CaptureCompletion {
+    func complete(_ transcript: CaptureTranscript, entry: HistoryEntryHandle?) async throws -> CaptureCompletion {
         completed.append(transcript)
         if holdsCompletion {
             isCompleting = true

@@ -111,9 +111,8 @@ struct HistoryView: View {
         let requestedRevision = controller.revision
 
         do {
-            let store = try await controller.requireStore()
-            let page = try await store.entries(search: requestedQuery, limit: max(Self.pageSize, entries.count))
-            let totals = try await store.dictationStats()
+            let page = try await controller.entries(search: requestedQuery, limit: max(Self.pageSize, entries.count))
+            let totals = try await controller.dictationStats()
             guard !Task.isCancelled, requestedQuery == query, requestedRevision == controller.revision else { return }
             entries = page
             stats = totals
@@ -134,8 +133,7 @@ struct HistoryView: View {
         let requestedQuery = query
         let requestedRevision = controller.revision
         do {
-            let store = try await controller.requireStore()
-            let page = try await store.entries(
+            let page = try await controller.entries(
                 search: requestedQuery,
                 limit: Self.pageSize,
                 offset: entries.count
@@ -146,18 +144,15 @@ struct HistoryView: View {
         } catch { }
     }
 
+    /// The controller logs a failed write; the list stays as it was.
     private func delete(_ id: UUID) async {
-        guard let store = try? await controller.requireStore() else { return }
-        try? await store.deleteEntry(id: id)
+        guard (try? await controller.delete(id: id)) != nil else { return }
         expandedIDs.remove(id)
-        controller.changed()
     }
 
     private func clear() async {
-        guard let store = try? await controller.requireStore() else { return }
-        try? await store.clear()
+        guard (try? await controller.clear()) != nil else { return }
         expandedIDs = []
-        controller.changed()
     }
 
     private func resetHistory() async {
@@ -340,8 +335,7 @@ private struct HistoryEntryCard: View {
         }
         .task(id: isExpanded) {
             guard isExpanded, entry.kind == .aiAction, detail == nil else { return }
-            guard let store = try? await HistoryController.shared.requireStore() else { return }
-            detail = try? await store.entry(id: entry.id)
+            detail = try? await HistoryController.shared.entry(id: entry.id)
         }
     }
 
