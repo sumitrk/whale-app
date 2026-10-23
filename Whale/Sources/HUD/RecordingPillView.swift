@@ -25,8 +25,9 @@ struct RecordingPillView: View {
                 isProcessing: model.content == .processing,
                 isPaused: !model.isVisible
             )
-                .frame(width: 36, height: 20)
-                .padding(.horizontal, 6)
+                // The bars size themselves; the pill keeps the same margin around them
+                // whatever their count (10.5pt a side, as with five bars in a 36pt slot).
+                .padding(.horizontal, 10.5)
                 .padding(.vertical, 8)
                 .transition(.blurReplace)
         } else if case .pasteHint(let reason) = model.content {
