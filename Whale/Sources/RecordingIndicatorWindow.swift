@@ -112,10 +112,10 @@ final class RecordingIndicatorWindow: NSPanel {
     /// Room for the widest pill, a two-line message.
     private static let pillArea = NSSize(width: 400, height: 56)
 
-    /// Arriving: up from 80% scale and 90% opacity.
+    /// Arriving: up from 90% scale and 90% opacity.
     private static let appearDuration: TimeInterval = 0.25
     private static let appearBounce: CGFloat = 0.32
-    private static let appearScale: CGFloat = 0.8
+    private static let appearScale: CGFloat = 0.9
     private static let appearOpacity: Float = 0.9
     /// Leaving: down to 90% scale, fading out.
     private static let disappearDuration: TimeInterval = 0.1
@@ -259,7 +259,7 @@ final class RecordingIndicatorWindow: NSPanel {
         CATransaction.commit()
         orderFront(nil)
 
-        // Springs up from 80% scale and 90% opacity; Reduce Motion keeps only the opacity change.
+        // Springs up from 90% scale and 90% opacity; Reduce Motion keeps only the opacity change.
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let fade = CASpringAnimation(perceptualDuration: Self.appearDuration, bounce: 0)
         fade.keyPath = "opacity"
