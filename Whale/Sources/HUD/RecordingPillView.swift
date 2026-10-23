@@ -14,7 +14,7 @@ struct RecordingPillView: View {
                 .background(.black, in: .capsule)
                 .clipShape(.capsule)
         }
-        .scaleEffect(model.isPresented || reduceMotion ? 1 : 0.9)
+        .scaleEffect(model.isPresented || reduceMotion ? 1 : model.isLeaving ? 0.9 : 0.5)
         .opacity(model.isPresented ? 1 : model.isLeaving ? 0 : 0.9)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: model.alignment)
     }
@@ -55,14 +55,8 @@ private struct PasteHintView: View {
             VStack(alignment: .leading, spacing: 2) {
                 switch reason {
                 case .manualPasteOnly:
-                    HStack(spacing: 4) {
-                        Text("Copied")
-                            .foregroundStyle(.white.opacity(0.55))
-                        Text("·")
-                            .foregroundStyle(.white.opacity(0.3))
-                        Text("⌘V to paste")
-                            .foregroundStyle(.white)
-                    }
+                    Text("Copied. ⌘V to paste")
+                        .foregroundStyle(.white)
 
                 case .accessibilityMissing:
                     Text("No Accessibility permission")

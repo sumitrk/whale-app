@@ -110,7 +110,7 @@ final class RecordingIndicatorWindow: NSPanel {
 
     private static let appear = Animation.spring(duration: 0.25, bounce: 0.32)
     private static let morph = Animation.spring(duration: 0.25, bounce: 0.18)
-    private static let disappear = Animation.spring(duration: 0.25, bounce: 0)
+    private static let disappear = Animation.spring(duration: 0.1, bounce: 0)
 
     private let model = HUDPillModel()
 
@@ -239,7 +239,7 @@ final class RecordingIndicatorWindow: NSPanel {
         isShowing = true
         isOnScreen = true
         orderFront(nil)
-        // Springs up from 90% scale and 90% opacity; Reduce Motion keeps only the opacity change
+        // Springs up from 50% scale and 90% opacity; Reduce Motion keeps only the opacity change
         // (the view skips the scale).
         withAnimation(Self.appear) {
             model.isLeaving = false
