@@ -114,7 +114,7 @@ final class RecordingIndicatorWindow: NSPanel {
 
     /// Arriving: up from 90% scale and 90% opacity.
     private static let appearDuration: TimeInterval = 0.25
-    private static let appearBounce: CGFloat = 0.45
+    private static let appearBounce: CGFloat = 0.32
     private static let appearScale: CGFloat = 0.9
     private static let appearOpacity: Float = 0.9
     /// Leaving: down to 90% scale, fading out.
