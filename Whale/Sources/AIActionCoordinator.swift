@@ -169,7 +169,7 @@ final class AIActionCoordinator: ObservableObject {
     private func recordingDidBecomeReady() {
         guard let run = activeRun, state == .capturingContext else { return }
         state = .listening
-        playSound("Blow")
+        FeedbackSound.start.play()
         if run.releaseRequested {
             startStopAndProcess(runID: run.id)
         }
@@ -239,7 +239,7 @@ final class AIActionCoordinator: ObservableObject {
                 instructionText: instruction,
                 resultText: result
             )
-            playSound("Bottle")
+            FeedbackSound.finish.play()
             activeRun = nil
             processingTask = nil
             state = .succeeded

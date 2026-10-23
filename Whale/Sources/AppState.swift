@@ -66,27 +66,6 @@ enum RecordingActivity: Equatable {
     }
 }
 
-/// Loaded once each: reading the sound on every press held the main thread for up to 50ms just
-/// as the HUD was springing in.
-@MainActor private var loadedSounds: [String: NSSound] = [:]
-
-@discardableResult
-@MainActor
-func playSound(_ name: String) -> TimeInterval {
-    let sound: NSSound
-    if let loaded = loadedSounds[name] {
-        sound = loaded
-    } else {
-        guard let named = NSSound(named: name)?.copy() as? NSSound else { return 0 }
-        loadedSounds[name] = named
-        sound = named
-    }
-    if sound.isPlaying { sound.stop() }
-    let duration = sound.duration
-    sound.play()
-    return duration
-}
-
 @MainActor
 class AppState: ObservableObject {
     @Published var status: AppStatus = .starting
@@ -302,7 +281,7 @@ class AppState: ObservableObject {
         }
         activity = .recording(mode: .paste, startedAt: Date())
         status = .recording
-        playSound("Blow")
+        FeedbackSound.start.play()
     }
 
     func startClipboardOnlyDictation() {
@@ -367,7 +346,7 @@ class AppState: ObservableObject {
             if mode == .markdown {
                 activity = .recording(mode: .markdown, startedAt: Date())
                 status = .recording
-                playSound("Blow")
+                FeedbackSound.start.play()
             } else if activity.stopRequested {
                 await stopRecording()
             }
@@ -463,7 +442,7 @@ class AppState: ObservableObject {
                     resultText: transcript,
                     audioSeconds: Double(recording.capturedSampleCount16k) / 16_000
                 )
-                playSound("Bottle")
+                FeedbackSound.finish.play()
 
             case .markdown:
                 RecordingIndicatorWindow.shared.hide()
@@ -480,7 +459,7 @@ class AppState: ObservableObject {
                 lastMeetingPath = mdURL.path
                 activity = .idle
                 status = .ready
-                playSound("Bottle")
+                FeedbackSound.finish.play()
 
                 NSWorkspace.shared.selectFile(mdURL.path, inFileViewerRootedAtPath: "")
 
@@ -559,6 +538,7 @@ class AppState: ObservableObject {
 
         AppRuntimeInfo.migrateSandboxDataIfNeeded()
         recorder.prepareMicrophoneCapture()
+        FeedbackSound.preload()
 
         do {
             try await history.prepare()

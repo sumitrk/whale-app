@@ -114,7 +114,7 @@ final class RecordingIndicatorWindow: NSPanel {
 
     /// Arriving: up from 90% scale and 90% opacity.
     private static let appearDuration: TimeInterval = 0.25
-    private static let appearBounce: CGFloat = 0.32
+    private static let appearBounce: CGFloat = 0.45
     private static let appearScale: CGFloat = 0.9
     private static let appearOpacity: Float = 0.9
     /// Leaving: down to 90% scale, fading out.
@@ -217,20 +217,21 @@ final class RecordingIndicatorWindow: NSPanel {
             scheduleFeedbackDismissal(after: feedbackDuration, presentationID: id)
         }
 
-        // Already up: the pill turns into the new content where it is.
-        if isShowing {
+        // Already up: the pill turns into the new content where it is. Except a new recording,
+        // which arrives as a fresh pill even over a paste hint still showing: morphing is a
+        // SwiftUI animation, stepped on the main thread just as the microphone starts and
+        // stalls it, and the new recording may belong to a different field anyway.
+        let startsFresh = content.meter != nil
+        if isShowing, !startsFresh {
             withAnimation(Self.morph) { model.content = content }
             startTracking()
             return
         }
 
-        if !isOnScreen {
-            model.content = content
-        } else {
-            // Still leaving: come back from wherever it got to.
-            withAnimation(Self.morph) { model.content = content }
-        }
-        isAppearing = true
+        // Swapped without animation, early enough that SwiftUI has drawn it by the time the
+        // anchor is known; the Core Animation spring is the arrival.
+        model.content = content
+        if !isShowing { isAppearing = true }
         resolveAnchor(timeout: Self.anchorTimeout) { [weak self] anchor in
             guard let self, self.presentationID == id else { return }
             self.currentAnchor = anchor

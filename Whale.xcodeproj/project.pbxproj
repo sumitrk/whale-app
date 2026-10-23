@@ -56,6 +56,8 @@
 		D4E5F60718293A4B5C6D7E8F /* SettingsCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */; };
 		EA62496C0185BEEC105B2E85 /* PTTRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8793309FEF6FE2D71751C324 /* PTTRecorderView.swift */; };
 		EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8416E07055CA131C50C9B6F6 /* SettingsStore.swift */; };
+		AD9166BF1A4723465E6E120F /* MenuBarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FF81D3B8E476BE5F247255 /* MenuBarIcon.swift */; };
+		FE2D665AD2AFA98369B963FB /* FeedbackSound.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF4C189E6F6EF91F87906EF7 /* FeedbackSound.swift */; };
 		9161D92CB9994895AE9A1460 /* PersonalDictionary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67814BA817C0D6D8AA250F5C /* PersonalDictionary.swift */; };
 		228386FF6E15158248BCB2AD /* TextReplacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A7D40213F214B45BEE1994 /* TextReplacement.swift */; };
 		C57CC7EBF4D6A3A3A9027925 /* ReplacementsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC3D0161E393E2F85F0642C /* ReplacementsSettingsView.swift */; };
@@ -127,6 +129,8 @@
 		5EB407F215A4729F95EBD5AA /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		617C5598D1998EE5F01350BC /* TranscribeMeetingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscribeMeetingApp.swift; sourceTree = "<group>"; };
 		8416E07055CA131C50C9B6F6 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		F1FF81D3B8E476BE5F247255 /* MenuBarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarIcon.swift; sourceTree = "<group>"; };
+		EF4C189E6F6EF91F87906EF7 /* FeedbackSound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSound.swift; sourceTree = "<group>"; };
 		67814BA817C0D6D8AA250F5C /* PersonalDictionary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dictionary/PersonalDictionary.swift; sourceTree = "<group>"; };
 		32A7D40213F214B45BEE1994 /* TextReplacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dictionary/TextReplacement.swift; sourceTree = "<group>"; };
 		8EC3D0161E393E2F85F0642C /* ReplacementsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplacementsSettingsView.swift; sourceTree = "<group>"; };
@@ -283,6 +287,8 @@
 				1AB301610DD9A73CD35155F7 /* RecordingIndicatorWindow.swift */,
 				D4E5F60718293A4B5C6D7E8E /* SettingsCoordinator.swift */,
 				8416E07055CA131C50C9B6F6 /* SettingsStore.swift */,
+				F1FF81D3B8E476BE5F247255 /* MenuBarIcon.swift */,
+				EF4C189E6F6EF91F87906EF7 /* FeedbackSound.swift */,
 				67814BA817C0D6D8AA250F5C /* PersonalDictionary.swift */,
 				32A7D40213F214B45BEE1994 /* TextReplacement.swift */,
 				8EC3D0161E393E2F85F0642C /* ReplacementsSettingsView.swift */,
@@ -582,6 +588,8 @@
 				0E354AF200DC5BC5FD6981CA /* RecordingIndicatorWindow.swift in Sources */,
 				D4E5F60718293A4B5C6D7E8F /* SettingsCoordinator.swift in Sources */,
 				EB4DAD4238C1CBE9885299AD /* SettingsStore.swift in Sources */,
+				AD9166BF1A4723465E6E120F /* MenuBarIcon.swift in Sources */,
+				FE2D665AD2AFA98369B963FB /* FeedbackSound.swift in Sources */,
 				9161D92CB9994895AE9A1460 /* PersonalDictionary.swift in Sources */,
 				228386FF6E15158248BCB2AD /* TextReplacement.swift in Sources */,
 				C57CC7EBF4D6A3A3A9027925 /* ReplacementsSettingsView.swift in Sources */,

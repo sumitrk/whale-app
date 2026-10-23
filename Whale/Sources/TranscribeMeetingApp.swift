@@ -111,18 +111,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct TranscribeMeetingApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var appState: AppState
-    @StateObject private var accessibilityController: AccessibilityController
-    @StateObject private var settingsCoordinator: SettingsCoordinator
+    // `@State`, not `@StateObject`: the App only hands these down. Observed here, every change
+    // to any of them rebuilt the menu bar item, and each rebuild blocks the main thread for
+    // 30–90ms in AppKit — four times per dictation, the first just as the HUD springs in.
+    // The views that read them observe them themselves.
+    @State private var appState: AppState
+    @State private var accessibilityController: AccessibilityController
+    @State private var settingsCoordinator: SettingsCoordinator
     private let updaterController: SPUStandardUpdaterController?
 
     init() {
         let accessibilityController = AccessibilityController()
         let settingsCoordinator = SettingsCoordinator()
-        _accessibilityController = StateObject(wrappedValue: accessibilityController)
-        _settingsCoordinator = StateObject(wrappedValue: settingsCoordinator)
-        _appState = StateObject(
-            wrappedValue: AppState(
+        _accessibilityController = State(initialValue: accessibilityController)
+        _settingsCoordinator = State(initialValue: settingsCoordinator)
+        _appState = State(
+            initialValue: AppState(
                 accessibility: accessibilityController
             )
         )
@@ -137,17 +141,6 @@ struct TranscribeMeetingApp: App {
         }
     }
 
-    @ViewBuilder
-    private var menuBarIcon: some View {
-        if appState.isRecording {
-            Image(systemName: "record.circle.fill")
-        } else if !accessibilityController.isTrusted {
-            Image(systemName: "exclamationmark.triangle.fill")
-        } else {
-            Image("MenuBarIcon")
-        }
-    }
-
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(updater: updaterController?.updater)
@@ -155,7 +148,7 @@ struct TranscribeMeetingApp: App {
                 .environmentObject(accessibilityController)
                 .environmentObject(settingsCoordinator)
         } label: {
-            menuBarIcon
+            MenuBarIcon(accessibility: accessibilityController)
                 .accessibilityLabel("Whale")
         }
         .menuBarExtraStyle(.menu)
