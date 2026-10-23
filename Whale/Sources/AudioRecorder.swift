@@ -4,29 +4,6 @@ import CoreAudio
 import Foundation
 import QuartzCore
 
-struct RecordingInputDevice: Sendable {
-    let uniqueID: String
-    let name: String
-    let transportType: UInt32?
-    let transportLabel: String
-    let isBluetooth: Bool
-}
-
-struct RecordingResult: Sendable {
-    let wavURL: URL
-    let capturedSampleCount16k: Int
-    let writtenSampleCount16k: Int
-    let durationSeconds: Double
-    let inputDeviceName: String
-    let isBluetoothInput: Bool
-    let wasPaddedForASR: Bool
-}
-
-private enum MicCapturePolicy {
-    case standard
-    case bluetooth
-}
-
 // AudioRecorder captures system audio via CATapDescription (macOS 14.2+) and
 // microphone via AVCaptureSession.
 //
@@ -73,22 +50,13 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     )
     private var inputDeviceChangeListener: AudioObjectPropertyListenerBlock?
     private var captureDeviceDisconnectObserver: (any NSObjectProtocol)?
-    /// macOS can briefly report an invalid input hardware format while the CATap
-    /// aggregate device is being created or torn down. Use this timestamp to
-    /// suppress restart churn during that settling window.
-    private var lastMicStartDate: Date = .distantPast
     private var micRestartWorkItem: DispatchWorkItem?
     private var isRestartingMicCapture = false
     private var currentInputDeviceUniqueID: String?
     private var currentInputDevice: RecordingInputDevice?
-    private var micCapturePolicy: MicCapturePolicy = .standard
+    /// Updated from the capture queue and the main thread, so only under `micReadyLock`.
+    private var readiness = MicrophoneReadiness()
     private let micReadyLock = NSLock()
-    private var hasReceivedUsableMicBuffer = false
-    private var isAwaitingBluetoothStabilization = false
-    private var bluetoothStableBufferCount = 0
-    private var bluetoothRestartCount = 0
-    private var lastBluetoothConfigChangeAt: Date?
-    private var lastUsableBluetoothBufferAt: Date?
 
     // MARK: - Sample buffers (lock-protected)
 
@@ -97,12 +65,8 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     private let lock = NSLock()
 
     private var tapSampleRate: Double = 48_000
-    private let targetSampleRate: Double = 16_000
-    private let minimumASRSamples = 16_000
     private var currentCaptureIncludesSystemAudio = true
-    private let bluetoothReadyBufferTarget = 3
     private let bluetoothRestartDelay: TimeInterval = 0.2
-    private let bluetoothReadyQuietPeriod: TimeInterval = 0.25
     private let bluetoothFallbackRestartDelay: TimeInterval = 0.75
     private var bluetoothStartupValidationWorkItem: DispatchWorkItem?
 
@@ -112,7 +76,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         if let currentInputDevice {
             return currentInputDevice
         }
-        return try currentDefaultInputDevice()
+        return try InputDevices.defaultInput()
     }
 
     @MainActor
@@ -146,7 +110,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
 
         do {
-            try configureMicCapture(for: currentDefaultInputDevice())
+            try configureMicCapture(for: InputDevices.defaultInput())
             print("AudioRecorder: microphone capture preconfigured")
         } catch {
             print("AudioRecorder: microphone preconfiguration deferred: \(error)")
@@ -357,17 +321,8 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         for buf in abl {
             guard let data = buf.mData, buf.mDataByteSize > 0 else { continue }
             let count = Int(buf.mDataByteSize) / MemoryLayout<Float>.size
-            let ptr   = data.bindMemory(to: Float.self, capacity: count)
-            let ch    = Int(buf.mNumberChannels)
-            if ch >= 2 {
-                var i = 0
-                while i + 1 < count {
-                    samples.append((ptr[i] + ptr[i + 1]) / 2.0)
-                    i += ch
-                }
-            } else {
-                samples.append(contentsOf: UnsafeBufferPointer(start: ptr, count: count))
-            }
+            let buffer = UnsafeBufferPointer(start: data.bindMemory(to: Float.self, capacity: count), count: count)
+            samples += AudioProcessing.downmixSystemAudio(buffer, channels: Int(buf.mNumberChannels))
         }
         guard !samples.isEmpty else { return }
         lock.lock()
@@ -378,9 +333,9 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     // MARK: - Microphone (AVCaptureSession)
 
     private func startMicCapture() async throws {
-        lastMicStartDate = Date()
-        let inputDevice = try currentDefaultInputDevice()
-        let capturePolicy: MicCapturePolicy =
+        let startedAt = Date()
+        let inputDevice = try InputDevices.defaultInput()
+        let capturePolicy: MicrophoneReadiness.Policy =
             !currentCaptureIncludesSystemAudio && inputDevice.isBluetooth ? .bluetooth : .standard
 
         if micCaptureSession == nil || currentInputDeviceUniqueID != inputDevice.uniqueID {
@@ -388,8 +343,8 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             try configureMicCapture(for: inputDevice)
         }
 
-        micCapturePolicy = capturePolicy
-        beginMicReadyState(for: capturePolicy, preserveRestartCount: isRestartingMicCapture)
+        let isRestart = isRestartingMicCapture
+        withReadiness { $0.begin(capturePolicy, at: startedAt, isRestart: isRestart) }
         micCaptureOutput?.setSampleBufferDelegate(self, queue: micCaptureQueue)
 
         guard let session = micCaptureSession else {
@@ -403,13 +358,13 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         print(
             "AudioRecorder: microphone capture started (device=\(inputDevice.name), " +
             "transport=\(inputDevice.transportLabel), bluetooth=\(inputDevice.isBluetooth), " +
-            "policy=\(capturePolicyLabel(capturePolicy)), " +
-            "sr=\(Int(targetSampleRate))Hz, ch=1)"
+            "policy=\(capturePolicy.label), " +
+            "sr=\(Int(AudioProcessing.sampleRate))Hz, ch=1)"
         )
     }
 
     private func configureMicCapture(for inputDevice: RecordingInputDevice) throws {
-        guard let captureDevice = captureDevice(for: inputDevice.uniqueID) else {
+        guard let captureDevice = InputDevices.captureDevice(for: inputDevice.uniqueID) else {
             throw RecorderError.inputDeviceUnavailable("Selected microphone is no longer available")
         }
         let session = AVCaptureSession()
@@ -429,7 +384,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         let output = AVCaptureAudioDataOutput()
         output.audioSettings = [
             AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: targetSampleRate,
+            AVSampleRateKey: AudioProcessing.sampleRate,
             AVNumberOfChannelsKey: 1,
             AVLinearPCMBitDepthKey: 32,
             AVLinearPCMIsFloatKey: true,
@@ -477,14 +432,13 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     private func restartMicCapture() {
         guard isRecording, !isRestartingMicCapture else { return }
         isRestartingMicCapture = true
-        if micCapturePolicy == .bluetooth {
-            micReadyLock.lock()
-            bluetoothRestartCount += 1
-            isAwaitingBluetoothStabilization = true
-            bluetoothStableBufferCount = 0
-            lastBluetoothConfigChangeAt = Date()
-            micReadyLock.unlock()
-            print("AudioRecorder: restarting bluetooth mic capture (\(bluetoothRestartCount))")
+        let restarts = withReadiness { readiness -> Int? in
+            guard readiness.policy == .bluetooth else { return nil }
+            readiness.restarting(at: Date())
+            return readiness.restartCount
+        }
+        if let restarts {
+            print("AudioRecorder: restarting bluetooth mic capture (\(restarts))")
         }
 
         teardownMicCapture()
@@ -510,7 +464,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         if let session = micCaptureSession {
             await stopCaptureSession(session)
         }
-        clearMicReadyState()
+        withReadiness { $0.clear() }
         await drainPendingMicCaptureCallbacks()
     }
 
@@ -535,7 +489,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         micCaptureInput = nil
         micCaptureSession = nil
         currentInputDeviceUniqueID = nil
-        clearMicReadyState()
+        withReadiness { $0.clear() }
     }
 
     private func drainPendingMicCaptureCallbacks() async {
@@ -546,49 +500,38 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         }
     }
 
+    /// Calls `onRecordingReady` the moment the microphone counts as ready.
     private func handleUsableMicSamples() {
-        if micCapturePolicy == .bluetooth {
-            handleBluetoothUsableBuffer()
-            return
+        let (becameReady, state) = withReadiness { readiness in
+            (readiness.receivedUsableBuffer(at: Date()), readiness)
         }
-        let shouldPromote: Bool
-        micReadyLock.lock()
-        if hasReceivedUsableMicBuffer {
-            shouldPromote = false
-        } else {
-            hasReceivedUsableMicBuffer = true
-            shouldPromote = true
+        if state.policy == .bluetooth {
+            if state.usableBufferCount == 1 {
+                print("AudioRecorder: first usable bluetooth mic buffer received")
+            }
+            DispatchQueue.main.async { [weak self] in
+                self?.bluetoothStartupValidationWorkItem?.cancel()
+                self?.bluetoothStartupValidationWorkItem = nil
+            }
         }
-        micReadyLock.unlock()
-        guard shouldPromote else { return }
-        print("AudioRecorder: first usable mic buffer received")
-        print("AudioRecorder: recording promoted to ready")
+        guard becameReady else { return }
+        print(
+            "AudioRecorder: recording promoted to ready " +
+            "(policy=\(state.policy.label), buffers=\(state.usableBufferCount), restarts=\(state.restartCount))"
+        )
         Task { @MainActor [weak self] in
             self?.onRecordingReady?()
         }
     }
 
-    private func beginMicReadyState(for policy: MicCapturePolicy, preserveRestartCount: Bool) {
-        micReadyLock.lock()
-        hasReceivedUsableMicBuffer = false
-        isAwaitingBluetoothStabilization = policy == .bluetooth
-        bluetoothStableBufferCount = 0
-        if !preserveRestartCount {
-            bluetoothRestartCount = 0
-        }
-        lastBluetoothConfigChangeAt = nil
-        lastUsableBluetoothBufferAt = nil
-        micReadyLock.unlock()
+    private var micCapturePolicy: MicrophoneReadiness.Policy {
+        withReadiness { $0.policy }
     }
 
-    private func clearMicReadyState() {
+    private func withReadiness<T>(_ body: (inout MicrophoneReadiness) -> T) -> T {
         micReadyLock.lock()
-        hasReceivedUsableMicBuffer = false
-        isAwaitingBluetoothStabilization = false
-        bluetoothStableBufferCount = 0
-        lastBluetoothConfigChangeAt = nil
-        lastUsableBluetoothBufferAt = nil
-        micReadyLock.unlock()
+        defer { micReadyLock.unlock() }
+        return body(&readiness)
     }
 
     private func installInputDeviceListener() {
@@ -600,7 +543,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         )
         let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             guard let self, self.isRecording else { return }
-            let nextInputUniqueID = try? self.currentDefaultInputDevice().uniqueID
+            let nextInputUniqueID = try? InputDevices.defaultInput().uniqueID
             guard nextInputUniqueID != self.currentInputDeviceUniqueID else { return }
             let delay = self.micCapturePolicy == .bluetooth ? self.bluetoothRestartDelay : 1.0
             self.scheduleMicCaptureRestart(after: delay)
@@ -624,57 +567,6 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         inputDeviceChangeListener = nil
     }
 
-    private func handleBluetoothUsableBuffer() {
-        let now = Date()
-        let shouldPromote: Bool
-        let stableBufferCount: Int
-        micReadyLock.lock()
-        lastUsableBluetoothBufferAt = now
-        if hasReceivedUsableMicBuffer {
-            shouldPromote = false
-            stableBufferCount = bluetoothStableBufferCount
-        } else {
-            bluetoothStableBufferCount += 1
-            stableBufferCount = bluetoothStableBufferCount
-            let quietSinceConfigChange: Bool
-            if let lastBluetoothConfigChangeAt {
-                quietSinceConfigChange =
-                    now.timeIntervalSince(lastBluetoothConfigChangeAt) >= bluetoothReadyQuietPeriod
-            } else {
-                quietSinceConfigChange =
-                    now.timeIntervalSince(lastMicStartDate) >= bluetoothReadyQuietPeriod
-            }
-            shouldPromote = quietSinceConfigChange && bluetoothStableBufferCount >= bluetoothReadyBufferTarget
-            if shouldPromote {
-                hasReceivedUsableMicBuffer = true
-                isAwaitingBluetoothStabilization = false
-            }
-        }
-        micReadyLock.unlock()
-        if stableBufferCount == 1 {
-            print("AudioRecorder: first usable bluetooth mic buffer received")
-        }
-        bluetoothStartupValidationWorkItem?.cancel()
-        bluetoothStartupValidationWorkItem = nil
-        guard shouldPromote else { return }
-        print(
-            "AudioRecorder: bluetooth recording promoted to ready " +
-            "(buffers=\(stableBufferCount), restarts=\(bluetoothRestartCount))"
-        )
-        Task { @MainActor [weak self] in
-            self?.onRecordingReady?()
-        }
-    }
-
-    private func capturePolicyLabel(_ policy: MicCapturePolicy) -> String {
-        switch policy {
-        case .standard:
-            return "standard"
-        case .bluetooth:
-            return "bluetooth"
-        }
-    }
-
     private func scheduleBluetoothStartupValidation(after delay: TimeInterval) {
         bluetoothStartupValidationWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
@@ -685,12 +577,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     }
 
     private func validateBluetoothStartup() {
-        guard isRecording, micCapturePolicy == .bluetooth else { return }
-        let shouldRestart: Bool
-        micReadyLock.lock()
-        shouldRestart = !hasReceivedUsableMicBuffer && isAwaitingBluetoothStabilization
-        micReadyLock.unlock()
-        guard shouldRestart else { return }
+        guard isRecording, withReadiness({ $0.needsRestart }) else { return }
         print("AudioRecorder: bluetooth route did not settle in time; restarting capture")
         scheduleMicCaptureRestart(after: bluetoothRestartDelay)
     }
@@ -710,115 +597,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         }
     }
 
-    private func currentDefaultInputDevice() throws -> RecordingInputDevice {
-        guard let defaultDevice = AVCaptureDevice.default(.microphone, for: .audio, position: .unspecified)
-            ?? AVCaptureDevice.default(for: .audio)
-        else {
-            throw RecorderError.inputDeviceUnavailable("No microphone is available for capture")
-        }
-        let defaultInput = recordingInputDevice(for: defaultDevice)
-        let isBluetooth = defaultInput.isBluetooth
-        if isBluetooth, let builtIn = builtInInputDevice() {
-            print(
-                "AudioRecorder: default input is bluetooth (\(defaultInput.name)); " +
-                "falling back to built-in (\(builtIn.name))"
-            )
-            return builtIn
-        }
-        return defaultInput
-    }
-
-    private func builtInInputDevice() -> RecordingInputDevice? {
-        availableInputDevices()
-            .first { isBuiltInTransport(UInt32(bitPattern: $0.transportType)) }
-            .map(recordingInputDevice(for:))
-    }
-
-    private func availableInputDevices() -> [AVCaptureDevice] {
-        AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.microphone],
-            mediaType: .audio,
-            position: .unspecified
-        ).devices
-    }
-
-    private func captureDevice(for uniqueID: String) -> AVCaptureDevice? {
-        availableInputDevices().first { $0.uniqueID == uniqueID }
-    }
-
-    private func recordingInputDevice(for captureDevice: AVCaptureDevice) -> RecordingInputDevice {
-        let transportType = UInt32(bitPattern: captureDevice.transportType)
-        let name = captureDevice.localizedName
-        return RecordingInputDevice(
-            uniqueID: captureDevice.uniqueID,
-            name: name,
-            transportType: transportType,
-            transportLabel: transportLabel(for: transportType),
-            isBluetooth: isBluetoothTransport(transportType) || inferredBluetoothDeviceName(name)
-        )
-    }
-
-    private func isBluetoothTransport(_ transportType: UInt32?) -> Bool {
-        guard let transportType else { return false }
-        return transportType == kAudioDeviceTransportTypeBluetooth
-            || transportType == kAudioDeviceTransportTypeBluetoothLE
-    }
-
-    private func isBuiltInTransport(_ transportType: UInt32?) -> Bool {
-        transportType == kAudioDeviceTransportTypeBuiltIn
-    }
-
-    private func transportLabel(for transportType: UInt32?) -> String {
-        guard let transportType else { return "unknown" }
-        switch transportType {
-        case kAudioDeviceTransportTypeBuiltIn:
-            return "built-in"
-        case kAudioDeviceTransportTypeBluetooth:
-            return "bluetooth"
-        case kAudioDeviceTransportTypeBluetoothLE:
-            return "bluetooth-le"
-        case kAudioDeviceTransportTypeUSB:
-            return "usb"
-        case kAudioDeviceTransportTypeAirPlay:
-            return "airplay"
-        case kAudioDeviceTransportTypeAggregate:
-            return "aggregate"
-        default:
-            return fourCharCodeString(transportType)
-        }
-    }
-
-    private func inferredBluetoothDeviceName(_ name: String) -> Bool {
-        let lowered = name.lowercased()
-        let bluetoothMarkers = ["airpods", "buds", "beats", "bluetooth", "headset"]
-        return bluetoothMarkers.contains { lowered.contains($0) }
-    }
-
-    private func fourCharCodeString(_ value: UInt32) -> String {
-        let scalarBytes: [UnicodeScalar] = [
-            UnicodeScalar((value >> 24) & 0xFF),
-            UnicodeScalar((value >> 16) & 0xFF),
-            UnicodeScalar((value >> 8) & 0xFF),
-            UnicodeScalar(value & 0xFF),
-        ].compactMap { $0 }
-        let string = String(String.UnicodeScalarView(scalarBytes))
-        return string.trimmingCharacters(in: .controlCharacters)
-    }
-
     // MARK: - Mix + Write WAV
-
-    static func mixSamples(system: [Float], microphone: [Float]) -> [Float] {
-        let sampleCount = max(system.count, microphone.count)
-        guard sampleCount > 0 else { return [] }
-
-        var mixed = [Float](repeating: 0, count: sampleCount)
-        for index in 0..<sampleCount {
-            let systemSample = index < system.count ? system[index] : 0
-            let microphoneSample = index < microphone.count ? microphone[index] : 0
-            mixed[index] = (systemSample + microphoneSample) / 2.0
-        }
-        return mixed
-    }
 
     private func mixAndWriteWAV() throws -> RecordingResult {
         lock.lock()
@@ -826,90 +605,39 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         let mic    = micSamples
         lock.unlock()
 
-        let sys = resample(rawSys, from: tapSampleRate, to: targetSampleRate)
-        var mixed = Self.mixSamples(system: sys, microphone: mic)
-        guard !mixed.isEmpty else { throw RecorderError.noAudioCaptured }
-
-        let capturedLength = mixed.count
-
-        let shouldPadForASR = !currentCaptureIncludesSystemAudio && mixed.count < minimumASRSamples
-        if shouldPadForASR {
-            mixed.append(contentsOf: [Float](repeating: 0, count: minimumASRSamples - mixed.count))
-        }
-
-        let int16 = mixed.map { s -> Int16 in
-            Int16(max(-1.0, min(1.0, s)) * Float(Int16.max))
-        }
+        let prepared = try AudioProcessing.prepare(
+            system: rawSys,
+            systemSampleRate: tapSampleRate,
+            microphone: mic,
+            padsShortRecordings: !currentCaptureIncludesSystemAudio
+        )
 
         let stamp = ISO8601DateFormatter().string(from: Date())
             .replacingOccurrences(of: ":", with: "-")
             .replacingOccurrences(of: "T", with: "_")
             .replacingOccurrences(of: "Z", with: "")
         let url = Self.recordingsFolder().appendingPathComponent("meeting-\(stamp).wav")
-        try writeWAV(samples: int16, sampleRate: Int(targetSampleRate), to: url)
+        try AudioProcessing.wavData(prepared.samples).write(to: url)
 
         let kb = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) ?? 0
         let inputDevice = currentInputDevice
         let inputDeviceName = inputDevice?.name ?? "Unknown Input"
-        let capturedDuration = Double(capturedLength) / targetSampleRate
         print(
             "AudioRecorder: WAV saved → \(url.lastPathComponent) (\(kb / 1024) KB, " +
-            "captured=\(capturedLength) samples, written=\(mixed.count) samples, " +
-            "padded=\(shouldPadForASR), device=\(inputDeviceName))"
+            "captured=\(prepared.capturedCount) samples, written=\(prepared.samples.count) samples, " +
+            "padded=\(prepared.wasPadded), device=\(inputDeviceName))"
         )
         let result = RecordingResult(
             wavURL: url,
-            capturedSampleCount16k: capturedLength,
-            writtenSampleCount16k: mixed.count,
-            durationSeconds: capturedDuration,
+            capturedSampleCount16k: prepared.capturedCount,
+            writtenSampleCount16k: prepared.samples.count,
+            durationSeconds: Double(prepared.capturedCount) / AudioProcessing.sampleRate,
             inputDeviceName: inputDeviceName,
             isBluetoothInput: inputDevice?.isBluetooth ?? false,
-            wasPaddedForASR: shouldPadForASR
+            wasPaddedForASR: prepared.wasPadded
         )
         currentInputDevice = nil
         return result
-    }
-
-    // MARK: - Linear resampler
-
-    private func resample(_ input: [Float], from: Double, to: Double) -> [Float] {
-        guard from != to, !input.isEmpty else { return input }
-        let ratio    = to / from
-        let outCount = Int(Double(input.count) * ratio)
-        var output   = [Float](repeating: 0, count: outCount)
-        for i in 0..<outCount {
-            let srcPos = Double(i) / ratio
-            let lo     = Int(srcPos)
-            let hi     = min(lo + 1, input.count - 1)
-            let frac   = Float(srcPos - Double(lo))
-            output[i]  = input[lo] * (1 - frac) + input[hi] * frac
-        }
-        return output
-    }
-
-    // MARK: - WAV writer
-
-    private func writeWAV(samples: [Int16], sampleRate: Int, to url: URL) throws {
-        var data = Data()
-        let dataSize = samples.count * 2
-        let byteRate = sampleRate * 2
-
-        data.appendString("RIFF")
-        data.appendUInt32(UInt32(36 + dataSize))
-        data.appendString("WAVE")
-        data.appendString("fmt ")
-        data.appendUInt32(16)
-        data.appendUInt16(1)
-        data.appendUInt16(1)
-        data.appendUInt32(UInt32(sampleRate))
-        data.appendUInt32(UInt32(byteRate))
-        data.appendUInt16(2)
-        data.appendUInt16(16)
-        data.appendString("data")
-        data.appendUInt32(UInt32(dataSize))
-        for s in samples { data.appendUInt16(UInt16(bitPattern: s)) }
-
-        try data.write(to: url)
     }
 
     // MARK: - Audio sample extraction (mic capture → 16 kHz mono)
@@ -929,12 +657,7 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
 
     private func updateMicLevel(using samples: [Float]) {
         guard !samples.isEmpty else { return }
-        var sum: Float = 0
-        for sample in samples {
-            sum += sample * sample
-        }
-        let rms = sqrt(sum / Float(samples.count))
-        levelMeter.record(min(1.0, rms * 40))
+        levelMeter.record(AudioProcessing.level(of: samples))
         if !levelMeter.hasSignal {
             levelMeter.hasSignal = true
             DispatchQueue.main.async {
@@ -949,14 +672,9 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
         else { return [] }
 
         let asbd = streamBasicDescription.pointee
+        let format = PCMFormat(asbd)
         let frameCount = CMSampleBufferGetNumSamples(sampleBuffer)
-        guard frameCount > 0 else { return [] }
-        guard (asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved) == 0 else {
-            print("AudioRecorder: unsupported non-interleaved microphone sample buffer")
-            return []
-        }
-
-        let channels = max(Int(asbd.mChannelsPerFrame), 1)
+        guard frameCount > 0, !format.isNonInterleaved else { return [] }
         let bytesPerFrame = Int(asbd.mBytesPerFrame)
         guard bytesPerFrame > 0 else {
             print("AudioRecorder: unsupported microphone sample buffer with zero bytes per frame")
@@ -986,142 +704,10 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             return []
         }
 
-        let extracted: [Float]
-        if (asbd.mFormatFlags & kLinearPCMFormatFlagIsFloat) != 0, asbd.mBitsPerChannel == 32 {
-            extracted = decodeFloatSamples(from: rawData, frameCount: frameCount, channels: channels)
-        } else if (asbd.mFormatFlags & kLinearPCMFormatFlagIsSignedInteger) != 0,
-                  asbd.mBitsPerChannel == 16 {
-            extracted = decodeInt16Samples(from: rawData, frameCount: frameCount, channels: channels)
-        } else {
-            print(
-                "AudioRecorder: unsupported microphone PCM format " +
-                "(bits=\(asbd.mBitsPerChannel), flags=\(asbd.mFormatFlags))"
-            )
+        guard let samples = AudioProcessing.decode(rawData, frameCount: frameCount, format: format) else {
+            print("AudioRecorder: unsupported microphone PCM format (bits=\(asbd.mBitsPerChannel), flags=\(asbd.mFormatFlags))")
             return []
         }
-
-        guard asbd.mSampleRate > 0 else { return extracted }
-        if asbd.mSampleRate != targetSampleRate {
-            return resample(extracted, from: asbd.mSampleRate, to: targetSampleRate)
-        }
-        return extracted
-    }
-
-    private func decodeFloatSamples(from rawData: Data, frameCount: Int, channels: Int) -> [Float] {
-        rawData.withUnsafeBytes { rawBuffer in
-            let values = rawBuffer.bindMemory(to: Float.self)
-            if channels == 1 {
-                return Array(values.prefix(frameCount))
-            }
-            var mixed = [Float]()
-            mixed.reserveCapacity(frameCount)
-            for frame in 0..<frameCount {
-                var sum: Float = 0
-                let baseIndex = frame * channels
-                for channel in 0..<channels {
-                    sum += values[baseIndex + channel]
-                }
-                mixed.append(sum / Float(channels))
-            }
-            return mixed
-        }
-    }
-
-    private func decodeInt16Samples(from rawData: Data, frameCount: Int, channels: Int) -> [Float] {
-        rawData.withUnsafeBytes { rawBuffer in
-            let values = rawBuffer.bindMemory(to: Int16.self)
-            if channels == 1 {
-                return values.prefix(frameCount).map { Float($0) / Float(Int16.max) }
-            }
-            var mixed = [Float]()
-            mixed.reserveCapacity(frameCount)
-            for frame in 0..<frameCount {
-                var sum: Float = 0
-                let baseIndex = frame * channels
-                for channel in 0..<channels {
-                    sum += Float(values[baseIndex + channel]) / Float(Int16.max)
-                }
-                mixed.append(sum / Float(channels))
-            }
-            return mixed
-        }
-    }
-}
-
-// MARK: - Errors
-
-enum RecorderError: LocalizedError {
-    case notRecording
-    case tapCreationFailed(OSStatus)
-    case aggregateDeviceCreationFailed(OSStatus)
-    case ioProcCreationFailed(OSStatus)
-    case audioDeviceStartFailed(OSStatus)
-    case inputDeviceUnavailable(String)
-    case captureSessionSetupFailed(String)
-    case noAudioCaptured
-
-    var errorDescription: String? {
-        switch self {
-        case .notRecording:                          return "Not currently recording"
-        case .tapCreationFailed(let s):              return "Failed to create audio tap (err \(s))"
-        case .aggregateDeviceCreationFailed(let s):  return "Failed to create aggregate device (err \(s))"
-        case .ioProcCreationFailed(let s):           return "Failed to create IOProc (err \(s))"
-        case .audioDeviceStartFailed(let s):         return "Failed to start audio device (err \(s))"
-        case .inputDeviceUnavailable(let reason):    return reason
-        case .captureSessionSetupFailed(let reason): return "Failed to configure microphone capture: \(reason)"
-        case .noAudioCaptured:                       return "No audio was captured"
-        }
-    }
-}
-
-// MARK: - Data WAV helpers
-
-private extension Data {
-    mutating func appendString(_ s: String) { append(contentsOf: s.utf8) }
-    mutating func appendUInt16(_ v: UInt16) { var x = v.littleEndian; append(Data(bytes: &x, count: 2)) }
-    mutating func appendUInt32(_ v: UInt32) { var x = v.littleEndian; append(Data(bytes: &x, count: 4)) }
-}
-
-/// The latest microphone level, shared between the capture thread and the HUD.
-///
-/// The HUD smooths it per frame, so this only holds the newest reading and when it arrived:
-/// a reading older than `staleAfter` counts as silence, which is what lets the bars settle when
-/// the mic stops delivering buffers without a timer to decay them.
-final class MicLevelMeter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var level: Float = 0
-    private var updatedAt: CFTimeInterval = 0
-    private var signal = false
-    private let staleAfter: CFTimeInterval = 0.15
-
-    func record(_ newLevel: Float) {
-        let now = CACurrentMediaTime()
-        lock.lock()
-        level = newLevel
-        updatedAt = now
-        lock.unlock()
-    }
-
-    /// 0…1, or 0 when no buffer has arrived recently.
-    var current: Float {
-        let now = CACurrentMediaTime()
-        lock.lock()
-        defer { lock.unlock() }
-        return now - updatedAt > staleAfter ? 0 : level
-    }
-
-    /// Whether a buffer has arrived since the last reset. Lets the capture thread announce
-    /// the first buffer once instead of hopping to the main thread for every one.
-    var hasSignal: Bool {
-        get { lock.lock(); defer { lock.unlock() }; return signal }
-        set { lock.lock(); signal = newValue; lock.unlock() }
-    }
-
-    func reset() {
-        lock.lock()
-        level = 0
-        updatedAt = 0
-        signal = false
-        lock.unlock()
+        return samples
     }
 }

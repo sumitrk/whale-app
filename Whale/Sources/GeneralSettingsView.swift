@@ -26,6 +26,18 @@ struct GeneralSettingsView: View {
                 )
             }
 
+            SettingsSection(
+                "Recording pill",
+                footer: "Next to where you type follows the text field, or the pointer when there isn’t one."
+            ) {
+                SettingsPickerRow(
+                    "Position",
+                    icon: SettingsRowIcon("capsule.fill", .settingsIndigo),
+                    selection: $store.hudPosition,
+                    choices: HUDPosition.allCases.map { .option($0.title, $0) }
+                )
+            }
+
             SettingsSection("Updates") {
                 SettingsValueRow("Version", value: appVersion)
                 if let updater = updaterState.updater {

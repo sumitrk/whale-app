@@ -3,10 +3,10 @@ import Foundation
 
 struct TranscriptionStage: PipelineStage {
     let name = "Transcription"
-    let transcriber: LocalTranscriptionService
+    let backends: TranscriptionBackends
 
     func process(_ context: PipelineContext) async throws -> PipelineContext {
-        let text = try await transcriber.transcribe(
+        let text = try await backends[context.modelID].transcribe(
             modelID: context.modelID,
             wavURL: context.wavURL,
             source: context.audioSource

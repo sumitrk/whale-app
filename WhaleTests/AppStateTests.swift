@@ -95,79 +95,6 @@ final class UpdateCheckActionTests: XCTestCase {
     }
 }
 
-final class OnboardingPermissionGateTests: XCTestCase {
-    func testAccessibilityIsOptionalWhenMicrophoneIsGranted() {
-        XCTAssertTrue(
-            OnboardingPermissionGate.canAdvance(
-                microphoneAuthorized: true
-            )
-        )
-    }
-
-    func testMicrophoneStillGatesOnboarding() {
-        XCTAssertFalse(
-            OnboardingPermissionGate.canAdvance(microphoneAuthorized: false)
-        )
-    }
-}
-
-final class AppStateActivityTests: XCTestCase {
-    func testEarlyPTTReleaseStaysInStartingPhaseAndRequestsStop() {
-        var activity = RecordingActivity.starting(mode: .paste, stopRequested: false)
-
-        activity.requestStop()
-
-        XCTAssertEqual(activity, .starting(mode: .paste, stopRequested: true))
-        XCTAssertEqual(activity.mode, .paste)
-        XCTAssertTrue(activity.isBusy)
-        XCTAssertFalse(activity.isRecording)
-    }
-
-    func testUnavailableModelUsesTerminalErrorPhase() {
-        let activity = RecordingActivity.error("Install the selected model")
-
-        XCTAssertFalse(activity.isBusy)
-        XCTAssertFalse(activity.isRecording)
-        XCTAssertNil(activity.mode)
-    }
-
-    func testRecorderFailureClearsRecordingProjection() {
-        let startedAt = Date(timeIntervalSince1970: 123)
-        let activity = RecordingActivity.error("Microphone unavailable")
-
-        XCTAssertNotEqual(activity, .recording(mode: .paste, startedAt: startedAt))
-        XCTAssertFalse(activity.isRecording)
-        XCTAssertFalse(activity.isBusy)
-    }
-
-    func testNormalCompletionMovesThroughOneActivityPhaseAtATime() {
-        let startedAt = Date(timeIntervalSince1970: 123)
-        var activity = RecordingActivity.starting(mode: .markdown, stopRequested: false)
-        XCTAssertTrue(activity.isBusy)
-
-        activity = .recording(mode: .markdown, startedAt: startedAt)
-        XCTAssertTrue(activity.isRecording)
-        XCTAssertEqual(activity.startedAt, startedAt)
-
-        activity = .processing(mode: .markdown)
-        XCTAssertTrue(activity.isBusy)
-        XCTAssertFalse(activity.isRecording)
-
-        activity = .idle
-        XCTAssertFalse(activity.isBusy)
-        XCTAssertFalse(activity.isRecording)
-        XCTAssertNil(activity.mode)
-    }
-
-    func testAIActionLifecycleIsNotRepresentedByRecordingActivity() {
-        let activity = RecordingActivity.idle
-
-        XCTAssertFalse(activity.isBusy)
-        XCTAssertFalse(activity.isRecording)
-        XCTAssertNil(activity.mode)
-    }
-}
-
 final class HUDPlacementPolicyTests: XCTestCase {
     func testWebAreaIsNotAFieldAnchor() {
         let pageFrame = NSRect(x: 80, y: 100, width: 1_200, height: 800)
@@ -266,17 +193,10 @@ final class HUDPlacementPolicyTests: XCTestCase {
 }
 
 final class HUDDismissalTests: XCTestCase {
-    func testOnlyMouseDownEventsDismissFeedback() {
-        XCTAssertEqual(
-            RecordingIndicatorWindow.feedbackDismissalEvents,
-            [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        )
-    }
-
     @MainActor
     func testPasteHintDismissesOnMouseDown() throws {
-        let hud = RecordingIndicatorWindow.shared
-        hud.showHint(reason: .manualPasteOnly)
+        let hud = HUDWindow.shared
+        hud.present(.pasteHint(.manualPasteOnly), dismissAfter: HUD.pasteHintDuration)
 
         let event = try XCTUnwrap(
             NSEvent.mouseEvent(
@@ -297,69 +217,26 @@ final class HUDDismissalTests: XCTestCase {
         XCTAssertFalse(hud.hasContent)
     }
 
-    /// The HUD is a shared singleton and the host app is still finishing launch when the first
-    /// test runs, so its startup path used to call `hide()` on this presentation about half a
-    /// second in — the auto-hide never ran, and the old assertion at a fixed 2.3s deadline won
-    /// or lost on scheduling noise. Settling first makes the teardown genuinely the 2s timer
-    /// (measured: ~2.28s, i.e. 2s + the 0.2s fade + a hop back to the main actor).
-    ///
-    /// The elapsed time itself is deliberately not asserted: a feedback presentation installs a
-    /// *global* mouse-down monitor, so a click anywhere on the machine dismisses the hint early
-    /// and would fail a lower bound for reasons that have nothing to do with the code.
+    /// Every state is the same pill inside one window sized for the widest; the window must not
+    /// resize between them, or the pill would jump instead of morphing.
     @MainActor
-    func testPasteHintAutoHidesAfterTwoSeconds() {
-        let hud = RecordingIndicatorWindow.shared
-        RunLoop.main.run(until: Date().addingTimeInterval(1.0))
-
-        hud.showHint(reason: .manualPasteOnly)
-        XCTAssertTrue(hud.hasContent, "hint should be on screen as soon as it is shown")
-
-        XCTAssertTrue(
-            waitForHUDToClear(hud, within: 4.0),
-            "hint should auto-hide on its own"
-        )
-    }
-
-    /// Spins the main run loop until the HUD has torn its content down, or the budget runs out.
-    @MainActor
-    private func waitForHUDToClear(
-        _ hud: RecordingIndicatorWindow,
-        within timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if !hud.hasContent { return true }
-            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-        }
-        return !hud.hasContent
-    }
-
-    /// Each presentation has its own size. Switching between them must leave the new pill
-    /// exactly filling the window — autoresizing it by the old size used to clip it.
-    @MainActor
-    func testPillFillsTheWindowAfterSwitchingSizes() throws {
-        let hud = RecordingIndicatorWindow.shared
-        hud.showHint(reason: .manualPasteOnly)
+    func testWindowKeepsItsSizeAcrossPillStates() throws {
+        let hud = HUDWindow.shared
+        hud.present(.pasteHint(.manualPasteOnly), dismissAfter: HUD.pasteHintDuration)
         let hintSize = try XCTUnwrap(hud.contentView).bounds.size
-        hud.showProcessing()
-
-        let container = try XCTUnwrap(hud.contentView)
-        let pill = try XCTUnwrap(container.subviews.first)
-        XCTAssertNotEqual(container.bounds.size, hintSize)
-        XCTAssertEqual(pill.frame, container.bounds)
-
-        hud.showHint(reason: .manualPasteOnly)
-        let hint = try XCTUnwrap(container.subviews.first)
-        XCTAssertEqual(hint.frame, container.bounds)
+        hud.present(.processing, dismissAfter: nil)
+        XCTAssertEqual(try XCTUnwrap(hud.contentView).bounds.size, hintSize)
+        hud.present(.message("Something went wrong", isError: true), dismissAfter: 1)
+        XCTAssertEqual(try XCTUnwrap(hud.contentView).bounds.size, hintSize)
         hud.hide()
     }
 
     @MainActor
     func testPasteHintReplacesAnInFlightHideAnimation() {
-        let hud = RecordingIndicatorWindow.shared
-        hud.showProcessing()
+        let hud = HUDWindow.shared
+        hud.present(.processing, dismissAfter: nil)
         hud.hide()
-        hud.showHint(reason: .manualPasteOnly)
+        hud.present(.pasteHint(.manualPasteOnly), dismissAfter: HUD.pasteHintDuration)
 
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
 

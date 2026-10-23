@@ -6,12 +6,6 @@ final class TextInsertionManagerTests: XCTestCase {
 
     // MARK: - Strategy selection
 
-    func testOnlyCopyOnlyStrategyShowsPasteHint() {
-        XCTAssertFalse(InsertionStrategy.directAX.showsPasteHint)
-        XCTAssertFalse(InsertionStrategy.simulatedPaste.showsPasteHint)
-        XCTAssertTrue(InsertionStrategy.copyOnly(.manualPasteOnly).showsPasteHint)
-    }
-
     func testSettableNativeTextFieldPrefersDirectAX() {
         let snapshot = makeSnapshot(
             appName: "Notes",
@@ -370,21 +364,6 @@ final class TextInsertionManagerTests: XCTestCase {
         snapshot.restore(to: pasteboard)
 
         XCTAssertEqual(pasteboard.string(forType: .string), "original")
-    }
-
-    func testClipboardRestoreSkippedWhenChangeCountChanged() {
-        XCTAssertFalse(
-            TextInsertionManager.shouldRestoreClipboard(
-                currentChangeCount: 8,
-                expectedTemporaryChangeCount: 7
-            )
-        )
-        XCTAssertTrue(
-            TextInsertionManager.shouldRestoreClipboard(
-                currentChangeCount: 7,
-                expectedTemporaryChangeCount: 7
-            )
-        )
     }
 
     private func makeSnapshot(

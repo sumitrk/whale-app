@@ -111,6 +111,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct TranscribeMeetingApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    // `@StateObject`, deliberately. Held as `@State` (so the App wouldn't observe them), the
+    // menu bar menu and the Settings window stopped taking mouse clicks.
     @StateObject private var appState: AppState
     @StateObject private var accessibilityController: AccessibilityController
     @StateObject private var settingsCoordinator: SettingsCoordinator
@@ -137,17 +139,6 @@ struct TranscribeMeetingApp: App {
         }
     }
 
-    @ViewBuilder
-    private var menuBarIcon: some View {
-        if appState.isRecording {
-            Image(systemName: "record.circle.fill")
-        } else if !accessibilityController.isTrusted {
-            Image(systemName: "exclamationmark.triangle.fill")
-        } else {
-            Image("MenuBarIcon")
-        }
-    }
-
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(updater: updaterController?.updater)
@@ -155,7 +146,7 @@ struct TranscribeMeetingApp: App {
                 .environmentObject(accessibilityController)
                 .environmentObject(settingsCoordinator)
         } label: {
-            menuBarIcon
+            MenuBarIcon(accessibility: accessibilityController)
                 .accessibilityLabel("Whale")
         }
         .menuBarExtraStyle(.menu)

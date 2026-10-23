@@ -48,7 +48,8 @@ final class HotkeyManager {
                  onPTTRelease: @escaping @MainActor () -> Void,
                  onActionPress: @escaping @MainActor () -> Void,
                  onActionRelease: @escaping @MainActor () -> Void,
-                 onActionCancel: @escaping @MainActor () -> Void) {
+                 onActionCancel: @escaping @MainActor () -> Void,
+                 onEscape: @escaping @MainActor () -> Void) {
         stop()
 
         guard mode != .stopped else { return }
@@ -74,8 +75,30 @@ final class HotkeyManager {
             onRelease: onActionRelease,
             onCancel: onActionCancel
         )
+        installEscape(mode: mode, action: onEscape)
     }
 
+    /// Escape cancels whatever capture is in progress, if it can be cancelled.
+    private func installEscape(mode: HotkeyRegistrationMode, action: @escaping @MainActor () -> Void) {
+        if mode.includesGlobal,
+           let monitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { event in
+               guard event.keyCode == 53 else { return }
+               Task { @MainActor in action() }
+           }) {
+            monitors.append(monitor)
+        }
+        if mode.includesLocal,
+           let monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { event in
+               guard event.keyCode == 53 else { return event }
+               Task { @MainActor in action() }
+               return event
+           }) {
+            monitors.append(monitor)
+        }
+    }
+
+    /// `onCancel` is for the AI Action key used as a real modifier: another key or a click
+    /// while it's held means it wasn't a tap.
     private func installAIAction(
         keyCode: Int,
         modifiers: NSEvent.ModifierFlags,
@@ -84,22 +107,6 @@ final class HotkeyManager {
         onRelease: @escaping @MainActor () -> Void,
         onCancel: @escaping @MainActor () -> Void
     ) {
-        if mode.includesGlobal,
-           let monitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { event in
-               guard event.keyCode == 53 else { return }
-               Task { @MainActor in onCancel() }
-           }) {
-            monitors.append(monitor)
-        }
-        if mode.includesLocal,
-           let monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { event in
-               guard event.keyCode == 53 else { return event }
-               Task { @MainActor in onCancel() }
-               return event
-           }) {
-            monitors.append(monitor)
-        }
-
         if let flag = modifierFlag(for: keyCode) {
             var globalDown = false
             var globalCancelled = false

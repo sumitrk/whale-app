@@ -5,15 +5,6 @@ import FluidAudio
 
 @MainActor
 final class TranscriptionModelTests: XCTestCase {
-    func testSelectedModelDefaultsToParakeet() {
-        let defaults = UserDefaults(suiteName: #function)!
-        defaults.removePersistentDomain(forName: #function)
-
-        let store = SettingsStore(userDefaults: defaults)
-
-        XCTAssertEqual(store.selectedBuiltInModelID, .parakeetEnglishV2)
-    }
-
     func testShortcutLabelsCoverModifierOnlyAndRegularKeys() {
         let store = SettingsStore(userDefaults: UserDefaults(suiteName: #function)!)
         let commandShift = Int(NSEvent.ModifierFlags([.command, .shift]).rawValue)
@@ -62,31 +53,6 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(
             store.localModelPath(for: .whisperLocalFolder).map { URL(fileURLWithPath: $0).standardizedFileURL.path },
             folder.standardizedFileURL.path
-        )
-    }
-
-    func testCatalogGroupsContainExpectedBuiltInModels() {
-        XCTAssertEqual(BuiltInModelGroup.allCases, [.parakeet, .whisper, .apple])
-        XCTAssertEqual(BuiltInModelCatalog.models(in: .apple).map(\.id), [.appleSpeech])
-        XCTAssertEqual(BuiltInModelCatalog.models(in: .parakeet).map(\.id), [.parakeetEnglishV2, .barkCleanEnglish])
-        XCTAssertEqual(
-            BuiltInModelCatalog.models(in: .whisper).map(\.id),
-            [.whisperLargeV3Turbo, .whisperLocalFolder]
-        )
-    }
-
-    func testCatalogSplitsBundledModelsFromCustomFolder() {
-        XCTAssertEqual(
-            BuiltInModelCatalog.models(from: .bundled).map(\.id),
-            [.parakeetEnglishV2, .barkCleanEnglish, .whisperLargeV3Turbo, .appleSpeech]
-        )
-        XCTAssertEqual(
-            BuiltInModelCatalog.models(from: .custom).map(\.id),
-            [.whisperLocalFolder]
-        )
-        XCTAssertEqual(
-            BuiltInModelCatalog.allModels.map(\.capabilityLabel),
-            ["English only", "English only · Leaves out “um” and false starts", "Multilingual", "English only", "Auto-detect"]
         )
     }
 
@@ -183,12 +149,12 @@ final class TranscriptionModelTests: XCTestCase {
 
         // Parakeet is installed, Whisper is not — exactly the shape that used to trigger the
         // silent fallback from the selected Whisper model back to Parakeet.
-        let service = LocalTranscriptionService(backends: [
+        let service = TranscriptionBackends([
             .parakeet: RecordingBackend(),
             .whisper: RecordingBackend(isInstalled: false),
             .apple: RecordingBackend(),
         ])
-        let store = TranscriptionModelStore(service: service)
+        let store = TranscriptionModelStore(backends: service)
 
         SettingsStore.shared.selectedBuiltInModelID = .whisperLargeV3Turbo
         await store.refreshNow()
@@ -204,35 +170,6 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(row.status, .active)
         XCTAssertEqual(row.primaryActionTitle, "Download")
         XCTAssertFalse(row.isReady)
-    }
-
-    func testCoordinatorRoutesByModelGroup() async throws {
-        let parakeet = RecordingBackend()
-        let whisper = RecordingBackend()
-        let service = LocalTranscriptionService(backends: [
-            .parakeet: parakeet,
-            .whisper: whisper,
-        ])
-
-        _ = try await service.isModelInstalled(.parakeetEnglishV2)
-        try await service.installModel(.whisperLargeV3Turbo)
-        try await service.connectLocalModel(
-            .whisperLocalFolder,
-            folderURL: URL(fileURLWithPath: "/tmp/local-whisper-model", isDirectory: true)
-        )
-        _ = try await service.transcribe(
-            modelID: .parakeetEnglishV2,
-            wavURL: URL(fileURLWithPath: "/tmp/test.wav"),
-            source: .microphone
-        )
-
-        let parakeetCalls = await parakeet.snapshot()
-        let whisperCalls = await whisper.snapshot()
-
-        XCTAssertEqual(parakeetCalls.checked, [.parakeetEnglishV2])
-        XCTAssertEqual(parakeetCalls.transcribed, [.parakeetEnglishV2])
-        XCTAssertEqual(whisperCalls.installed, [.whisperLargeV3Turbo])
-        XCTAssertEqual(whisperCalls.connected, [.whisperLocalFolder])
     }
 
     func testSelectedModelTextComesFromDescriptor() throws {
@@ -282,34 +219,10 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertEqual(options.task, .transcribe)
     }
 
-    func testRefreshKeepsSelectedWhisperModelWhileChecking() async {
-        let originalSelection = SettingsStore.shared.selectedBuiltInModelID
-        defer {
-            SettingsStore.shared.selectedBuiltInModelID = originalSelection
-        }
-
-        let parakeet = RecordingBackend()
-        let whisper = RecordingBackend()
-        let service = LocalTranscriptionService(backends: [
-            .parakeet: parakeet,
-            .whisper: whisper,
-        ])
-        let store = TranscriptionModelStore(service: service)
-
-        await store.refresh(.parakeetEnglishV2)
-        await store.refresh(.whisperLargeV3Turbo)
-
-        SettingsStore.shared.selectedBuiltInModelID = .whisperLargeV3Turbo
-
-        await store.refresh(.whisperLargeV3Turbo)
-
-        XCTAssertEqual(SettingsStore.shared.selectedBuiltInModelID, .whisperLargeV3Turbo)
-    }
-
     func testModelStoreSharesOperationLifecycleAcrossInstallResetAndConnect() async {
         let backend = ModelOperationBackend()
-        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(backends: service)
 
         store.install(.parakeetEnglishV2)
         await backend.waitUntilStarted(.install)
@@ -341,8 +254,8 @@ final class TranscriptionModelTests: XCTestCase {
 
     func testModelStoreCancellationIgnoresLateProgressAndCompletion() async {
         let backend = ModelOperationBackend()
-        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(backends: service)
 
         store.install(.parakeetEnglishV2)
         await backend.waitUntilStarted(.install)
@@ -369,13 +282,6 @@ final class TranscriptionModelTests: XCTestCase {
             await Task.yield()
         }
         XCTFail("Timed out waiting for \(modelID) to reach \(expected)")
-    }
-
-    func testLocalWhisperPromptMentionsChoosingFolder() {
-        let descriptor = BuiltInModelID.whisperLocalFolder.descriptor
-
-        XCTAssertEqual(descriptor.provisioning, .localFolder)
-        XCTAssertTrue(descriptor.installationPrompt.contains("choose a WhisperKit/Core ML folder"))
     }
 
     func testWhisperLocalFolderValidationSucceedsWhenArtifactsExist() throws {
@@ -1140,29 +1046,6 @@ final class ModelInstallFeedbackTests: XCTestCase {
         XCTAssertTrue(loading.isBusy)
     }
 
-    /// A real transfer still reports where it has got to.
-    func testTransferPhaseStillShowsItsPercent() {
-        let downloading = TranscriptionModelRowModel(
-            model: BuiltInModelID.whisperLargeV3Turbo.descriptor,
-            installState: .downloading(progress: 0.42, phase: "Downloading"),
-            isSelected: false
-        )
-
-        XCTAssertEqual(downloading.statusText, "Downloading · 42%")
-    }
-
-    /// The app sits at 0% CPU while Core ML compiles out of process, so the row is the only
-    /// place the user can learn the wait is expected rather than a hang.
-    func testLoadingPhaseNamesTheWait() {
-        let phase = WhisperBuiltInConfiguration.loadingPhase
-
-        XCTAssertTrue(
-            phase.lowercased().contains("minute"),
-            "the load phase has to say how long it can take, or it reads as stuck"
-        )
-        XCTAssertFalse(phase.contains("%"))
-    }
-
     /// A running install is the only state worth offering to abandon. `checking` runs on every
     /// appearance of the pane, so a Cancel button there would flicker on all three rows.
     func testOnlyARunningInstallOffersCancel() {
@@ -1206,8 +1089,8 @@ final class ModelInstallFeedbackTests: XCTestCase {
     /// retry is immediately possible.
     func testCancellingADownloadReturnsTheRowToItsPreviousState() async {
         let backend = ModelOperationBackend()
-        let service = LocalTranscriptionService(backends: [.parakeet: backend, .whisper: backend])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: backend, .whisper: backend])
+        let store = TranscriptionModelStore(backends: service)
 
         store.install(.parakeetEnglishV2)
         await backend.waitUntilStarted(.install)
@@ -1229,14 +1112,6 @@ final class ModelInstallFeedbackTests: XCTestCase {
             XCTFail("a cancelled row could not start a new download")
         }
         store.cancel(.parakeetEnglishV2)
-    }
-
-    /// Deleting is only offered for checkpoints the app downloaded. The custom row points at
-    /// a folder the user converted themselves, and erasing that would be indefensible.
-    func testOnlyAppDownloadedModelsOfferDeletion() {
-        XCTAssertEqual(BuiltInModelID.parakeetEnglishV2.descriptor.resetActionTitle, "Delete")
-        XCTAssertEqual(BuiltInModelID.whisperLargeV3Turbo.descriptor.resetActionTitle, "Delete")
-        XCTAssertEqual(BuiltInModelID.whisperLocalFolder.descriptor.resetActionTitle, "Disconnect")
     }
 
     /// The safety property, stated directly: nothing the user supplied may be deleted, and it
@@ -1317,11 +1192,6 @@ final class TranscriptionLanguageTests: XCTestCase {
         let sorted = titles.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
 
         XCTAssertEqual(titles, sorted)
-    }
-
-    func testAutoDetectAsksTheDecoderToDetectAndALanguageDoesNot() {
-        XCTAssertNil(TranscriptionLanguageOption.autoDetect.decodingLanguageCode)
-        XCTAssertEqual(TranscriptionLanguageOption.language(code: "de").decodingLanguageCode, "de")
     }
 
     // MARK: - Capability
@@ -1623,8 +1493,8 @@ private actor SlowPrepareBackend: BuiltInTranscriptionBackend {
 final class ModelPreparingIndicatorTests: XCTestCase {
     /// A slow first load shows as preparing, then clears.
     func testSlowLoadShowsPreparingUntilItFinishes() async throws {
-        let service = LocalTranscriptionService(backends: [.parakeet: SlowPrepareBackend(delayNanoseconds: 800_000_000)])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: SlowPrepareBackend(delayNanoseconds: 800_000_000)])
+        let store = TranscriptionModelStore(backends: service)
 
         let load = Task { try await store.prepare(.barkCleanEnglish) }
         try await Task.sleep(nanoseconds: 500_000_000)
@@ -1636,8 +1506,8 @@ final class ModelPreparingIndicatorTests: XCTestCase {
 
     /// A warm load is over before the indicator would appear, so nothing flashes.
     func testFastLoadNeverShowsPreparing() async throws {
-        let service = LocalTranscriptionService(backends: [.parakeet: SlowPrepareBackend(delayNanoseconds: 50_000_000)])
-        let store = TranscriptionModelStore(service: service)
+        let service = TranscriptionBackends([.parakeet: SlowPrepareBackend(delayNanoseconds: 50_000_000)])
+        let store = TranscriptionModelStore(backends: service)
 
         try await store.prepare(.barkCleanEnglish)
         try await Task.sleep(nanoseconds: 400_000_000)

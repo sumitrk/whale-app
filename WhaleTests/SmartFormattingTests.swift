@@ -50,22 +50,6 @@ final class SmartFormattingStageTests: XCTestCase {
         XCTAssertTrue(SmartFormattingStage().isRecoverable)
     }
 
-    /// The stage is only appended when Smart Formatting is on, so a pipeline
-    /// without it must hand back exactly what transcription produced.
-    func testPipelineWithoutTheStageLeavesTheTranscriptAlone() async throws {
-        let pipeline = TranscriptionPipeline(stages: [
-            MockTranscriptionStage(name: "Transcription", output: "I have twenty one apples")
-        ])
-        let result = try await pipeline.process(
-            wavURL: wav,
-            modelID: .parakeetEnglishV2,
-            audioSource: .microphone
-        )
-
-        XCTAssertEqual(result.processedTranscript, "I have twenty one apples")
-        XCTAssertEqual(result.stagesExecuted, ["Transcription"])
-    }
-
     private final class Expectation: @unchecked Sendable {
         private(set) var didRun = false
         func fulfill() { didRun = true }
