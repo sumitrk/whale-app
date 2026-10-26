@@ -51,6 +51,8 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     private var inputDeviceChangeListener: AudioObjectPropertyListenerBlock?
     private var captureDeviceDisconnectObserver: (any NSObjectProtocol)?
     private var micRestartWorkItem: DispatchWorkItem?
+    private var idleRewarmWorkItem: DispatchWorkItem?
+    private var isStartingRecording = false
     private var isRestartingMicCapture = false
     private var currentInputDeviceUniqueID: String?
     private var currentInputDevice: RecordingInputDevice?
@@ -82,6 +84,16 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
     @MainActor
     func startRecording(captureSystemAudio: Bool = true) async throws {
         guard !isRecording else { return }
+        isStartingRecording = true
+        defer { isStartingRecording = false }
+
+        // The microphone changed moments ago and the held session hasn't been rebuilt yet:
+        // drop it, so this recording builds a fresh one instead of starting a dead device.
+        if let pending = idleRewarmWorkItem {
+            pending.cancel()
+            idleRewarmWorkItem = nil
+            teardownMicCapture()
+        }
 
         currentCaptureIncludesSystemAudio = captureSystemAudio
         systemAudioSamples = []
@@ -542,9 +554,13 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             mElement: kAudioObjectPropertyElementMain
         )
         let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            guard let self, self.isRecording else { return }
+            guard let self else { return }
             let nextInputUniqueID = try? InputDevices.defaultInput().uniqueID
             guard nextInputUniqueID != self.currentInputDeviceUniqueID else { return }
+            guard self.isRecording else {
+                self.scheduleIdleMicCaptureRewarm()
+                return
+            }
             let delay = self.micCapturePolicy == .bluetooth ? self.bluetoothRestartDelay : 1.0
             self.scheduleMicCaptureRestart(after: delay)
         }
@@ -589,12 +605,39 @@ class AudioRecorder: NSObject, ObservableObject, AVCaptureAudioDataOutputSampleB
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            guard let self, self.isRecording else { return }
+            guard let self else { return }
             guard let device = notification.object as? AVCaptureDevice else { return }
             guard device.uniqueID == self.currentInputDeviceUniqueID else { return }
+            guard self.isRecording else {
+                // Plugging the same headset back in reports the same uniqueID, so without
+                // this the next recording would reuse a session whose device is gone.
+                self.scheduleIdleMicCaptureRewarm()
+                return
+            }
             print("AudioRecorder: selected microphone disconnected; restarting capture")
             self.scheduleMicCaptureRestart(after: 0.1)
         }
+    }
+
+    /// The microphone was unplugged, or the default input changed, while no recording runs.
+    /// Rebuilds the held session for the new default right away, so the next recording still
+    /// starts instantly. Waits briefly so an unplug's disconnect and default-input change land
+    /// as one rebuild.
+    private func scheduleIdleMicCaptureRewarm() {
+        idleRewarmWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, !self.isRecording, !self.isStartingRecording else { return }
+                self.idleRewarmWorkItem = nil
+                self.teardownMicCapture()
+                self.prepareMicrophoneCapture()
+                DiagnosticLog.log(
+                    "[Audio] Microphone changed while idle; prepared \(self.currentInputDevice?.name ?? "nothing")."
+                )
+            }
+        }
+        idleRewarmWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
     }
 
     // MARK: - Mix + Write WAV
